@@ -53,6 +53,28 @@ public class SignupFlowTest {
     }
 
     /**
+     * Verify that clicking Continue on the Address screen with empty
+     * Address line 1, City, or Postal code does NOT navigate away.
+     */
+    @Test
+    public void testEmptyAddressFieldsShowsError() {
+        // Navigate to the Address screen via the signup flow
+        onView(withId(R.id.tv_signup_prompt)).perform(click());
+        onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_birthday)).perform(typeText("01/01/2000"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        // Confirm we are on the Address screen
+        onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
+
+        // Attempt to continue without filling any address fields
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        // Should still be on the Address screen (navigation was blocked)
+        onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
+    }
+
+    /**
      * Full happy-path signup flow: fill all required fields and navigate
      * from Login → Details → Address → MainActivity.
      */
@@ -74,9 +96,14 @@ public class SignupFlowTest {
 
         // 5. Check the Signup Address screen is displayed
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
+
+        // 6. Enter required address fields, then continue
+        onView(withId(R.id.et_address_line_1)).perform(typeText("123 Main St"), closeSoftKeyboard());
+        onView(withId(R.id.et_city)).perform(typeText("Edmonton"), closeSoftKeyboard());
+        onView(withId(R.id.et_postal_code)).perform(typeText("T6G 2R3"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
-        // 6. Check that MainActivity (Home) is displayed
+        // 7. Check that MainActivity (Home) is displayed
         onView(withId(R.id.main)).check(matches(isDisplayed()));
     }
 }

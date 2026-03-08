@@ -63,6 +63,7 @@
             android:layout_height="wrap_content"
             android:hint="Address line 1">
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_address_line_1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPostalAddress" />
@@ -87,6 +88,7 @@
             android:layout_marginTop="16dp"
             android:hint="City">
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_city"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPostalAddress" />
@@ -99,6 +101,7 @@
             android:layout_marginTop="16dp"
             android:hint="Postal code">
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_postal_code"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPostalAddress" />
