@@ -61,7 +61,8 @@ public class SignupFlowTest {
         // Navigate to the Address screen via the signup flow
         onView(withId(R.id.tv_signup_prompt)).perform(click());
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
-        onView(withId(R.id.et_birthday)).perform(typeText("01/01/2000"), closeSoftKeyboard());
+        // Type digits only — the TextWatcher auto-inserts '/' to form MM/DD/YYYY
+        onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
         // Confirm we are on the Address screen
@@ -91,7 +92,8 @@ public class SignupFlowTest {
 
         // 4. Enter first name and birthday, then continue
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
-        onView(withId(R.id.et_birthday)).perform(typeText("01/01/2000"), closeSoftKeyboard());
+        // Type digits only — the TextWatcher auto-inserts '/' to form MM/DD/YYYY
+        onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
         // 5. Check the Signup Address screen is displayed
