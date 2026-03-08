@@ -1,12 +1,16 @@
 package com.example.wecookproject;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.RemoteException;
+import android.provider.Settings;
+import android.util.Log;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
+
 
 public class LoginActivity extends AppCompatActivity {
     @Override
@@ -14,27 +18,35 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        Button loginButton = findViewById(R.id.btn_login);
-        TextView signupPrompt = findViewById(R.id.tv_signup_prompt);
-        EditText etUsername = findViewById(R.id.et_username);
-        EditText etPassword = findViewById(R.id.et_password);
+        Button btnEntrant = findViewById(R.id.btn_entrant_login);
+        Button btnOrganizer = findViewById(R.id.btn_organizer_login);
+        TextView adminLogin = findViewById(R.id.text_Admin_login);
 
-        loginButton.setOnClickListener(v -> {
-            String username = etUsername.getText().toString().trim();
-            String password = etPassword.getText().toString().trim();
-            if (username.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Username and Password cannot be empty", Toast.LENGTH_SHORT).show();
+        btnEntrant.setOnClickListener(v -> handleLogin("ENTRANT"));
+        btnOrganizer.setOnClickListener(v -> handleLogin("ORGANIZER"));
+
+        adminLogin.setOnClickListener(v -> {
+            // 管理员登录通常有专门的逻辑，或者也走 ID 登录
+            handleLogin("ADMIN");
+        });
+    }
+
+    private void handleLogin(String role) {
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) {
+                Log.w("FCM", "Fetching FCM registration token failed", task.getException());
                 return;
             }
-            // For demonstration, navigate to SignupDetailsActivity even on login
-            Intent intent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
-            startActivity(intent);
-        });
-
-        signupPrompt.setOnClickListener(v -> {
-            // Sign up should not require existing credentials in the login fields
+            String token = task.getResult();
+            Log.d("LOGIN_INFO", "Device ID: " + androidId);
+            Log.d("LOGIN_INFO", "FCM Token: " + token);
             Intent intent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
             startActivity(intent);
         });
     }
 }
+
+
+

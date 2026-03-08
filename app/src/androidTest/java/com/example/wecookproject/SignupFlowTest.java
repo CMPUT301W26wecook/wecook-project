@@ -36,7 +36,7 @@ public class SignupFlowTest {
         onView(withId(R.id.tv_title)).check(matches(withText("Login or sign up")));
 
         // Attempt to login without entering any credentials
-        onView(withId(R.id.btn_login)).perform(click());
+        onView(withId(R.id.btn_organizer_login)).perform(click());
 
         // Should still be on the Login screen (navigation was blocked)
         onView(withId(R.id.tv_title)).check(matches(withText("Login or sign up")));
@@ -48,7 +48,7 @@ public class SignupFlowTest {
      */
     @Test
     public void testSignupPromptNavigatesWhenEmpty() {
-        onView(withId(R.id.tv_signup_prompt)).perform(click());
+        onView(withId(R.id.text_Admin_login)).perform(click());
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
     }
 
@@ -59,7 +59,7 @@ public class SignupFlowTest {
     @Test
     public void testEmptyAddressFieldsShowsError() {
         // Navigate to the Address screen via the signup flow
-        onView(withId(R.id.tv_signup_prompt)).perform(click());
+        onView(withId(R.id.text_Admin_login)).perform(click());
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
         // Type digits only — the TextWatcher auto-inserts '/' to form MM/DD/YYYY
         onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
@@ -85,7 +85,7 @@ public class SignupFlowTest {
         onView(withId(R.id.tv_title)).check(matches(withText("Login or sign up")));
 
         // 2. Tap the sign-up prompt (no credentials needed)
-        onView(withId(R.id.tv_signup_prompt)).perform(click());
+        onView(withId(R.id.text_Admin_login)).perform(click());
 
         // 3. Check the Signup Details screen is displayed
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
