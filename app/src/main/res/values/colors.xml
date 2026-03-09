@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="primary_blue">#0D6EFD</color> <!-- vivid blue from Figma -->
+    <color name="button_blue">#0056D2</color>
+    <color name="bg_light">#F8F9FA</color>
+    <color name="text_dark">#212529</color>
+    <color name="text_muted">#6C757D</color>
+    <color name="outline_gray">#DEE2E6</color>
 </resources>

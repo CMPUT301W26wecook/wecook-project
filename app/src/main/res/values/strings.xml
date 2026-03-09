@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">wecookproject</string>
+    <string name="AdminLogin"> <u>Admin login here.</u> </string>
 </resources>
