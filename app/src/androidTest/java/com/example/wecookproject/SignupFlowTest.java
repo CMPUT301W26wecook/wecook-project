@@ -33,9 +33,8 @@ import org.junit.runners.MethodSorters;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class SignupFlowTest {
 
-    @Rule
-    public ActivityScenarioRule<LoginActivity> activityRule =
-            new ActivityScenarioRule<>(LoginActivity.class);
+    // Removed ActivityScenarioRule to ensure DB deletion finishes BEFORE activity launches
+    private androidx.test.core.app.ActivityScenario<LoginActivity> activityScenario;
 
     @Before
     public void setUp() {
@@ -49,6 +48,16 @@ public class SignupFlowTest {
         FirebaseFirestore.getInstance().collection("users").document(androidId).delete()
                 .addOnCompleteListener(task -> latch.countDown());
         try { latch.await(5, TimeUnit.SECONDS); } catch (Exception e) {}
+
+        // Launch the activity manually AFTER the user profile is deleted
+        activityScenario = androidx.test.core.app.ActivityScenario.launch(LoginActivity.class);
+    }
+
+    @org.junit.After
+    public void tearDown() {
+        if (activityScenario != null) {
+            activityScenario.close();
+        }
     }
 
     /**
@@ -76,7 +85,6 @@ public class SignupFlowTest {
     public void test2_SignupPromptNavigatesWhenEmpty() {
         // Because the @Before deletes the Firestore user, the auto-login won't bypass SignupDetails.
         // Wait for Firestore to complete "does not exist" check
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         
         onView(withId(R.id.text_Admin_login)).perform(click());
         
@@ -91,7 +99,6 @@ public class SignupFlowTest {
     @Test
     public void test3_EmptyAddressFieldsShowsError() {
         // Navigate to the Address screen via the signup flow
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         onView(withId(R.id.text_Admin_login)).perform(click());
         
         try { Thread.sleep(1500); } catch (InterruptedException e) {}
@@ -119,7 +126,6 @@ public class SignupFlowTest {
     @Test
     public void test4_SignupFlow() {
         // 1. Wait for Firebase or screen load
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         
         // The title in activity_login.xml is "Login via your phone"
         onView(withId(R.id.tv_title)).check(matches(withText("Login via your phone")));
@@ -159,7 +165,6 @@ public class SignupFlowTest {
      */
     @Test
     public void test5_SignupFlowPartialFields1() {
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         onView(withId(R.id.tv_title)).check(matches(withText("Login via your phone")));
         onView(withId(R.id.text_Admin_login)).perform(click());
 
@@ -187,7 +192,6 @@ public class SignupFlowTest {
      */
     @Test
     public void test6_SignupFlowPartialFields2() {
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         onView(withId(R.id.tv_title)).check(matches(withText("Login via your phone")));
         onView(withId(R.id.text_Admin_login)).perform(click());
 
@@ -216,7 +220,6 @@ public class SignupFlowTest {
      */
     @Test
     public void test7_SignupFlowPartialFields3() {
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         onView(withId(R.id.tv_title)).check(matches(withText("Login via your phone")));
         onView(withId(R.id.text_Admin_login)).perform(click());
 
@@ -245,7 +248,6 @@ public class SignupFlowTest {
      */
     @Test
     public void test8_SignupFlowPartialFields4() {
-        try { Thread.sleep(3000); } catch (InterruptedException e) {}
         onView(withId(R.id.tv_title)).check(matches(withText("Login via your phone")));
         onView(withId(R.id.text_Admin_login)).perform(click());
 
