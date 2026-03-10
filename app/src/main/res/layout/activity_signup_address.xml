@@ -76,6 +76,7 @@
             android:layout_marginTop="16dp"
             android:hint="Address line 2">
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_address_line_2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPostalAddress" />
@@ -114,6 +115,7 @@
             android:layout_marginTop="16dp"
             android:hint="Country">
             <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_country"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPostalAddress" />

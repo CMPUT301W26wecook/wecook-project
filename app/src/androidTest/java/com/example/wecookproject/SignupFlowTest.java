@@ -93,6 +93,7 @@ public class SignupFlowTest {
         
         try { Thread.sleep(1500); } catch (InterruptedException e) {}
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_last_name)).perform(typeText("Doe"), closeSoftKeyboard());
         // Type digits only — the TextWatcher auto-inserts '/' to form MM/DD/YYYY
         onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
@@ -127,8 +128,9 @@ public class SignupFlowTest {
         try { Thread.sleep(1500); } catch (InterruptedException e) {}
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
 
-        // 4. Enter first name and birthday, then continue
+        // 4. Enter first name, last name, and birthday, then continue
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_last_name)).perform(typeText("Doe"), closeSoftKeyboard());
         onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
@@ -138,8 +140,10 @@ public class SignupFlowTest {
 
         // 6. Enter required address fields, then continue
         onView(withId(R.id.et_address_line_1)).perform(typeText("123 Main St"), closeSoftKeyboard());
+        onView(withId(R.id.et_address_line_2)).perform(typeText("Apt 4B"), closeSoftKeyboard());
         onView(withId(R.id.et_city)).perform(typeText("Edmonton"), closeSoftKeyboard());
         onView(withId(R.id.et_postal_code)).perform(typeText("T6G 2R3"), closeSoftKeyboard());
+        onView(withId(R.id.et_country)).perform(typeText("Canada"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
         // 7. Check that MainActivity (Home) is displayed (navigation no longer waits on Firestore)
