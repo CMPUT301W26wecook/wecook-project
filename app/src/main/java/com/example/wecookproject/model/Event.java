@@ -13,6 +13,9 @@ public class Event {
     private String location; // As seen in details "Edmonton"
     private String description;
 
+    private String posterPath;
+    private String qrCodePath;
+
     // Required empty constructor for Firestore
     public Event() {
     }
@@ -120,4 +123,5 @@ public class Event {
     public void setDescription(String description) {
         this.description = description;
     }
+  
 }
