@@ -2,28 +2,36 @@ package com.example.wecookproject;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 public class MainActivity extends AppCompatActivity {
-    private Button btnNavProfile;
+
+    private LinearLayout bottomNavEvents, bottomNavScan, bottomNavHistory, bottomNavProfile;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
+
+        bottomNavEvents = findViewById(R.id.bottom_nav_events);
+        bottomNavScan = findViewById(R.id.bottom_nav_scan);
+        bottomNavHistory = findViewById(R.id.bottom_nav_history);
+        bottomNavProfile = findViewById(R.id.bottom_nav_profile);
+
+        bottomNavEvents.setOnClickListener(v -> {
+            // already on Events page
         });
-        btnNavProfile = findViewById(R.id.btn_nav_profile);
-        btnNavProfile.setOnClickListener(v -> {
+
+        bottomNavScan.setOnClickListener(v ->
+                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show());
+
+        bottomNavHistory.setOnClickListener(v ->
+                Toast.makeText(this, "History (coming soon)", Toast.LENGTH_SHORT).show());
+
+        bottomNavProfile.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, Profile.class);
             startActivity(intent);
         });
