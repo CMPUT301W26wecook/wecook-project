@@ -89,13 +89,18 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void routeUser() {
+        Intent jumpIntent;
         if (isUserExists) {
-            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-            startActivity(intent);
+            if ("ORGANIZER".equals(clickedRole)) {
+                jumpIntent = new Intent(LoginActivity.this, OrganizerHomeActivity.class);
+            } else {
+                jumpIntent = new Intent(LoginActivity.this, MainActivity.class);
+            }
         } else {
-            Intent intent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
-            startActivity(intent);
+            jumpIntent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
+            jumpIntent.putExtra("clickedRole", clickedRole);
         }
+        startActivity(jumpIntent);
     }
 }
 

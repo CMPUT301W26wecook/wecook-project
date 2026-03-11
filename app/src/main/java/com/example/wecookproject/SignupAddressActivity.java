@@ -62,8 +62,14 @@ public class SignupAddressActivity extends AppCompatActivity {
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("users").document(androidId).set(userData)
                 .addOnSuccessListener(aVoid -> {
-                    // Go to MainActivity only after Firestore success
-                    Intent intent = new Intent(SignupAddressActivity.this, MainActivity.class);
+                    // Go to appropriate Activity only after Firestore success
+                    String role = intentFromDetails.getStringExtra("clickedRole");
+                    Intent intent;
+                    if ("ORGANIZER".equals(role)) {
+                        intent = new Intent(SignupAddressActivity.this, OrganizerHomeActivity.class);
+                    } else {
+                        intent = new Intent(SignupAddressActivity.this, MainActivity.class);
+                    }
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(intent);
                 })
