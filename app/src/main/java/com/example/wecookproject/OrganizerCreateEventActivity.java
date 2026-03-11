@@ -8,11 +8,12 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
+import android.annotation.SuppressLint;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
@@ -63,10 +64,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         findViewById(R.id.btn_cancel).setOnClickListener(v -> finish());
 
         findViewById(R.id.btn_create_event).setOnClickListener(v -> {
-            String eventName = etEventName.getText().toString().trim();
-            String startDateStr = etRegistrationStartDate.getText().toString().trim();
-            String endDateStr = etRegistrationEndDate.getText().toString().trim();
-            String maxWaitlistStr = etMaxWaitlist.getText().toString().trim();
+            String eventName = etEventName.getText() != null ? etEventName.getText().toString().trim() : "";
+            String startDateStr = etRegistrationStartDate.getText() != null ? etRegistrationStartDate.getText().toString().trim() : "";
+            String endDateStr = etRegistrationEndDate.getText() != null ? etRegistrationEndDate.getText().toString().trim() : "";
+            String maxWaitlistStr = etMaxWaitlist.getText() != null ? etMaxWaitlist.getText().toString().trim() : "";
 
             if (eventName.isEmpty() || startDateStr.isEmpty() || endDateStr.isEmpty() || maxWaitlistStr.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
@@ -102,6 +103,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return;
             }
 
+            @SuppressLint("HardwareIds")
             String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             String eventId = UUID.randomUUID().toString();
 
@@ -130,9 +132,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         startActivity(intent);
                         finish();
                     })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(this, "Failed to create event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
+                    .addOnFailureListener(e -> Toast.makeText(this, "Failed to create event: " + e.getMessage(), Toast.LENGTH_SHORT).show());
         });
     }
 

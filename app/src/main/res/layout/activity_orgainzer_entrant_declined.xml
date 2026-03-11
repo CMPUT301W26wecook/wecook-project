@@ -41,51 +41,26 @@
             android:padding="16dp">
 
             <Button
-                android:id="@+id/btn_send_invitation_to_selected"
+                android:id="@+id/btn_send_notification"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Send Invitation to selected"
+                android:text="Send Notifycation to selected"
                 android:layout_marginBottom="8dp" />
 
             <Button
-                android:id="@+id/btn_send_notification_to_all"
+                android:id="@+id/btn_Remove_selected"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Send Notification to all"
+                android:text="Remove Selected Entrants"
                 android:layout_marginBottom="8dp" />
-
-            <Button
-                android:id="@+id/btn_view_invited"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="View Invited"
-                android:layout_marginBottom="8dp" />
-
-            <Button
-                android:id="@+id/btn_lottery_draw"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="lottery Draw"
-                android:backgroundTint="@color/outline_gray"
-                android:textColor="@color/text_dark"
-                android:layout_marginBottom="8dp" />
-
             <Button
                 android:id="@+id/btn_redraw_entrants"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Redraw Entrants"
-                android:backgroundTint="@color/outline_gray"
-                android:textColor="@color/text_dark"
+                android:text="Redraw from waitlist"
                 android:layout_marginBottom="8dp" />
 
-            <Button
-                android:id="@+id/btn_delete_all_selected"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Delete All Selected Entrants"
-                android:backgroundTint="#DC3545"
-                android:layout_marginBottom="4dp" />
+
 
         </LinearLayout>
 
