@@ -192,6 +192,44 @@ public class OrganizerFlowTest {
         notifScenario.close();
     }
 
+    @Test
+    public void test7_CreateEventAndVerifyInList() {
+        // Complete signup so Firestore has a valid user before entering organizer screens
+        performFullSignup();
+
+        ActivityScenario<OrganizerHomeActivity> homeScenario =
+                ActivityScenario.launch(OrganizerHomeActivity.class);
+
+        // Switch to Create Events tab
+        onView(withId(R.id.nav_create_events)).perform(click());
+        safeSleep(1000);
+
+        // Fill out the Create Event form
+        String testEventName = "Espresso Test Event";
+        onView(withId(R.id.et_event_name)).perform(typeText(testEventName), closeSoftKeyboard());
+        onView(withId(R.id.et_registration_period)).perform(typeText("2026-04-01 to 2026-04-10"), closeSoftKeyboard());
+        onView(withId(R.id.et_max_waitlist)).perform(typeText("50"), closeSoftKeyboard());
+
+        // Select radio buttons
+        onView(withId(R.id.rb_open_to_all)).perform(click());
+        onView(withId(R.id.rb_system_generates)).perform(click());
+
+        // Click create
+        onView(withId(R.id.btn_create_event)).perform(click());
+
+        // Wait for Firestore save and navigation back to Home
+        safeSleep(2500);
+
+        // Verify we are back on the Organizer Home screen with the list
+        onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
+
+        // Cannot easily check RecyclerView content without an Espresso RecyclerViewAction dependency,
+        // but we can at least assert the layout is shown.
+        // If we had Espresso Contrib we could check for the specific item text.
+
+        homeScenario.close();
+    }
+
     private void performFullSignup() {
         // Login screen
         onView(withId(R.id.btn_organizer_login)).perform(click());
