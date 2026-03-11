@@ -9,6 +9,8 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
 import android.provider.Settings;
@@ -18,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.example.wecookproject.model.Event;
 
@@ -28,19 +31,24 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
 
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class OrganizerFlowTest {
 
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ActivityScenario<LoginActivity> activityScenario;
+    private String eventId;
 
     /**
      * Deletes the Firestore user document before each test so the app always
      * starts from an unauthenticated state, then launches LoginActivity.
+     * Also creates a test event document used by the edit-event tests.
      */
     @Before
     public void setUp() {
@@ -60,6 +68,31 @@ public class OrganizerFlowTest {
             Thread.currentThread().interrupt();
         }
 
+        // Create a reusable test event for edit-event tests (test9, test10)
+        eventId = "edit-test-" + UUID.randomUUID();
+        Event editTestEvent = new Event(
+                eventId,
+                "organizer-test",
+                "Original Event",
+                "2026-04-01",
+                "Open to all",
+                25,
+                0,
+                "System generates",
+                false,
+                "Edmonton",
+                "Original description"
+        );
+        CountDownLatch eventLatch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .set(editTestEvent)
+                .addOnCompleteListener(task -> eventLatch.countDown());
+        try {
+            eventLatch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         activityScenario = ActivityScenario.launch(LoginActivity.class);
     }
 
@@ -67,6 +100,19 @@ public class OrganizerFlowTest {
     public void tearDown() {
         if (activityScenario != null) {
             activityScenario.close();
+        }
+
+        // Clean up the test event created in setUp
+        if (eventId != null) {
+            CountDownLatch eventLatch = new CountDownLatch(1);
+            db.collection("events").document(eventId)
+                    .delete()
+                    .addOnCompleteListener(task -> eventLatch.countDown());
+            try {
+                eventLatch.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -269,6 +315,62 @@ public class OrganizerFlowTest {
         FirebaseFirestore.getInstance().collection("events").document("mockEventId").delete();
     }
 
+    /**
+     * Launching OrganizerEditEventActivity without passing an eventId extra
+     * should cause the activity to finish immediately (DESTROYED state).
+     */
+    @Test
+    public void test9_EditEventLaunchWithoutIdFinishesActivity() {
+        ActivityScenario<OrganizerEditEventActivity> scenario =
+                ActivityScenario.launch(OrganizerEditEventActivity.class);
+
+        assertEquals(androidx.lifecycle.Lifecycle.State.DESTROYED, scenario.getState());
+        scenario.close();
+    }
+
+    /**
+     * Editing only the event name in OrganizerEditEventActivity should update
+     * that field in Firestore while leaving all other fields unchanged.
+     */
+    @Test
+    public void test10_EditEventUpdateSingleFieldUpdatesFirestore() throws InterruptedException {
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEditEventActivity.class
+        );
+        intent.putExtra("eventId", eventId);
+
+        ActivityScenario<OrganizerEditEventActivity> scenario = ActivityScenario.launch(intent);
+
+        onView(withId(R.id.et_event_name))
+                .perform(replaceText("Updated Event Name"), closeSoftKeyboard());
+        onView(withId(R.id.btn_update_event)).perform(click());
+
+        waitForFirestoreWrite();
+
+        AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events")
+                .document(eventId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    snapshotRef.set(snapshot);
+                    latch.countDown();
+                })
+                .addOnFailureListener(e -> latch.countDown());
+
+        assertTrue("Timed out reading updated event", latch.await(5, TimeUnit.SECONDS));
+        DocumentSnapshot snapshot = snapshotRef.get();
+        assertTrue(snapshot != null && snapshot.exists());
+        assertEquals("Updated Event Name", snapshot.getString("eventName"));
+        assertEquals("2026-04-01", snapshot.getString("registrationPeriod"));
+        assertEquals("Open to all", snapshot.getString("enrollmentCriteria"));
+        assertEquals(Long.valueOf(25), snapshot.getLong("maxWaitlist"));
+        assertEquals("System generates", snapshot.getString("lotteryMethodology"));
+
+        scenario.close();
+    }
+
     private void performFullSignup() {
         // Login screen
         onView(withId(R.id.btn_organizer_login)).perform(click());
@@ -276,26 +378,34 @@ public class OrganizerFlowTest {
         // Details screen
         safeSleep(1500);
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
-        onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
-        onView(withId(R.id.et_last_name)).perform(typeText("Doe"), closeSoftKeyboard());
-        onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
+        onView(withId(R.id.et_first_name)).perform(replaceText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_last_name)).perform(replaceText("Doe"), closeSoftKeyboard());
+        onView(withId(R.id.et_birthday)).perform(replaceText("01/01/2000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
         // Address screen
-        safeSleep(1500);
+        safeSleep(3000);
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
-        onView(withId(R.id.et_address_line_1)).perform(typeText("123 Main St"), closeSoftKeyboard());
-        onView(withId(R.id.et_city)).perform(typeText("Edmonton"), closeSoftKeyboard());
-        onView(withId(R.id.et_postal_code)).perform(typeText("T6G 2R3"), closeSoftKeyboard());
+        onView(withId(R.id.et_address_line_1)).perform(replaceText("123 Main St"), closeSoftKeyboard());
+        onView(withId(R.id.et_city)).perform(replaceText("Edmonton"), closeSoftKeyboard());
+        onView(withId(R.id.et_postal_code)).perform(replaceText("T6G 2R3"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
         // Wait for Firestore write and navigation to OrganizerHomeActivity
-        safeSleep(2500);
+        safeSleep(3500);
     }
 
     private void safeSleep(long millis) {
         try {
             Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void waitForFirestoreWrite() {
+        try {
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

@@ -78,7 +78,13 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         });
         
         findViewById(R.id.btn_edit_event).setOnClickListener(v -> {
-             Toast.makeText(this, "Edit event clicked", Toast.LENGTH_SHORT).show();
+             if (eventId != null) {
+                 Intent intent = new Intent(this, OrganizerEditEventActivity.class);
+                 intent.putExtra("eventId", eventId);
+                 startActivity(intent);
+             } else {
+                 Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
+             }
         });
         
         findViewById(R.id.btn_view_waitlist).setOnClickListener(v -> {
