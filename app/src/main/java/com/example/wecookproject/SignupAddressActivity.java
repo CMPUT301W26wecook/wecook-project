@@ -68,7 +68,7 @@ public class SignupAddressActivity extends AppCompatActivity {
                     if ("ORGANIZER".equals(role)) {
                         intent = new Intent(SignupAddressActivity.this, OrganizerHomeActivity.class);
                     } else {
-                        intent = new Intent(SignupAddressActivity.this, MainActivity.class);
+                        intent = new Intent(SignupAddressActivity.this, UserEventActivity.class);
                     }
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(intent);

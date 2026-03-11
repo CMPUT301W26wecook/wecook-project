@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 @LargeTest
 public class UserEventListTest {
 
-    private ActivityScenario<MainActivity> activityScenario;
+    private ActivityScenario<UserEventActivity> activityScenario;
     private final String testEventId = "test_event_123";
 
     @Before
@@ -41,7 +41,7 @@ public class UserEventListTest {
         createTestEvent();
 
         // Launch MainActivity
-        activityScenario = ActivityScenario.launch(MainActivity.class);
+        activityScenario = ActivityScenario.launch(UserEventActivity.class);
     }
 
     @After

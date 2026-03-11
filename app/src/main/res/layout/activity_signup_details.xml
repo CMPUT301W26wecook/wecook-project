@@ -96,8 +96,9 @@
         android:id="@+id/btn_continue"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Continue"
         android:layout_marginBottom="24dp"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        android:text="Continue"
+        app:layout_constraintBottom_toBottomOf="parent"
+        tools:layout_editor_absoluteX="24dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

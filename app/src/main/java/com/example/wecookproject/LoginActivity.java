@@ -1,9 +1,7 @@
 package com.example.wecookproject;
 
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Button;
@@ -93,7 +91,7 @@ public class LoginActivity extends AppCompatActivity {
             if ("ORGANIZER".equals(clickedRole)) {
                 jumpIntent = new Intent(LoginActivity.this, OrganizerHomeActivity.class);
             } else {
-                jumpIntent = new Intent(LoginActivity.this, MainActivity.class);
+                jumpIntent = new Intent(LoginActivity.this, UserEventActivity.class);
             }
         } else {
             jumpIntent = new Intent(LoginActivity.this, SignupDetailsActivity.class);

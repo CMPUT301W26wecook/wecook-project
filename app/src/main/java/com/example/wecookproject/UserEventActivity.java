@@ -26,7 +26,7 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class UserEventActivity extends AppCompatActivity {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventItem> eventList = new ArrayList<>();
@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_history) {
                 Toast.makeText(this, "History (coming soon)", Toast.LENGTH_SHORT).show();
             } else if (itemId == R.id.nav_profile) {
-                startActivity(new Intent(MainActivity.this, OrganizerProfileActivity.class));
+                startActivity(new Intent(UserEventActivity.this, UserProfileActivity.class));
             }
             return true;
         });
