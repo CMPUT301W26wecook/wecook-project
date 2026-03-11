@@ -139,7 +139,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Registration Period">
+                android:hint="Registration Period (YYYY-MM-DD)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_registration_period"
                     android:layout_width="match_parent"

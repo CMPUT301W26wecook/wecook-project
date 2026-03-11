@@ -192,20 +192,9 @@ public class OrganizerFlowTest {
         notifScenario.close();
     }
 
-    /**
-     * Drives the full signup happy-path:
-     *   LoginActivity → SignupDetailsActivity → SignupAddressActivity → MainActivity
-     *
-     * Call this at the start of any test that needs an existing Firestore user
-     * (i.e., the device must already be "signed up") before jumping into
-     * organizer-specific screens.
-     *
-     * Note: @Before deletes the Firestore user and launches LoginActivity, so
-     * the activityScenario is already open when this helper is called.
-     */
     private void performFullSignup() {
         // Login screen
-        onView(withId(R.id.text_Admin_login)).perform(click());
+        onView(withId(R.id.btn_organizer_login)).perform(click());
 
         // Details screen
         safeSleep(1500);
@@ -223,7 +212,7 @@ public class OrganizerFlowTest {
         onView(withId(R.id.et_postal_code)).perform(typeText("T6G 2R3"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
-        // Wait for Firestore write and navigation to MainActivity
+        // Wait for Firestore write and navigation to OrganizerHomeActivity
         safeSleep(2500);
     }
 
