@@ -103,6 +103,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     false, // Default geolocation
                     "Location TBD", // Default location
                     "" // Default description
+                    "" // Default QR code URL
+                    "" // Default Poster URL
             );
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
