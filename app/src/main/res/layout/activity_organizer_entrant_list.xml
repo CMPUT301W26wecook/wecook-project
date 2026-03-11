@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    tools:context=".OrganizerEntrantListActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:layout_marginBottom="56dp">
+
+        <!-- Search bar -->
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/sv_search_entrant"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            app:queryHint="Search by Entrant Name"
+            app:iconifiedByDefault="false" />
+
+        <!-- Entrant list -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_entrants"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="8dp"
+            android:clipToPadding="false" />
+
+        <!-- Action buttons (shown/hidden depending on list mode) -->
+        <LinearLayout
+            android:id="@+id/ll_action_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
+                android:id="@+id/btn_send_invitation_to_selected"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Send Invitation to selected"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_send_notification_to_all"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Send Notification to all"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_view_invited"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="View Invited"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_manual_draw"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Manual Draw"
+                android:backgroundTint="@color/outline_gray"
+                android:textColor="@color/text_dark"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_redraw_entrants"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Redraw Entrants"
+                android:backgroundTint="@color/outline_gray"
+                android:textColor="@color/text_dark"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btn_delete_all_selected"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Delete All Selected Entrants"
+                android:backgroundTint="#DC3545"
+                android:layout_marginBottom="4dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Bottom Navigation -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        app:menu="@menu/organizer_bottom_nav" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

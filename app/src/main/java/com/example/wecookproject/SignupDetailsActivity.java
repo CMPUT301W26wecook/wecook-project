@@ -74,6 +74,9 @@ public class SignupDetailsActivity extends AppCompatActivity {
             intent.putExtra("firstName", firstName);
             intent.putExtra("lastName", lastName);
             intent.putExtra("birthday", birthday);
+            if (getIntent().hasExtra("clickedRole")) {
+                intent.putExtra("clickedRole", getIntent().getStringExtra("clickedRole"));
+            }
             startActivity(intent);
         });
     }

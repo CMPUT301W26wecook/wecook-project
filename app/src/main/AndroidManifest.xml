@@ -30,6 +30,30 @@
         <activity
             android:name=".SignupAddressActivity"
             android:exported="false" />
+        <activity
+            android:name=".OrganizerHomeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerProfileActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerCreateEventActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerEditEventActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerEventDetailsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerEventMapActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerNotificationActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerEntrantListActivity"
+            android:exported="false" />
     </application>
 
 </manifest>
