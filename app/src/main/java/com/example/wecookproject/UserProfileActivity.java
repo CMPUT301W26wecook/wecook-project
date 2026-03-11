@@ -17,6 +17,7 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,20 +36,17 @@ public class UserProfileActivity extends AppCompatActivity {
     private String androidId;
     private boolean notificationsEnabled = false;
     private boolean isEditing = false;
+    private BottomNavigationView bottomNav;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_profile);
+        setContentView(R.layout.activity_user_profile);
 
         btnUpdate = findViewById(R.id.btn_update);
         btnDelete = findViewById(R.id.btn_delete);
         switchAutoLogin = findViewById(R.id.switch_auto_login);
         ivNotifications = findViewById(R.id.iv_notifications);
-        bottomNavEvents = findViewById(R.id.bottom_nav_events);
-        bottomNavScan = findViewById(R.id.bottom_nav_scan);
-        bottomNavHistory = findViewById(R.id.bottom_nav_history);
-        bottomNavProfile = findViewById(R.id.bottom_nav_profile);
 
         etFirstName = findViewById(R.id.et_first_name);
         etLastName = findViewById(R.id.et_last_name);
@@ -57,6 +55,7 @@ public class UserProfileActivity extends AppCompatActivity {
         etCity = findViewById(R.id.et_city);
         etPostalCode = findViewById(R.id.et_postal_code);
         etCountry = findViewById(R.id.et_country);
+        bottomNav = findViewById(R.id.bottom_nav);
 
         db = FirebaseFirestore.getInstance();
         androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -91,12 +90,27 @@ public class UserProfileActivity extends AppCompatActivity {
 
         });
 
-        bottomNavEvents.setOnClickListener(v -> navigateToMain());
-        bottomNavScan.setOnClickListener(v ->
-                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show());
-        bottomNavHistory.setOnClickListener(v ->
-                Toast.makeText(this, "History (coming soon)", Toast.LENGTH_SHORT).show());
-        bottomNavProfile.setOnClickListener(v -> { });
+        bottomNav = findViewById(R.id.bottom_nav);
+        bottomNav.setSelectedItemId(R.id.nav_profile);
+
+        bottomNav.setOnItemSelectedListener(item -> {
+            int id = item.getItemId();
+
+            if (id == R.id.nav_events) {
+                navigateToMain();
+                return true;
+            } else if (id == R.id.nav_scan) {
+                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
+                return true;
+            } else if (id == R.id.nav_history) {
+                Toast.makeText(this, "History (coming soon)", Toast.LENGTH_SHORT).show();
+                return true;
+            } else if (id == R.id.nav_profile) {
+                return true;
+            }
+
+            return false;
+        });
     }
 
     private void setEditable(boolean enabled) {
