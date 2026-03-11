@@ -7,11 +7,12 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
+import android.annotation.SuppressLint;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.UUID;
@@ -24,22 +25,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         TextInputEditText etEventName = findViewById(R.id.et_event_name);
         TextInputEditText etRegistrationPeriod = findViewById(R.id.et_registration_period);
-        TextInputLayout tilRegistrationPeriod = findViewById(R.id.til_registration_period);
         TextInputEditText etMaxWaitlist = findViewById(R.id.et_max_waitlist);
         RadioGroup rgEnrollmentCriteria = findViewById(R.id.rg_enrollment_criteria);
         RadioGroup rgLotteryMethod = findViewById(R.id.rg_lottery_method);
-
-        etRegistrationPeriod.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                tilRegistrationPeriod.setHint("Registration Period");
-            } else {
-                if (etRegistrationPeriod.getText() != null && etRegistrationPeriod.getText().toString().isEmpty()) {
-                    tilRegistrationPeriod.setHint("Registration Period (YYYY-MM-DD)");
-                } else {
-                    tilRegistrationPeriod.setHint("Registration Period");
-                }
-            }
-        });
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_create_events);
@@ -60,9 +48,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         findViewById(R.id.btn_cancel).setOnClickListener(v -> finish());
 
         findViewById(R.id.btn_create_event).setOnClickListener(v -> {
-            String eventName = etEventName.getText().toString().trim();
-            String registrationPeriod = etRegistrationPeriod.getText().toString().trim();
-            String maxWaitlistStr = etMaxWaitlist.getText().toString().trim();
+            String eventName = etEventName.getText() != null ? etEventName.getText().toString().trim() : "";
+            String registrationPeriod = etRegistrationPeriod.getText() != null ? etRegistrationPeriod.getText().toString().trim() : "";
+            String maxWaitlistStr = etMaxWaitlist.getText() != null ? etMaxWaitlist.getText().toString().trim() : "";
 
             if (eventName.isEmpty() || registrationPeriod.isEmpty() || maxWaitlistStr.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
@@ -88,6 +76,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return;
             }
 
+            @SuppressLint("HardwareIds")
             String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             String eventId = UUID.randomUUID().toString();
 
@@ -103,8 +92,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     false, // Default geolocation
                     "Location TBD", // Default location
                     "" // Default description
-                    "" // Default QR code URL
-                    "" // Default Poster URL
             );
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -117,9 +104,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         startActivity(intent);
                         finish();
                     })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(this, "Failed to create event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
+                    .addOnFailureListener(e -> Toast.makeText(this, "Failed to create event: " + e.getMessage(), Toast.LENGTH_SHORT).show());
         });
     }
 }

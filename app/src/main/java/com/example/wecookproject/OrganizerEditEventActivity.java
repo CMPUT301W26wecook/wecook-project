@@ -23,11 +23,9 @@ import com.google.firebase.storage.StorageReference;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import java.util.UUID;
 
 public class OrganizerEditEventActivity extends AppCompatActivity {
-    private static final Pattern DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
-
     private String eventId;
     private FirebaseFirestore db;
     private FirebaseStorage storage;
@@ -72,18 +70,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 this::handlePosterSelection
         );
 
-        etRegistrationPeriod.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                tilRegistrationPeriod.setHint("Registration Period");
-            } else {
-                if (etRegistrationPeriod.getText() != null && etRegistrationPeriod.getText().toString().isEmpty()) {
-                    tilRegistrationPeriod.setHint("Registration Period (YYYY-MM-DD)");
-                } else {
-                    tilRegistrationPeriod.setHint("Registration Period");
-                }
-            }
-        });
-
         loadCurrentPosterUrl();
         flPosterUpload.setOnClickListener(v -> posterPickerLauncher.launch("image/*"));
 
@@ -106,6 +92,13 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         findViewById(R.id.iv_back).setOnClickListener(v -> cancelAndExit());
         findViewById(R.id.btn_cancel).setOnClickListener(v -> cancelAndExit());
         findViewById(R.id.btn_update_event).setOnClickListener(v -> updateEvent());
+
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                cancelAndExit();
+            }
+        });
     }
 
     private void updateEvent() {
@@ -125,12 +118,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         if (!TextUtils.isEmpty(registrationPeriod)) {
-            if (!DATE_PATTERN.matcher(registrationPeriod).matches()) {
-                tilRegistrationPeriod.setError("Use YYYY-MM-DD");
-                hasError = true;
-            } else {
-                updates.put("registrationPeriod", registrationPeriod);
-            }
+            updates.put("registrationPeriod", registrationPeriod);
         }
 
         if (!TextUtils.isEmpty(maxWaitlistText)) {
@@ -238,9 +226,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         db.collection("events")
                 .document(eventId)
                 .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    originalPosterUrl = documentSnapshot.getString("posterUrl");
-                });
+                .addOnSuccessListener(documentSnapshot -> originalPosterUrl = documentSnapshot.getString("posterUrl"));
     }
 
     private void cancelAndExit() {
@@ -291,8 +277,4 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         return null;
     }
 
-    @Override
-    public void onBackPressed() {
-        cancelAndExit();
-    }
 }

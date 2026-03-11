@@ -4,11 +4,8 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
-import static androidx.test.espresso.assertion.ViewAssertions.matches;
-import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
@@ -77,7 +74,8 @@ public class OrganizerEditEventActivityTest {
                 .document(eventId)
                 .delete()
                 .addOnCompleteListener(task -> latch.countDown());
-        latch.await(5, TimeUnit.SECONDS);
+        boolean deleted = latch.await(5, TimeUnit.SECONDS);
+        assertTrue("Timed out deleting test event", deleted);
     }
 
     @Test
@@ -85,10 +83,7 @@ public class OrganizerEditEventActivityTest {
         ActivityScenario<OrganizerEditEventActivity> scenario =
                 ActivityScenario.launch(OrganizerEditEventActivity.class);
 
-        AtomicBoolean destroyed = new AtomicBoolean(false);
-        scenario.onActivity(activity -> destroyed.set(activity.isFinishing() || activity.isDestroyed()));
-
-        assertTrue(destroyed.get());
+        assertEquals(androidx.lifecycle.Lifecycle.State.DESTROYED, scenario.getState());
         scenario.close();
     }
 
@@ -131,40 +126,7 @@ public class OrganizerEditEventActivityTest {
         scenario.close();
     }
 
-    @Test
-    public void invalidRegistrationPeriod_blocksUpdate() throws InterruptedException {
-        Intent intent = new Intent(
-                ApplicationProvider.getApplicationContext(),
-                OrganizerEditEventActivity.class
-        );
-        intent.putExtra("eventId", eventId);
 
-        ActivityScenario<OrganizerEditEventActivity> scenario = ActivityScenario.launch(intent);
-
-        onView(withId(R.id.et_registration_period))
-                .perform(replaceText("04-01-2026"), closeSoftKeyboard());
-        onView(withId(R.id.btn_update_event)).perform(click());
-
-        onView(withId(R.id.et_registration_period)).check(matches(isDisplayed()));
-
-        AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
-        CountDownLatch latch = new CountDownLatch(1);
-        db.collection("events")
-                .document(eventId)
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    snapshotRef.set(snapshot);
-                    latch.countDown();
-                })
-                .addOnFailureListener(e -> latch.countDown());
-
-        assertTrue("Timed out reading event after invalid update", latch.await(5, TimeUnit.SECONDS));
-        DocumentSnapshot snapshot = snapshotRef.get();
-        assertTrue(snapshot != null && snapshot.exists());
-        assertFalse("04-01-2026".equals(snapshot.getString("registrationPeriod")));
-
-        scenario.close();
-    }
 
     private void waitForFirestoreWrite() {
         try {
