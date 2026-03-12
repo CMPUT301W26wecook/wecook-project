@@ -182,7 +182,7 @@ public class UserEventActivity extends AppCompatActivity {
         TextView tvStatusChip = dialogView.findViewById(R.id.tv_dialog_status_chip);
         TextView tvDescription = dialogView.findViewById(R.id.tv_dialog_description);
         Button btnSecondary = dialogView.findViewById(R.id.btn_dialog_secondary);
-        Button btnPrimary = dialogView.findViewById(R.id.btn_dialog_primary);
+        Button btnJoinWaitlist = dialogView.findViewById(R.id.btn_join_waitlist);
 
         tvAvatar.setText(UserEventUiUtils.getAvatarLetter(eventRecord.getEventName()));
         tvHeaderName.setText(eventRecord.getEventName());
@@ -214,53 +214,53 @@ public class UserEventActivity extends AppCompatActivity {
         btnShowQr.setOnClickListener(v ->
                 Toast.makeText(this, "QR code preview coming soon", Toast.LENGTH_SHORT).show());
 
-        configureDialogActions(dialog, eventRecord, btnPrimary, btnSecondary);
+        configureDialogActions(dialog, eventRecord, btnJoinWaitlist, btnSecondary);
         dialog.show();
     }
 
     private void configureDialogActions(AlertDialog dialog,
                                         UserEventRecord eventRecord,
-                                        Button btnPrimary,
+                                        Button btnJoinWaitlist,
                                         Button btnSecondary) {
         String status = eventRecord.getEffectiveStatus();
         btnSecondary.setVisibility(View.GONE);
-        btnPrimary.setEnabled(true);
+        btnJoinWaitlist.setEnabled(true);
 
         if (UserEventRecord.STATUS_INVITED.equals(status)) {
             btnSecondary.setVisibility(View.VISIBLE);
             btnSecondary.setText("Decline");
-            btnPrimary.setText("Accept");
+            btnJoinWaitlist.setText("Accept");
             btnSecondary.setOnClickListener(v -> declineInvitation(eventRecord, dialog));
-            btnPrimary.setOnClickListener(v -> acceptInvitation(eventRecord, dialog));
+            btnJoinWaitlist.setOnClickListener(v -> acceptInvitation(eventRecord, dialog));
             return;
         }
 
         if (UserEventRecord.STATUS_ACCEPTED.equals(status)) {
-            btnPrimary.setText("Accepted");
-            btnPrimary.setEnabled(false);
+            btnJoinWaitlist.setText("Accepted");
+            btnJoinWaitlist.setEnabled(false);
             return;
         }
 
         if (UserEventRecord.STATUS_REJECTED.equals(status)) {
-            btnPrimary.setText("Rejected");
-            btnPrimary.setEnabled(false);
+            btnJoinWaitlist.setText("Rejected");
+            btnJoinWaitlist.setEnabled(false);
             return;
         }
 
         if (UserEventRecord.STATUS_WAITLISTED.equals(status)) {
-            btnPrimary.setText("Leave Waitlist");
-            btnPrimary.setOnClickListener(v -> leaveWaitlist(eventRecord, dialog));
+            btnJoinWaitlist.setText("Leave Waitlist");
+            btnJoinWaitlist.setOnClickListener(v -> leaveWaitlist(eventRecord, dialog));
             return;
         }
 
         if (eventRecord.isWaitlistFull()) {
-            btnPrimary.setText("Waitlist Full");
-            btnPrimary.setEnabled(false);
+            btnJoinWaitlist.setText("Waitlist Full");
+            btnJoinWaitlist.setEnabled(false);
             return;
         }
 
-        btnPrimary.setText("Join the Waitlist");
-        btnPrimary.setOnClickListener(v -> joinWaitingList(eventRecord, dialog));
+        btnJoinWaitlist.setText("Join the Waitlist");
+        btnJoinWaitlist.setOnClickListener(v -> joinWaitingList(eventRecord, dialog));
     }
 
     private void joinWaitingList(UserEventRecord eventRecord, AlertDialog dialog) {

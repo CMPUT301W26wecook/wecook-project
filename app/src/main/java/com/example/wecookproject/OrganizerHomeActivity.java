@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     
     private EventAdapter eventAdapter;
     private List<Event> eventList;
+    private ListenerRegistration eventsListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,20 +61,32 @@ public class OrganizerHomeActivity extends AppCompatActivity {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         
-        db.collection("events")
+        // Use addSnapshotListener for real-time updates
+        eventsListener = db.collection("events")
                 .whereEqualTo("organizerId", androidId)
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this, "Failed to load events: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    if (value != null) {
                         eventList.clear();
-                        for (QueryDocumentSnapshot document : task.getResult()) {
+                        for (QueryDocumentSnapshot document : value) {
                             Event event = document.toObject(Event.class);
                             eventList.add(event);
                         }
                         eventAdapter.notifyDataSetChanged();
-                    } else {
-                        Toast.makeText(this, "Failed to load events", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Detach the listener to prevent memory leaks
+        if (eventsListener != null) {
+            eventsListener.remove();
+        }
     }
 }

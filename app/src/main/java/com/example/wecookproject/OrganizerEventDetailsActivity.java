@@ -10,8 +10,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
+    
+    private ListenerRegistration eventListener;
+    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -29,29 +36,46 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
 
         if (eventId != null) {
             FirebaseFirestore db = FirebaseFirestore.getInstance();
-            db.collection("events").document(eventId).get().addOnSuccessListener(documentSnapshot -> {
-                if (documentSnapshot.exists()) {
-                    Event event = documentSnapshot.toObject(Event.class);
-                    if (event != null) {
-                        tvEventNameBig.setText(event.getEventName());
-                        tvEventLocation.setText(event.getLocation());
-                        tvEventNameDetail.setText(event.getEventName());
-                        tvEventDates.setText(event.getRegistrationPeriod());
-                        tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
-                        tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
+            // Use addSnapshotListener for real-time updates
+            eventListener = db.collection("events").document(eventId)
+                    .addSnapshotListener((documentSnapshot, error) -> {
+                        if (error != null) {
+                            Toast.makeText(this, "Failed to load event details: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                         
-                        String description = "Enrollment: " + event.getEnrollmentCriteria() + "\n" +
-                                             "Methodology: " + event.getLotteryMethodology() + "\n" +
-                                             event.getDescription();
-                        tvEventDescription.setText(description.trim());
-                    }
-                } else {
-                    Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
-                    finish();
-                }
-            }).addOnFailureListener(e -> {
-                Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
-            });
+                        if (documentSnapshot != null && documentSnapshot.exists()) {
+                            Event event = documentSnapshot.toObject(Event.class);
+                            if (event != null) {
+                                tvEventNameBig.setText(event.getEventName());
+                                tvEventLocation.setText(event.getLocation());
+                                tvEventNameDetail.setText(event.getEventName());
+                                
+                                // Format registration dates
+                                String registrationDateText = "TBD";
+                                if (event.getRegistrationStartDate() != null && event.getRegistrationEndDate() != null) {
+                                    registrationDateText = dateFormat.format(event.getRegistrationStartDate()) + " to " + dateFormat.format(event.getRegistrationEndDate());
+                                } else if (event.getRegistrationStartDate() != null) {
+                                    registrationDateText = "From " + dateFormat.format(event.getRegistrationStartDate());
+                                } else if (event.getRegistrationEndDate() != null) {
+                                    registrationDateText = "Until " + dateFormat.format(event.getRegistrationEndDate());
+                                }
+                                tvEventDates.setText(registrationDateText);
+                                
+                                tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
+                                tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
+                                
+                                String description = "Enrollment: " + event.getEnrollmentCriteria() + "\n" +
+                                                     "Methodology: " + event.getLotteryMethodology() + "\n" +
+                                                     event.getDescription();
+                                tvEventDescription.setText(description.trim());
+                            }
+                        } else {
+                            // Event was deleted or doesn't exist
+                            Toast.makeText(this, "Event no longer exists", Toast.LENGTH_SHORT).show();
+                            finish();
+                        }
+                    });
         } else {
             Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
             finish();
@@ -104,5 +128,14 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         findViewById(R.id.btn_show_qr).setOnClickListener(v -> {
             // TODO: show QR code dialog
         });
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Detach the listener to prevent memory leaks
+        if (eventListener != null) {
+            eventListener.remove();
+        }
     }
 }

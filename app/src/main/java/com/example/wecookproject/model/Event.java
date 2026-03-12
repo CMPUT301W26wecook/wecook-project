@@ -1,10 +1,13 @@
 package com.example.wecookproject.model;
 
+import java.util.Date;
+
 public class Event {
     private String eventId;
     private String organizerId;
     private String eventName;
-    private String registrationPeriod;
+    private Date registrationStartDate;
+    private Date registrationEndDate;
     private String enrollmentCriteria;
     private int maxWaitlist;
     private int currentWaitlistCount;
@@ -20,13 +23,14 @@ public class Event {
     public Event() {
     }
 
-    public Event(String eventId, String organizerId, String eventName, String registrationPeriod,
+    public Event(String eventId, String organizerId, String eventName, Date registrationStartDate, Date registrationEndDate,
                  String enrollmentCriteria, int maxWaitlist, int currentWaitlistCount, String lotteryMethodology,
                  boolean geolocationRequired, String location, String description) {
         this.eventId = eventId;
         this.organizerId = organizerId;
         this.eventName = eventName;
-        this.registrationPeriod = registrationPeriod;
+        this.registrationStartDate = registrationStartDate;
+        this.registrationEndDate = registrationEndDate;
         this.enrollmentCriteria = enrollmentCriteria;
         this.maxWaitlist = maxWaitlist;
         this.currentWaitlistCount = currentWaitlistCount;
@@ -60,12 +64,20 @@ public class Event {
         this.eventName = eventName;
     }
 
-    public String getRegistrationPeriod() {
-        return registrationPeriod;
+    public Date getRegistrationStartDate() {
+        return registrationStartDate;
     }
 
-    public void setRegistrationPeriod(String registrationPeriod) {
-        this.registrationPeriod = registrationPeriod;
+    public void setRegistrationStartDate(Date registrationStartDate) {
+        this.registrationStartDate = registrationStartDate;
+    }
+
+    public Date getRegistrationEndDate() {
+        return registrationEndDate;
+    }
+
+    public void setRegistrationEndDate(Date registrationEndDate) {
+        this.registrationEndDate = registrationEndDate;
     }
 
     public String getEnrollmentCriteria() {

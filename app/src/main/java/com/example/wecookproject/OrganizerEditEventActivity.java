@@ -1,5 +1,6 @@
 package com.example.wecookproject;
 
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -23,17 +24,26 @@ import com.google.firebase.storage.StorageReference;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.UUID;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 
 public class OrganizerEditEventActivity extends AppCompatActivity {
+    private Date registrationStartDate;
+    private Date registrationEndDate;
+    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private String eventId;
     private FirebaseFirestore db;
     private FirebaseStorage storage;
     private TextInputLayout tilEventName;
-    private TextInputLayout tilRegistrationPeriod;
+    private TextInputLayout tilRegistrationStartDate;
+    private TextInputLayout tilRegistrationEndDate;
     private TextInputLayout tilMaxWaitlist;
     private TextInputEditText etEventName;
-    private TextInputEditText etRegistrationPeriod;
+    private TextInputEditText etRegistrationStartDate;
+    private TextInputEditText etRegistrationEndDate;
     private TextInputEditText etMaxWaitlist;
     private RadioGroup rgEnrollmentCriteria;
     private RadioGroup rgLotteryMethod;
@@ -56,10 +66,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         tilEventName = findViewById(R.id.til_event_name);
-        tilRegistrationPeriod = findViewById(R.id.til_registration_period);
+        tilRegistrationStartDate = findViewById(R.id.til_registration_start_date);
+        tilRegistrationEndDate = findViewById(R.id.til_registration_end_date);
         tilMaxWaitlist = findViewById(R.id.til_max_waitlist);
         etEventName = findViewById(R.id.et_event_name);
-        etRegistrationPeriod = findViewById(R.id.et_registration_period);
+        etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
+        etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         etMaxWaitlist = findViewById(R.id.et_max_waitlist);
         rgEnrollmentCriteria = findViewById(R.id.rg_enrollment_criteria);
         rgLotteryMethod = findViewById(R.id.rg_lottery_method);
@@ -69,6 +81,10 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 new ActivityResultContracts.GetContent(),
                 this::handlePosterSelection
         );
+
+        // Set up date pickers for registration dates
+        etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
+        etRegistrationEndDate.setOnClickListener(v -> showEndDatePicker(etRegistrationEndDate));
 
         loadCurrentPosterUrl();
         flPosterUpload.setOnClickListener(v -> posterPickerLauncher.launch("image/*"));
@@ -101,13 +117,55 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         });
     }
 
+    private void showStartDatePicker(TextInputEditText editText) {
+        Calendar calendar = Calendar.getInstance();
+        DatePickerDialog datePickerDialog = new DatePickerDialog(
+            this,
+            (view, year, month, dayOfMonth) -> {
+                calendar.set(year, month, dayOfMonth);
+                registrationStartDate = calendar.getTime();
+                editText.setText(dateFormat.format(registrationStartDate));
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        );
+        datePickerDialog.show();
+    }
+
+    private void showEndDatePicker(TextInputEditText editText) {
+        Calendar calendar = Calendar.getInstance();
+        if (registrationStartDate != null) {
+            calendar.setTime(registrationStartDate);
+        }
+        
+        DatePickerDialog datePickerDialog = new DatePickerDialog(
+            this,
+            (view, year, month, dayOfMonth) -> {
+                calendar.set(year, month, dayOfMonth);
+                registrationEndDate = calendar.getTime();
+                editText.setText(dateFormat.format(registrationEndDate));
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        );
+        
+        // Set minimum date to start date if selected
+        if (registrationStartDate != null) {
+            datePickerDialog.getDatePicker().setMinDate(registrationStartDate.getTime());
+        }
+        
+        datePickerDialog.show();
+    }
+
     private void updateEvent() {
         tilEventName.setError(null);
-        tilRegistrationPeriod.setError(null);
+        tilRegistrationStartDate.setError(null);
+        tilRegistrationEndDate.setError(null);
         tilMaxWaitlist.setError(null);
 
         String eventName = getTrimmedText(etEventName);
-        String registrationPeriod = getTrimmedText(etRegistrationPeriod);
         String maxWaitlistText = getTrimmedText(etMaxWaitlist);
 
         boolean hasError = false;
@@ -117,8 +175,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             updates.put("eventName", eventName);
         }
 
-        if (!TextUtils.isEmpty(registrationPeriod)) {
-            updates.put("registrationPeriod", registrationPeriod);
+        if (registrationStartDate != null) {
+            updates.put("registrationStartDate", registrationStartDate);
+        }
+
+        if (registrationEndDate != null) {
+            updates.put("registrationEndDate", registrationEndDate);
         }
 
         if (!TextUtils.isEmpty(maxWaitlistText)) {
@@ -276,5 +338,4 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
         return null;
     }
-
 }
