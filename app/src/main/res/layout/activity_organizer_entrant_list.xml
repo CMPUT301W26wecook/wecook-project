@@ -12,7 +12,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:layout_marginBottom="56dp">
+        android:layout_marginBottom="80dp"
+        android:paddingBottom="12dp">
 
         <!-- Search bar -->
         <androidx.appcompat.widget.SearchView
@@ -32,13 +33,26 @@
             android:padding="8dp"
             android:clipToPadding="false" />
 
+        <TextView
+            android:id="@+id/tv_empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="24dp"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="No entrants have joined this waiting list yet."
+            android:textColor="@color/text_muted"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
         <!-- Action buttons (shown/hidden depending on list mode) -->
         <LinearLayout
             android:id="@+id/ll_action_buttons"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:paddingBottom="20dp">
 
             <Button
                 android:id="@+id/btn_send_invitation_to_selected"
