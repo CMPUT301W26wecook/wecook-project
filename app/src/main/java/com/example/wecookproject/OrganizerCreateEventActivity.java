@@ -4,6 +4,8 @@ import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
@@ -13,9 +15,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -41,9 +43,33 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         // Set up date picker for start date
         etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
-        
+        etRegistrationStartDate.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                try {
+                    registrationStartDate = dateFormat.parse(s.toString().trim());
+                } catch (ParseException e) {
+                    registrationStartDate = null;
+                }
+            }
+        });
+
         // Set up date picker for end date
         etRegistrationEndDate.setOnClickListener(v -> showEndDatePicker(etRegistrationEndDate));
+        etRegistrationEndDate.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                try {
+                    registrationEndDate = dateFormat.parse(s.toString().trim());
+                } catch (ParseException e) {
+                    registrationEndDate = null;
+                }
+            }
+        });
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_create_events);

@@ -4,8 +4,11 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
-import static androidx.test.espresso.action.ViewActions.typeText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
+import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
+import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
+import static org.hamcrest.Matchers.allOf;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
@@ -14,15 +17,20 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
 import android.provider.Settings;
+import android.view.View;
 
+import androidx.core.widget.NestedScrollView;
+import androidx.lifecycle.Lifecycle;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.example.wecookproject.model.Event;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.example.wecookproject.model.Event;
 
 import org.junit.After;
 import org.junit.Before;
@@ -30,6 +38,8 @@ import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
+
+import org.hamcrest.Matcher;
 
 import java.util.Date;
 import java.util.UUID;
@@ -42,14 +52,19 @@ import java.util.concurrent.atomic.AtomicReference;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class OrganizerFlowTest {
 
+    // Sleep durations (ms) 鈥?generous enough for Firestore + UI transitions on CI/emulator
+    private static final int WAIT_SHORT  = 2000;
+    private static final int WAIT_MEDIUM = 4000;
+    private static final int WAIT_LONG   = 6000;
+
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ActivityScenario<LoginActivity> activityScenario;
-    private String eventId;
+    /** Stable event ID used by test9 / test10 to exercise the edit flow. */
+    private String editEventId;
 
     /**
-     * Deletes the Firestore user document before each test so the app always
-     * starts from an unauthenticated state, then launches LoginActivity.
-     * Also creates a test event document used by the edit-event tests.
+     * Deletes the device user document so every test starts unauthenticated,
+     * then pre-creates one event document used by the edit tests.
      */
     @Before
     public void setUp() {
@@ -57,26 +72,21 @@ public class OrganizerFlowTest {
                 ApplicationProvider.getApplicationContext().getContentResolver(),
                 Settings.Secure.ANDROID_ID);
 
-        CountDownLatch latch = new CountDownLatch(1);
-        FirebaseFirestore.getInstance().collection("users").document(androidId).delete()
-                .addOnCompleteListener(task -> latch.countDown());
-        try {
-            boolean success = latch.await(5, TimeUnit.SECONDS);
-            if (!success) {
-                System.err.println("Warning: Firestore delete timed out before starting test.");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        // Ensure no existing user so LoginActivity always routes to signup
+        CountDownLatch userDeleteLatch = new CountDownLatch(1);
+        db.collection("users").document(androidId).delete()
+                .addOnCompleteListener(task -> userDeleteLatch.countDown());
+        awaitLatch(userDeleteLatch, 10, "user document deletion");
 
-        // Create a reusable test event for edit-event tests (test9, test10)
-        eventId = "edit-test-" + UUID.randomUUID();
+        // Pre-create event used by test9 / test10
+        editEventId = "edit-test-" + UUID.randomUUID();
+        @SuppressWarnings("deprecation")
         Event editTestEvent = new Event(
-                eventId,
+                editEventId,
                 "organizer-test",
                 "Original Event",
-                new Date(2026 - 1900, 3, 1),  // April 1, 2026
-                new Date(2026 - 1900, 3, 30), // April 30, 2026
+                new Date(126, 3, 1),   // 2026-04-01
+                new Date(126, 3, 30),  // 2026-04-30
                 "Open to all",
                 25,
                 0,
@@ -85,15 +95,11 @@ public class OrganizerFlowTest {
                 "Edmonton",
                 "Original description"
         );
-        CountDownLatch eventLatch = new CountDownLatch(1);
-        db.collection("events").document(eventId)
+        CountDownLatch eventCreateLatch = new CountDownLatch(1);
+        db.collection("events").document(editEventId)
                 .set(editTestEvent)
-                .addOnCompleteListener(task -> eventLatch.countDown());
-        try {
-            eventLatch.await(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+                .addOnCompleteListener(task -> eventCreateLatch.countDown());
+        awaitLatch(eventCreateLatch, 10, "edit-test event creation");
 
         activityScenario = ActivityScenario.launch(LoginActivity.class);
     }
@@ -103,113 +109,101 @@ public class OrganizerFlowTest {
         if (activityScenario != null) {
             activityScenario.close();
         }
-
-        // Clean up the test event created in setUp
-        if (eventId != null) {
-            CountDownLatch eventLatch = new CountDownLatch(1);
-            db.collection("events").document(eventId)
+        if (editEventId != null) {
+            CountDownLatch latch = new CountDownLatch(1);
+            db.collection("events").document(editEventId)
                     .delete()
-                    .addOnCompleteListener(task -> eventLatch.countDown());
-            try {
-                eventLatch.await(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+                    .addOnCompleteListener(task -> latch.countDown());
+            awaitLatch(latch, 10, "edit-test event cleanup");
         }
     }
 
+    // 鈹€鈹€鈹€ Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
     /**
-     * When no Firestore user exists, tapping "Login as organizer" should
-     * route through the signup flow (Details screen), not directly to
-     * OrganizerHomeActivity.
+     * test1: Without an existing Firestore user, tapping "Login as organizer"
+     * must route to the signup Details screen (not OrganizerHomeActivity).
      */
     @Test
     public void test1_OrganizerLoginWithoutExistingUserRoutesToSignup() {
         onView(withId(R.id.btn_organizer_login)).perform(click());
-        safeSleep(1500);
+        safeSleep(WAIT_MEDIUM); // allow FCM token fetch + Firestore lookup + navigation
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
     }
 
     /**
-     * On the Organizer Profile screen, tapping "Update Info" with both
-     * First Name and Last Name empty should NOT navigate away — both fields
-     * are mandatory for becoming an organizer.
+     * test2: Tapping "Update Info" with both First Name and Last Name blank should
+     * keep the organizer on the Profile screen 鈥?both fields are mandatory.
      */
     @Test
     public void test2_OrganizerProfileMandatoryNamesBlockUpdate() {
-        // Complete signup so Firestore has a valid user before entering organizer screens
         performFullSignup();
 
         ActivityScenario<OrganizerProfileActivity> profileScenario =
                 ActivityScenario.launch(OrganizerProfileActivity.class);
 
-        // Leave First Name and Last Name blank, attempt update
         onView(withId(R.id.btn_update_info)).perform(click());
 
-        // Should still be on the Profile screen (not navigated away)
+        // Screen must not have navigated away
         onView(withId(R.id.tv_organizer_info_title)).check(matches(withText("Organizer Info")));
 
         profileScenario.close();
     }
 
     /**
-     * On the Create Event screen, tapping "Create Event" without an Event Name
-     * should NOT navigate away — Event Name is a required field.
+     * test3: Submitting the Create Event form with no Event Name entered must
+     * be blocked 鈥?Event Name is required.
      */
     @Test
     public void test3_CreateEventWithoutNameIsBlocked() {
-        // Complete signup so Firestore has a valid user before entering organizer screens
         performFullSignup();
 
         ActivityScenario<OrganizerCreateEventActivity> createScenario =
                 ActivityScenario.launch(OrganizerCreateEventActivity.class);
 
-        // Leave Event Name blank, attempt to create
-        onView(withId(R.id.btn_create_event)).perform(click());
+        onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
 
-        // Should still be on the Create Event screen
+        // Create Event button must still be visible (no navigation occurred)
         onView(withId(R.id.btn_create_event)).check(matches(isDisplayed()));
 
         createScenario.close();
     }
 
     /**
-     * Verify the bottom navigation bar switches correctly between the three
-     * organizer tabs: Events → Create Events → Profile → Events.
+     * test4: Bottom navigation bar correctly switches among the three organizer
+     * tabs: Events 鈫?Create Events 鈫?Profile 鈫?Events.
      */
     @Test
     public void test4_BottomNavSwitchesBetweenTabs() {
-        // Complete signup so Firestore has a valid user before entering organizer screens
         performFullSignup();
 
         ActivityScenario<OrganizerHomeActivity> homeScenario =
                 ActivityScenario.launch(OrganizerHomeActivity.class);
 
-        // Switch to Create Events tab
+        // Home 鈫?Create Events
         onView(withId(R.id.nav_create_events)).perform(click());
-        safeSleep(500);
+        safeSleep(WAIT_SHORT);
         onView(withId(R.id.btn_create_event)).check(matches(isDisplayed()));
 
-        // Switch to Profile tab
+        // Create Events 鈫?Profile
         onView(withId(R.id.nav_profile)).perform(click());
-        safeSleep(500);
+        safeSleep(WAIT_SHORT);
         onView(withId(R.id.tv_organizer_info_title)).check(matches(withText("Organizer Info")));
 
-        // Switch back to Events tab
+        // Profile 鈫?Events
         onView(withId(R.id.nav_events)).perform(click());
-        safeSleep(500);
+        safeSleep(WAIT_SHORT);
         onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
 
         homeScenario.close();
     }
 
     /**
-     * Filling all mandatory fields on the Profile screen (First Name, Last Name)
-     * and tapping "Update Info" should not crash or navigate away unexpectedly.
+     * test5: Supplying valid First Name and Last Name and tapping "Update Info"
+     * should leave the organizer on the Profile screen without errors.
      */
     @Test
     public void test5_OrganizerProfileUpdateWithValidNames() {
-        // Complete signup so Firestore has a valid user before entering organizer screens
         performFullSignup();
 
         ActivityScenario<OrganizerProfileActivity> profileScenario =
@@ -219,19 +213,17 @@ public class OrganizerFlowTest {
         onView(withId(R.id.et_last_name)).perform(replaceText("Smith"), closeSoftKeyboard());
         onView(withId(R.id.btn_update_info)).perform(click());
 
-        // Profile screen should still be displayed (no external navigation triggered yet)
         onView(withId(R.id.tv_organizer_info_title)).check(matches(withText("Organizer Info")));
 
         profileScenario.close();
     }
 
     /**
-     * Verify the Notification screen is reachable from OrganizerEntrantListActivity
-     * and its hint text field is visible.
+     * test6: OrganizerNotificationActivity is reachable and its message input
+     * field is visible.
      */
     @Test
     public void test6_NotificationScreenIsReachableAndShowsHintField() {
-        // Complete signup so Firestore has a valid user before entering organizer screens
         performFullSignup();
 
         ActivityScenario<OrganizerNotificationActivity> notifScenario =
@@ -242,85 +234,87 @@ public class OrganizerFlowTest {
         notifScenario.close();
     }
 
+    /**
+     * test7: Filling all mandatory Create Event fields (name, dates via text
+     * input, max waitlist, and both radio groups) and tapping "Create Event"
+     * should save to Firestore and navigate back to OrganizerHomeActivity.
+     *
+     * <p>Date fields accept "yyyy-MM-dd" text directly because
+     * OrganizerCreateEventActivity registers a TextWatcher that parses the
+     * typed value and sets the internal Date field 鈥?in addition to the
+     * DatePickerDialog that sets the same field when the user taps the view.</p>
+     */
     @Test
     public void test7_CreateEventAndVerifyInList() {
-        // Complete signup so Firestore has a valid user before entering organizer screens
         performFullSignup();
 
         ActivityScenario<OrganizerHomeActivity> homeScenario =
                 ActivityScenario.launch(OrganizerHomeActivity.class);
 
-        // Switch to Create Events tab
         onView(withId(R.id.nav_create_events)).perform(click());
-        safeSleep(1000);
+        safeSleep(WAIT_SHORT);
 
-        // Fill out the Create Event form
-        String testEventName = "Espresso Test Event";
-        onView(withId(R.id.et_event_name)).perform(typeText(testEventName), closeSoftKeyboard());
-        onView(withId(R.id.et_registration_start_date)).perform(typeText("2026-04-01"), closeSoftKeyboard());
-        onView(withId(R.id.et_registration_end_date)).perform(typeText("2026-04-10"), closeSoftKeyboard());
-        onView(withId(R.id.et_max_waitlist)).perform(typeText("50"), closeSoftKeyboard());
+        onView(withId(R.id.et_event_name))
+                .perform(replaceText("Espresso Test Event"), closeSoftKeyboard());
+        onView(withId(R.id.et_registration_start_date))
+                .perform(replaceText("2026-04-01"), closeSoftKeyboard());
+        onView(withId(R.id.et_registration_end_date))
+                .perform(replaceText("2026-04-10"), closeSoftKeyboard());
+        onView(withId(R.id.et_max_waitlist))
+                .perform(replaceText("50"), closeSoftKeyboard());
 
-        // Select radio buttons
         onView(withId(R.id.rb_open_to_all)).perform(click());
         onView(withId(R.id.rb_system_generates)).perform(click());
 
-        // Click create
-        onView(withId(R.id.btn_create_event)).perform(click());
+        onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
 
-        // Wait for Firestore save and navigation back to Home
-        safeSleep(2500);
+        // Wait for Firestore write and navigation back to Home
+        safeSleep(WAIT_LONG);
 
-        // Verify we are back on the Organizer Home screen with the list
         onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
-
-        // Cannot easily check RecyclerView content without an Espresso RecyclerViewAction dependency,
-        // but we can at least assert the layout is shown.
-        // If we had Espresso Contrib we could check for the specific item text.
 
         homeScenario.close();
     }
 
     /**
-     * Verify the Event Details screen correctly displays information and buttons 
-     * when opened with a valid event ID.
+     * test8: Launching OrganizerEventDetailsActivity with a valid event ID
+     * should display all required UI elements (name, dates, edit, waitlist, map
+     * buttons).
      */
     @Test
     public void test8_EventDetailsScreenDisplaysCorrectly() {
-        CountDownLatch latch = new CountDownLatch(1);
-        Event mockEvent = new Event();
-        mockEvent.setEventId("mockEventId");
-        mockEvent.setOrganizerId("org123");
-        mockEvent.setEventName("Test Event Details");
-        mockEvent.setRegistrationStartDate(new Date(2026 - 1900, 0, 1));  // 2026-01-01
-        mockEvent.setRegistrationEndDate(new Date(2026 - 1900, 1, 2));    // 2026-02-02
-        mockEvent.setEnrollmentCriteria("Open");
-        mockEvent.setMaxWaitlist(100);
-        mockEvent.setCurrentWaitlistCount(50);
-        mockEvent.setLotteryMethodology("Random");
-        mockEvent.setGeolocationRequired(false);
-        mockEvent.setLocation("Edmonton");
-        mockEvent.setDescription("Test description");
+        // Use a unique ID to avoid collisions across test runs
+        String mockEventId = "mock-details-" + UUID.randomUUID();
+        @SuppressWarnings("deprecation")
+        Event mockEvent = new Event(
+                mockEventId,
+                "org123",
+                "Test Event Details",
+                new Date(126, 0, 1),  // 2026-01-01
+                new Date(126, 1, 2),  // 2026-02-02
+                "Open",
+                100,
+                50,
+                "Random",
+                false,
+                "Edmonton",
+                "Test description"
+        );
 
-        FirebaseFirestore.getInstance().collection("events").document("mockEventId")
-                .set(mockEvent).addOnCompleteListener(task -> latch.countDown());
-        try {
-            boolean success = latch.await(5, TimeUnit.SECONDS);
-            if (!success) {
-                System.err.println("Warning: Mock event creation timed out.");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        CountDownLatch createLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .set(mockEvent)
+                .addOnCompleteListener(task -> createLatch.countDown());
+        awaitLatch(createLatch, 10, "mock event creation");
 
-        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), OrganizerEventDetailsActivity.class);
-        intent.putExtra("eventId", "mockEventId");
-        ActivityScenario<OrganizerEventDetailsActivity> detailsScenario = 
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", mockEventId);
+        ActivityScenario<OrganizerEventDetailsActivity> detailsScenario =
                 ActivityScenario.launch(intent);
 
-        safeSleep(1500);
+        safeSleep(WAIT_MEDIUM);
 
-        // Check if layout fields are shown
         onView(withId(R.id.tv_event_name_detail)).check(matches(isDisplayed()));
         onView(withId(R.id.tv_event_dates)).check(matches(isDisplayed()));
         onView(withId(R.id.btn_edit_event)).check(matches(isDisplayed()));
@@ -328,88 +322,101 @@ public class OrganizerFlowTest {
         onView(withId(R.id.btn_registration_map)).check(matches(isDisplayed()));
 
         detailsScenario.close();
-        
-        // Cleanup the mock document
-        FirebaseFirestore.getInstance().collection("events").document("mockEventId").delete();
+
+        // Clean up the mock document created for this test
+        CountDownLatch deleteLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .delete()
+                .addOnCompleteListener(task -> deleteLatch.countDown());
+        awaitLatch(deleteLatch, 10, "mock event deletion");
     }
 
     /**
-     * Launching OrganizerEditEventActivity without passing an eventId extra
-     * should cause the activity to finish immediately (DESTROYED state).
+     * test9: Launching OrganizerEditEventActivity without an "eventId" extra
+     * must cause the activity to finish immediately (state = DESTROYED).
      */
     @Test
     public void test9_EditEventLaunchWithoutIdFinishesActivity() {
         ActivityScenario<OrganizerEditEventActivity> scenario =
                 ActivityScenario.launch(OrganizerEditEventActivity.class);
 
-        assertEquals(androidx.lifecycle.Lifecycle.State.DESTROYED, scenario.getState());
+        assertEquals(Lifecycle.State.DESTROYED, scenario.getState());
         scenario.close();
     }
 
     /**
-     * Editing only the event name in OrganizerEditEventActivity should update
-     * that field in Firestore while leaving all other fields unchanged.
+     * test10: Editing only the event name in OrganizerEditEventActivity should
+     * persist the new name to Firestore while leaving all other original fields
+     * (enrollmentCriteria, maxWaitlist, lotteryMethodology) unchanged.
      */
     @Test
     public void test10_EditEventUpdateSingleFieldUpdatesFirestore() throws InterruptedException {
         Intent intent = new Intent(
                 ApplicationProvider.getApplicationContext(),
-                OrganizerEditEventActivity.class
-        );
-        intent.putExtra("eventId", eventId);
+                OrganizerEditEventActivity.class);
+        intent.putExtra("eventId", editEventId);
 
-        ActivityScenario<OrganizerEditEventActivity> scenario = ActivityScenario.launch(intent);
+        ActivityScenario<OrganizerEditEventActivity> scenario =
+                ActivityScenario.launch(intent);
 
         onView(withId(R.id.et_event_name))
                 .perform(replaceText("Updated Event Name"), closeSoftKeyboard());
-        onView(withId(R.id.btn_update_event)).perform(click());
+        onView(withId(R.id.btn_update_event)).perform(nestedScrollTo(), click());
 
-        waitForFirestoreWrite();
+        safeSleep(WAIT_MEDIUM); // allow Firestore update to complete
 
         AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
-        CountDownLatch latch = new CountDownLatch(1);
-        db.collection("events")
-                .document(eventId)
+        CountDownLatch readLatch = new CountDownLatch(1);
+        db.collection("events").document(editEventId)
                 .get()
                 .addOnSuccessListener(snapshot -> {
                     snapshotRef.set(snapshot);
-                    latch.countDown();
+                    readLatch.countDown();
                 })
-                .addOnFailureListener(e -> latch.countDown());
+                .addOnFailureListener(e -> readLatch.countDown());
 
-        assertTrue("Timed out reading updated event", latch.await(5, TimeUnit.SECONDS));
+        assertTrue("Timed out reading updated event", readLatch.await(10, TimeUnit.SECONDS));
         DocumentSnapshot snapshot = snapshotRef.get();
-        assertTrue(snapshot != null && snapshot.exists());
-        assertEquals("Updated Event Name", snapshot.getString("eventName"));
-        assertEquals("Open to all", snapshot.getString("enrollmentCriteria"));
-        assertEquals(Long.valueOf(25), snapshot.getLong("maxWaitlist"));
-        assertEquals("System generates", snapshot.getString("lotteryMethodology"));
+        assertTrue("Event document must exist", snapshot != null && snapshot.exists());
+        assertEquals("Updated Event Name",  snapshot.getString("eventName"));
+        assertEquals("Open to all",         snapshot.getString("enrollmentCriteria"));
+        assertEquals(Long.valueOf(25),       snapshot.getLong("maxWaitlist"));
+        assertEquals("System generates",    snapshot.getString("lotteryMethodology"));
 
         scenario.close();
     }
 
+    // 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    /**
+     * Drives the full organizer signup flow that is launched from LoginActivity
+     * (Details screen 鈫?Address screen) and waits until OrganizerHomeActivity
+     * is visible.
+     */
     private void performFullSignup() {
-        // Login screen
+        // LoginActivity was already launched by setUp()
         onView(withId(R.id.btn_organizer_login)).perform(click());
 
-        // Details screen
-        safeSleep(1500);
+        // Wait for routing to Details screen (FCM token + Firestore lookup)
+        safeSleep(WAIT_MEDIUM);
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
+
         onView(withId(R.id.et_first_name)).perform(replaceText("John"), closeSoftKeyboard());
         onView(withId(R.id.et_last_name)).perform(replaceText("Doe"), closeSoftKeyboard());
         onView(withId(R.id.et_birthday)).perform(replaceText("01/01/2000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
-        // Address screen
-        safeSleep(3000);
+        // Wait for navigation to Address screen
+        safeSleep(WAIT_MEDIUM);
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
+
         onView(withId(R.id.et_address_line_1)).perform(replaceText("123 Main St"), closeSoftKeyboard());
         onView(withId(R.id.et_city)).perform(replaceText("Edmonton"), closeSoftKeyboard());
         onView(withId(R.id.et_postal_code)).perform(replaceText("T6G 2R3"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
-        // Wait for Firestore write and navigation to OrganizerHomeActivity
-        safeSleep(3500);
+        // Wait for Firestore write + navigation to OrganizerHomeActivity
+        safeSleep(WAIT_LONG);
     }
 
     private void safeSleep(long millis) {
@@ -420,11 +427,42 @@ public class OrganizerFlowTest {
         }
     }
 
-    private void waitForFirestoreWrite() {
+    private void awaitLatch(CountDownLatch latch, int timeoutSeconds, String operation) {
         try {
-            Thread.sleep(2000);
+            if (!latch.await(timeoutSeconds, TimeUnit.SECONDS)) {
+                System.err.println("Warning: timed out waiting for: " + operation);
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private ViewAction nestedScrollTo() {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return allOf(
+                        withEffectiveVisibility(androidx.test.espresso.matcher.ViewMatchers.Visibility.VISIBLE),
+                        isDescendantOfA(isAssignableFrom(NestedScrollView.class))
+                );
+            }
+
+            @Override
+            public String getDescription() {
+                return "scroll to view inside NestedScrollView";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                View parent = (View) view.getParent();
+                while (parent != null && !(parent instanceof NestedScrollView)) {
+                    parent = (View) parent.getParent();
+                }
+                if (parent instanceof NestedScrollView) {
+                    ((NestedScrollView) parent).scrollTo(0, view.getBottom());
+                }
+                uiController.loopMainThreadUntilIdle();
+            }
+        };
     }
 }
