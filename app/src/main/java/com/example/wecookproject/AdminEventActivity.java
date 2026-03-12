@@ -28,7 +28,7 @@ public class AdminEventActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.acticity_admin_event_home);
+        setContentView(R.layout.activity_admin_event_home);
 
         RecyclerView eventRecyclerView = findViewById(R.id.eventRecyclerView);
         MaterialButton deleteSelectedEventsButton = findViewById(R.id.deleteSelectedEventsButton);
