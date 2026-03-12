@@ -35,6 +35,7 @@ public class UserEventActivity extends AppCompatActivity {
     private TextView tvEmptyState;
     private UserEventAdapter eventAdapter;
     private String entrantId;
+    private BottomNavigationView bottomNav;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,25 +46,13 @@ public class UserEventActivity extends AppCompatActivity {
 
         rvEvents = findViewById(R.id.rv_events);
         tvEmptyState = findViewById(R.id.tv_empty_state);
-        BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
+        bottomNav = findViewById(R.id.bottom_nav);
 
         rvEvents.setLayoutManager(new LinearLayoutManager(this));
         eventAdapter = new UserEventAdapter(eventList, this::showEventDetailsDialog);
         rvEvents.setAdapter(eventAdapter);
 
-        bottomNav.setSelectedItemId(R.id.nav_events);
-        bottomNav.setOnItemSelectedListener(item -> {
-            int itemId = item.getItemId();
-            if (itemId == R.id.nav_scan) {
-                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
-            } else if (itemId == R.id.nav_history) {
-                Toast.makeText(this, "History (coming soon)", Toast.LENGTH_SHORT).show();
-            } else if (itemId == R.id.nav_profile) {
-                startActivity(new Intent(UserEventActivity.this, UserProfileActivity.class));
-            }
-            return true;
-        });
-
+        setupBottomNav();
         loadEvents();
     }
 
@@ -71,6 +60,33 @@ public class UserEventActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEvents();
+    }
+
+    private void setupBottomNav() {
+        bottomNav.setSelectedItemId(R.id.nav_events);
+
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+
+            if (itemId == R.id.nav_events) {
+                return true;
+            } else if (itemId == R.id.nav_scan) {
+                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
+                return true;
+            } else if (itemId == R.id.nav_history) {
+                Toast.makeText(this, "History (coming soon)", Toast.LENGTH_SHORT).show();
+                return true;
+            } else if (itemId == R.id.nav_profile) {
+                Intent intent = new Intent(UserEventActivity.this, UserProfileActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                overridePendingTransition(0, 0);
+                finish();
+                return true;
+            }
+
+            return false;
+        });
     }
 
     private void loadEvents() {

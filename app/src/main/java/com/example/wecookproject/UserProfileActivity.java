@@ -5,38 +5,44 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class UserProfileActivity extends AppCompatActivity {
 
-    private MaterialButton btnUpdate, btnDelete;
+    private MaterialButton btnUpdate;
+    private MaterialButton btnDelete;
     private SwitchMaterial switchAutoLogin;
     private ImageView ivNotifications;
-    private LinearLayout bottomNavEvents, bottomNavScan, bottomNavHistory, bottomNavProfile;
+    private BottomNavigationView bottomNav;
 
-    private EditText etFirstName, etLastName, etBirthday;
-    private EditText etAddressLine1, etCity, etPostalCode, etCountry;
+    private TextInputEditText etFirstName;
+    private TextInputEditText etLastName;
+    private TextInputEditText etBirthday;
+    private TextInputEditText etAddressLine1;
+    private TextInputEditText etCity;
+    private TextInputEditText etPostalCode;
+    private TextInputEditText etCountry;
 
     private FirebaseFirestore db;
     private String androidId;
-    private boolean notificationsEnabled = false;
+
     private boolean isEditing = false;
-    private BottomNavigationView bottomNav;
+    private boolean notificationsEnabled = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,6 +53,7 @@ public class UserProfileActivity extends AppCompatActivity {
         btnDelete = findViewById(R.id.btn_delete);
         switchAutoLogin = findViewById(R.id.switch_auto_login);
         ivNotifications = findViewById(R.id.iv_notifications);
+        bottomNav = findViewById(R.id.bottom_nav);
 
         etFirstName = findViewById(R.id.et_first_name);
         etLastName = findViewById(R.id.et_last_name);
@@ -55,12 +62,13 @@ public class UserProfileActivity extends AppCompatActivity {
         etCity = findViewById(R.id.et_city);
         etPostalCode = findViewById(R.id.et_postal_code);
         etCountry = findViewById(R.id.et_country);
-        bottomNav = findViewById(R.id.bottom_nav);
 
         db = FirebaseFirestore.getInstance();
         androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
         setupBirthdayWatcher();
+        setupBottomNav();
+
         setEditable(false);
         loadUserProfile();
 
@@ -77,27 +85,28 @@ public class UserProfileActivity extends AppCompatActivity {
         btnDelete.setOnClickListener(v -> showDeleteAccountConfirm());
 
         ivNotifications.setOnClickListener(v -> {
-
             notificationsEnabled = !notificationsEnabled;
 
             if (notificationsEnabled) {
-                ivNotifications.setImageResource(R.drawable.ic_notifications);
                 Toast.makeText(this, "Notifications ON", Toast.LENGTH_SHORT).show();
             } else {
-                ivNotifications.setImageResource(R.drawable.ic_notifications_off);
                 Toast.makeText(this, "Notifications OFF", Toast.LENGTH_SHORT).show();
             }
-
         });
+    }
 
-        bottomNav = findViewById(R.id.bottom_nav);
+    private void setupBottomNav() {
         bottomNav.setSelectedItemId(R.id.nav_profile);
 
         bottomNav.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
 
             if (id == R.id.nav_events) {
-                navigateToMain();
+                Intent intent = new Intent(UserProfileActivity.this, UserEventActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                overridePendingTransition(0, 0);
+                finish();
                 return true;
             } else if (id == R.id.nav_scan) {
                 Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
@@ -121,33 +130,7 @@ public class UserProfileActivity extends AppCompatActivity {
         etCity.setEnabled(enabled);
         etPostalCode.setEnabled(enabled);
         etCountry.setEnabled(enabled);
-    }
-
-    private void navigateToMain() {
-        Intent intent = new Intent(this, UserEventActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        startActivity(intent);
-        finish();
-    }
-
-    private void showDeleteAccountConfirm() {
-        new AlertDialog.Builder(this)
-                .setTitle("Delete Account")
-                .setMessage("Are you sure you want to delete your account? This action cannot be undone.")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    db.collection("users").document(androidId)
-                            .delete()
-                            .addOnSuccessListener(aVoid -> {
-                                Toast.makeText(UserProfileActivity.this, "Account deleted", Toast.LENGTH_SHORT).show();
-                                Intent intent = new Intent(UserProfileActivity.this, LoginActivity.class);
-                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                startActivity(intent);
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show());
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        switchAutoLogin.setEnabled(enabled);
     }
 
     private void setupBirthdayWatcher() {
@@ -155,10 +138,10 @@ public class UserProfileActivity extends AppCompatActivity {
             private boolean isFormatting = false;
 
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
 
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) { }
 
             @Override
             public void afterTextChanged(Editable s) {
@@ -200,6 +183,11 @@ public class UserProfileActivity extends AppCompatActivity {
                         if (autoLogin != null) {
                             switchAutoLogin.setChecked(autoLogin);
                         }
+
+                        Boolean notifications = documentSnapshot.getBoolean("notificationsEnabled");
+                        if (notifications != null) {
+                            notificationsEnabled = notifications;
+                        }
                     }
                 })
                 .addOnFailureListener(e ->
@@ -207,13 +195,13 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void saveUserProfile() {
-        String firstName = etFirstName.getText().toString().trim();
-        String lastName = etLastName.getText().toString().trim();
-        String birthday = etBirthday.getText().toString().trim();
-        String addressLine1 = etAddressLine1.getText().toString().trim();
-        String city = etCity.getText().toString().trim();
-        String postalCode = etPostalCode.getText().toString().trim();
-        String country = etCountry.getText().toString().trim();
+        String firstName = textOf(etFirstName);
+        String lastName = textOf(etLastName);
+        String birthday = textOf(etBirthday);
+        String addressLine1 = textOf(etAddressLine1);
+        String city = textOf(etCity);
+        String postalCode = textOf(etPostalCode);
+        String country = textOf(etCountry);
         boolean autoLogin = switchAutoLogin.isChecked();
 
         if (firstName.isEmpty()) {
@@ -222,6 +210,7 @@ public class UserProfileActivity extends AppCompatActivity {
         }
 
         Map<String, Object> userData = new HashMap<>();
+        userData.put("androidId", androidId);
         userData.put("firstName", firstName);
         userData.put("lastName", lastName);
         userData.put("birthday", birthday);
@@ -230,11 +219,12 @@ public class UserProfileActivity extends AppCompatActivity {
         userData.put("postalCode", postalCode);
         userData.put("country", country);
         userData.put("autoLogin", autoLogin);
+        userData.put("notificationsEnabled", notificationsEnabled);
         userData.put("profileCompleted", true);
 
         db.collection("users").document(androidId)
                 .set(userData, SetOptions.merge())
-                .addOnSuccessListener(aVoid -> {
+                .addOnSuccessListener(unused -> {
                     Toast.makeText(UserProfileActivity.this, "Profile updated", Toast.LENGTH_SHORT).show();
                     isEditing = false;
                     setEditable(false);
@@ -244,7 +234,31 @@ public class UserProfileActivity extends AppCompatActivity {
                         Toast.makeText(UserProfileActivity.this, "Error updating profile", Toast.LENGTH_SHORT).show());
     }
 
+    private void showDeleteAccountConfirm() {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Account")
+                .setMessage("Are you sure you want to delete your account? This action cannot be undone.")
+                .setPositiveButton("Delete", (dialog, which) ->
+                        db.collection("users").document(androidId)
+                                .delete()
+                                .addOnSuccessListener(unused -> {
+                                    Toast.makeText(UserProfileActivity.this, "Account deleted", Toast.LENGTH_SHORT).show();
+                                    Intent intent = new Intent(UserProfileActivity.this, LoginActivity.class);
+                                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                    startActivity(intent);
+                                })
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show())
+                )
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private String textOf(TextInputEditText editText) {
+        return editText.getText() == null ? "" : editText.getText().toString().trim();
     }
 }
