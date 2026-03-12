@@ -1,5 +1,8 @@
 package com.example.wecookproject.model;
 
+import java.util.List;
+import java.util.ArrayList;
+
 public class Event {
     private String eventId;
     private String organizerId;
@@ -15,6 +18,10 @@ public class Event {
 
     private String posterPath;
     private String qrCodePath;
+    private List<String> waitlistEntrantIds = new ArrayList<>();
+    private List<String> selectedEntrantIds = new ArrayList<>();
+    private List<String> replacementEntrantIds = new ArrayList<>();
+    private Integer lotteryCount = 0;
 
     // Required empty constructor for Firestore
     public Event() {
@@ -138,5 +145,37 @@ public class Event {
 
     public void setQrCodePath(String qrCodePath) {
         this.qrCodePath = qrCodePath;
+    }
+
+    public List<String> getWaitlistEntrantIds() {
+        return waitlistEntrantIds;
+    }
+
+    public void setWaitlistEntrantIds(List<String> waitlistEntrantIds) {
+        this.waitlistEntrantIds = waitlistEntrantIds;
+    }
+
+    public List<String> getSelectedEntrantIds() {
+        return selectedEntrantIds;
+    }
+
+    public void setSelectedEntrantIds(List<String> selectedEntrantIds) {
+        this.selectedEntrantIds = selectedEntrantIds;
+    }
+
+    public List<String> getReplacementEntrantIds() {
+        return replacementEntrantIds;
+    }
+
+    public void setReplacementEntrantIds(List<String> replacementEntrantIds) {
+        this.replacementEntrantIds = replacementEntrantIds;
+    }
+
+    public Integer getLotteryCount() {
+        return lotteryCount;
+    }
+
+    public void setLotteryCount(Integer lotteryCount) {
+        this.lotteryCount = lotteryCount;
     }
 }
