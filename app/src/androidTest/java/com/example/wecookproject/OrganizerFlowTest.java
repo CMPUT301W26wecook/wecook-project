@@ -31,6 +31,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
 import com.example.wecookproject.model.Event;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -75,6 +76,13 @@ public class OrganizerFlowTest {
      */
     @Before
     public void setUp() {
+        // Configure Firebase to use emulator
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        db.useEmulator("10.0.2.2", 8080);
+
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        auth.useEmulator("10.0.2.2", 9099);
+
         String androidId = Settings.Secure.getString(
                 ApplicationProvider.getApplicationContext().getContentResolver(),
                 Settings.Secure.ANDROID_ID);
