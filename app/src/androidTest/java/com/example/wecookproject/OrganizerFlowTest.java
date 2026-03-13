@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class OrganizerFlowTest {
 
-    // Sleep durations (ms) 鈥?generous enough for Firestore + UI transitions on CI/emulator
+    // Sleep durations (ms) generous enough for Firestore + UI transitions on CI/emulator
     private static final int WAIT_SHORT  = 2000;
     private static final int WAIT_MEDIUM = 4000;
     private static final int WAIT_LONG   = 6000;
@@ -124,7 +124,6 @@ public class OrganizerFlowTest {
         }
     }
 
-    // 鈹€鈹€鈹€ Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     /**
      * test1: Without an existing Firestore user, tapping "Login as organizer"
@@ -158,7 +157,7 @@ public class OrganizerFlowTest {
 
     /**
      * test3: Submitting the Create Event form with no Event Name entered must
-     * be blocked 鈥?Event Name is required.
+     * be blocked Event Name is required.
      */
     @Test
     public void test3_CreateEventWithoutNameIsBlocked() {
@@ -177,7 +176,6 @@ public class OrganizerFlowTest {
 
     /**
      * test4: Bottom navigation bar correctly switches among the three organizer
-     * tabs: Events 鈫?Create Events 鈫?Profile 鈫?Events.
      */
     @Test
     public void test4_BottomNavSwitchesBetweenTabs() {
@@ -191,12 +189,12 @@ public class OrganizerFlowTest {
         safeSleep(WAIT_SHORT);
         onView(withId(R.id.btn_create_event)).check(matches(isDisplayed()));
 
-        // Create Events 鈫?Profile
+        // Create Events Profile
         onView(withId(R.id.nav_profile)).perform(click());
         safeSleep(WAIT_SHORT);
         onView(withId(R.id.tv_organizer_info_title)).check(matches(withText("Organizer Info")));
 
-        // Profile 鈫?Events
+        // Profile Events
         onView(withId(R.id.nav_events)).perform(click());
         safeSleep(WAIT_SHORT);
         onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
@@ -247,7 +245,7 @@ public class OrganizerFlowTest {
      *
      * <p>Date fields accept "yyyy-MM-dd" text directly because
      * OrganizerCreateEventActivity registers a TextWatcher that parses the
-     * typed value and sets the internal Date field 鈥?in addition to the
+     * typed value and sets the internal Date field in addition to the
      * DatePickerDialog that sets the same field when the user taps the view.</p>
      */
     @Test
@@ -476,11 +474,9 @@ public class OrganizerFlowTest {
         awaitLatch(eventDeleteLatch, 15, "lottery with entrants test event cleanup");
     }
 
-    // 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-
     /**
      * Drives the full organizer signup flow that is launched from LoginActivity
-     * (Details screen 鈫?Address screen) and waits until OrganizerHomeActivity
+     * (Details screen Address screen) and waits until OrganizerHomeActivity
      * is visible.
      */
     private void performFullSignup() {
