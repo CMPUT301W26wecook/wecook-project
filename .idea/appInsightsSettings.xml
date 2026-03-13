@@ -9,10 +9,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.example.wecookproject" />
-                  <option name="mobileSdkAppId" value="1:904887108863:android:e230bb2f84a0eec5dab8ca" />
-                  <option name="projectId" value="wecook-proj" />
-                  <option name="projectNumber" value="904887108863" />
+                  <option name="appId" value="PLACEHOLDER" />
+                  <option name="mobileSdkAppId" value="" />
+                  <option name="projectId" value="" />
+                  <option name="projectNumber" value="" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

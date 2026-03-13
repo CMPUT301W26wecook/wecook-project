@@ -22,25 +22,25 @@
             android:orientation="vertical">
 
             <TextView
-                android:id="@+id/tv_user_name"
+                android:id="@+id/tv_organizer_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="User Name"
+                android:text="Organizer Name"
                 android:textColor="@color/black"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tv_user_id"
+                android:id="@+id/tv_organizer_id"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="User ID: android_id_123..."
+                android:text="Organizer ID: android_id_123..."
                 android:textColor="@color/text_muted"
                 android:textSize="12sp" />
 
             <TextView
-                android:id="@+id/tv_user_location"
+                android:id="@+id/tv_organizer_location"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -48,26 +48,36 @@
                 android:textColor="@color/text_muted"
                 android:textSize="12sp" />
 
+            <TextView
+                android:id="@+id/tv_event_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Events: 3 managed"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp" />
+
         </LinearLayout>
 
         <TextView
-            android:id="@+id/tv_user_status"
+            android:id="@+id/tv_organizer_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="16dp"
             android:background="@drawable/rounded_background"
-            android:backgroundTint="#E3F2FD"
+            android:backgroundTint="#E8F5E8"
             android:paddingHorizontal="12dp"
             android:paddingVertical="4dp"
             android:text="Active"
-            android:textColor="#1976D2"
+            android:textColor="#2E7D32"
             android:textSize="12sp" />
 
         <CheckBox
-            android:id="@+id/cb_select_user"
+            android:id="@+id/cb_select_organizer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="Select user" />
+            android:contentDescription="Select organizer" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
+
