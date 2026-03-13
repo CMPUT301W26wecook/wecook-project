@@ -217,3 +217,4 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
         }
     }
 }
+}
