@@ -205,7 +205,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         if (!TextUtils.isEmpty(pendingPosterUrl)) {
-            updates.put("posterUrl", pendingPosterUrl);
+            updates.put("posterPath", pendingPosterUrl);
         }
 
         if (hasError) {
@@ -284,7 +284,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         db.collection("events")
                 .document(eventId)
                 .get()
-                .addOnSuccessListener(documentSnapshot -> originalPosterUrl = documentSnapshot.getString("posterUrl"));
+                .addOnSuccessListener(documentSnapshot -> {
+                    originalPosterUrl = documentSnapshot.getString("posterPath");
+                    if (TextUtils.isEmpty(originalPosterUrl)) {
+                        originalPosterUrl = documentSnapshot.getString("posterUrl");
+                    }
+                });
     }
 
     private void cancelAndExit() {
