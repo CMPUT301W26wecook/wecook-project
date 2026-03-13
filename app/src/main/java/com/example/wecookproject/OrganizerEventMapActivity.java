@@ -30,8 +30,6 @@ import java.util.Objects;
  * the broader organizer feature set.
  *
  * Outstanding issues:
- * - The map-specific functionality is not implemented, so the screen currently provides navigation
- *   scaffolding without actual geographic event data or map interaction.
  * - The QR-code action is still a placeholder and does not yet present the expected organizer
  *   workflow.
  */
@@ -43,9 +41,6 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
 
-
-
-public class OrganizerEventMapActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -218,5 +213,4 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
             this.title = title;
         }
     }
-}
 }
