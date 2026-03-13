@@ -62,6 +62,11 @@ public class AdminUserFragment extends Fragment {
         loadUsersFromFirestore();
 
         adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<User>() {
+            /**
+             * Opens selected user detail screen.
+             *
+             * @param user selected user
+             */
             @Override
             public void onShowDetail(User user) {
                 viewModel.selectUser(user);
@@ -71,6 +76,12 @@ public class AdminUserFragment extends Fragment {
                         .commit();
             }
 
+            /**
+             * Clears selected user profile fields.
+             *
+             * @param user selected user
+             * @param position adapter position
+             */
             @Override
             public void onDelete(User user, int position) {
                 user.clearProfile();

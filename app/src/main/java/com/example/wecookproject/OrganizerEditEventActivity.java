@@ -121,6 +121,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         findViewById(R.id.btn_update_event).setOnClickListener(v -> updateEvent());
 
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            /**
+             * Handles system back press and applies cancel cleanup behavior.
+             */
             @Override
             public void handleOnBackPressed() {
                 cancelAndExit();

@@ -71,6 +71,9 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         notifyDataSetChanged();
     }
 
+    /**
+     * ViewHolder for organizer waitlist rows.
+     */
     static class WaitlistViewHolder extends RecyclerView.ViewHolder {
         private final TextView tvAvatar;
         private final TextView tvName;

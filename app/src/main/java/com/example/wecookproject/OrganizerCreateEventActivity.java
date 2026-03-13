@@ -59,8 +59,31 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         // Set up date picker for start date
         etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
         etRegistrationStartDate.addTextChangedListener(new TextWatcher() {
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param count changed length
+             * @param after replacement length
+             */
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param before replaced length
+             * @param count inserted length
+             */
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            /**
+             * Parses typed start-date text into internal date state.
+             *
+             * @param s editable content
+             */
             @Override
             public void afterTextChanged(Editable s) {
                 try {
@@ -74,8 +97,31 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         // Set up date picker for end date
         etRegistrationEndDate.setOnClickListener(v -> showEndDatePicker(etRegistrationEndDate));
         etRegistrationEndDate.addTextChangedListener(new TextWatcher() {
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param count changed length
+             * @param after replacement length
+             */
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param before replaced length
+             * @param count inserted length
+             */
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            /**
+             * Parses typed end-date text into internal date state.
+             *
+             * @param s editable content
+             */
             @Override
             public void afterTextChanged(Editable s) {
                 try {
