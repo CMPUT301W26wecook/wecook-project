@@ -3,6 +3,10 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+val mapsApiKey = (project.findProperty("MAPS_API_KEY") as String?)
+    ?: System.getenv("MAPS_API_KEY")
+    ?: ""
+
 android {
     namespace = "com.example.wecookproject"
     compileSdk = 36
@@ -13,6 +17,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -47,4 +52,6 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.android.gms:play-services-maps:19.2.0")
 }

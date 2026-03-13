@@ -1,9 +1,12 @@
 package com.example.wecookproject;
 
+import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.location.Location;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.LayoutInflater;
@@ -15,7 +18,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -25,7 +31,12 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.GeoPoint;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
+import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +53,10 @@ public class UserEventActivity extends AppCompatActivity {
     private UserEventAdapter eventAdapter;
     private String entrantId;
     private BottomNavigationView bottomNav;
+    private FusedLocationProviderClient fusedLocationClient;
+    private ActivityResultLauncher<String[]> locationPermissionLauncher;
+    private UserEventRecord pendingJoinEventRecord;
+    private AlertDialog pendingJoinDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +64,19 @@ public class UserEventActivity extends AppCompatActivity {
         setContentView(R.layout.activity_user_event_list);
 
         entrantId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        locationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestMultiplePermissions(),
+                result -> {
+                    boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
+                            || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+                    if (granted && pendingJoinEventRecord != null && pendingJoinDialog != null) {
+                        fetchLocationAndJoinWaitlist(pendingJoinEventRecord, pendingJoinDialog);
+                    } else if (!granted) {
+                        Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
 
         rvEvents = findViewById(R.id.rv_events);
         tvEmptyState = findViewById(R.id.tv_empty_state);
@@ -260,17 +288,70 @@ public class UserEventActivity extends AppCompatActivity {
         }
 
         btnJoinWaitlist.setText("Join the Waitlist");
-        btnJoinWaitlist.setOnClickListener(v -> joinWaitingList(eventRecord, dialog));
+        btnJoinWaitlist.setOnClickListener(v -> requestLocationAndJoinWaitlist(eventRecord, dialog));
     }
 
-    private void joinWaitingList(UserEventRecord eventRecord, AlertDialog dialog) {
+    private void requestLocationAndJoinWaitlist(UserEventRecord eventRecord, AlertDialog dialog) {
+        if (!eventRecord.isGeolocationRequired()) {
+            joinWaitingList(eventRecord, dialog, null);
+            return;
+        }
+        pendingJoinEventRecord = eventRecord;
+        pendingJoinDialog = dialog;
+        if (hasLocationPermission()) {
+            fetchLocationAndJoinWaitlist(eventRecord, dialog);
+            return;
+        }
+
+        locationPermissionLauncher.launch(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        });
+    }
+
+    private void fetchLocationAndJoinWaitlist(UserEventRecord eventRecord, AlertDialog dialog) {
+        if (!hasLocationPermission()) {
+            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(location -> {
+                    if (location != null) {
+                        joinWaitingList(eventRecord, dialog, location);
+                        return;
+                    }
+
+                    CancellationTokenSource tokenSource = new CancellationTokenSource();
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
+                            .addOnSuccessListener(currentLocation -> {
+                                if (currentLocation == null) {
+                                    Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                joinWaitingList(eventRecord, dialog, currentLocation);
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+    }
+
+    private boolean hasLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void joinWaitingList(UserEventRecord eventRecord, AlertDialog dialog, Location entrantLocation) {
         updateWaitlistMembership(
                 eventRecord,
                 true,
                 UserEventRecord.STATUS_WAITLISTED,
                 false,
                 "Joined waiting list successfully",
-                dialog
+                dialog,
+                entrantLocation
         );
     }
 
@@ -281,7 +362,8 @@ public class UserEventActivity extends AppCompatActivity {
                 null,
                 true,
                 "Left waiting list",
-                dialog
+                dialog,
+                null
         );
     }
 
@@ -292,7 +374,8 @@ public class UserEventActivity extends AppCompatActivity {
                 UserEventRecord.STATUS_ACCEPTED,
                 false,
                 "Invitation accepted",
-                dialog
+                dialog,
+                null
         );
     }
 
@@ -303,7 +386,8 @@ public class UserEventActivity extends AppCompatActivity {
                 UserEventRecord.STATUS_REJECTED,
                 false,
                 "Invitation declined",
-                dialog
+                dialog,
+                null
         );
     }
 
@@ -312,7 +396,8 @@ public class UserEventActivity extends AppCompatActivity {
                                           String newStatus,
                                           boolean deleteHistory,
                                           String successMessage,
-                                          AlertDialog dialog) {
+                                          AlertDialog dialog,
+                                          Location entrantLocation) {
         DocumentReference eventReference = db.collection("events").document(eventRecord.getEventId());
 
         db.runTransaction(transaction -> {
@@ -331,8 +416,13 @@ public class UserEventActivity extends AppCompatActivity {
 
             Long maxWaitlistValue = snapshot.getLong("maxWaitlist");
             int maxWaitlist = maxWaitlistValue == null ? 0 : maxWaitlistValue.intValue();
+            Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
+            boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
 
             if (addEntrant) {
+                if (geolocationRequired && entrantLocation == null) {
+                    throw new IllegalStateException("Location is required to join this waitlist");
+                }
                 if (waitlistEntrants.contains(entrantId)) {
                     throw new IllegalStateException("You already joined this waiting list");
                 }
@@ -344,9 +434,18 @@ public class UserEventActivity extends AppCompatActivity {
                 waitlistEntrants.remove(entrantId);
             }
 
-            transaction.update(eventReference,
-                    "waitlistEntrantIds", waitlistEntrants,
-                    "currentWaitlistCount", waitlistEntrants.size());
+            if (addEntrant && entrantLocation != null) {
+                transaction.update(eventReference,
+                        "waitlistEntrantIds", waitlistEntrants,
+                        "currentWaitlistCount", waitlistEntrants.size(),
+                        "waitlistEntrantLocations." + entrantId,
+                        new GeoPoint(entrantLocation.getLatitude(), entrantLocation.getLongitude()));
+            } else {
+                transaction.update(eventReference,
+                        "waitlistEntrantIds", waitlistEntrants,
+                        "currentWaitlistCount", waitlistEntrants.size(),
+                        "waitlistEntrantLocations." + entrantId, FieldValue.delete());
+            }
             return waitlistEntrants;
         }).addOnSuccessListener(updatedWaitlist -> {
             eventRecord.setWaitlistEntrantIds(new ArrayList<>(updatedWaitlist));

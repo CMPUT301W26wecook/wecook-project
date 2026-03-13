@@ -32,23 +32,14 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
-    <!-- Map placeholder (use Maps Fragment in production) -->
-    <FrameLayout
-        android:id="@+id/fl_map_container"
+    <fragment
+        android:id="@+id/map_fragment"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="56dp"
         android:layout_marginBottom="56dp"
-        android:background="@color/bg_light">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="Map View"
-            android:textColor="@color/text_muted"
-            android:textSize="16sp" />
-    </FrameLayout>
+        android:background="@color/bg_light" />
 
     <!-- Event header card (overlaid on map, top-left) -->
     <LinearLayout

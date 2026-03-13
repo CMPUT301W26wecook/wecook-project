@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
@@ -18,6 +19,8 @@ import java.util.Locale;
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
     
     private ListenerRegistration eventListener;
+    private SwitchMaterial geolocationSwitch;
+    private boolean suppressSwitchCallback;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,9 +36,25 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         TextView tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
         TextView tvWaitlistLabel = findViewById(R.id.tv_waitlist_label);
         TextView tvEventDescription = findViewById(R.id.tv_event_description);
+        geolocationSwitch = findViewById(R.id.switch_geolocation);
 
         if (eventId != null) {
             FirebaseFirestore db = FirebaseFirestore.getInstance();
+            geolocationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (suppressSwitchCallback) {
+                    return;
+                }
+                db.collection("events")
+                        .document(eventId)
+                        .update("geolocationRequired", isChecked)
+                        .addOnFailureListener(e -> {
+                            suppressSwitchCallback = true;
+                            buttonView.setChecked(!isChecked);
+                            suppressSwitchCallback = false;
+                            Toast.makeText(this, "Failed to update geolocation requirement", Toast.LENGTH_SHORT).show();
+                        });
+            });
+
             // Use addSnapshotListener for real-time updates
             eventListener = db.collection("events").document(eventId)
                     .addSnapshotListener((documentSnapshot, error) -> {
@@ -64,6 +83,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 
                                 tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
                                 tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
+                                suppressSwitchCallback = true;
+                                geolocationSwitch.setChecked(event.isGeolocationRequired());
+                                suppressSwitchCallback = false;
                                 
                                 String description = "Enrollment: " + event.getEnrollmentCriteria() + "\n" +
                                                      "Methodology: " + event.getLotteryMethodology() + "\n" +
@@ -122,7 +144,13 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         });
         
         findViewById(R.id.btn_registration_map).setOnClickListener(v -> {
-             Toast.makeText(this, "Map clicked", Toast.LENGTH_SHORT).show();
+             if (eventId != null) {
+                 Intent intent = new Intent(this, OrganizerEventMapActivity.class);
+                 intent.putExtra("eventId", eventId);
+                 startActivity(intent);
+             } else {
+                 Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
+             }
         });
 
         findViewById(R.id.btn_show_qr).setOnClickListener(v -> {

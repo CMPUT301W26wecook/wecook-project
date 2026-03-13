@@ -24,6 +24,7 @@ public class UserEventRecord {
     private final String entrantId;
     private final Timestamp registrationStartDate;
     private final Timestamp registrationEndDate;
+    private final boolean geolocationRequired;
 
     private List<String> waitlistEntrantIds;
     private String historyStatus;
@@ -40,6 +41,7 @@ public class UserEventRecord {
                            String entrantId,
                            Timestamp registrationStartDate,
                            Timestamp registrationEndDate,
+                           boolean geolocationRequired,
                            List<String> waitlistEntrantIds,
                            String historyStatus) {
         this.eventId = eventId;
@@ -54,6 +56,7 @@ public class UserEventRecord {
         this.entrantId = entrantId;
         this.registrationStartDate = registrationStartDate;
         this.registrationEndDate = registrationEndDate;
+        this.geolocationRequired = geolocationRequired;
         this.waitlistEntrantIds = waitlistEntrantIds;
         this.historyStatus = historyStatus == null ? "" : historyStatus;
     }
@@ -81,6 +84,7 @@ public class UserEventRecord {
                 entrantId,
                 snapshot.getTimestamp("registrationStartDate"),
                 snapshot.getTimestamp("registrationEndDate"),
+                getBoolean(snapshot, "geolocationRequired", true),
                 waitlistEntrants,
                 resolvedStatus
         );
@@ -89,6 +93,11 @@ public class UserEventRecord {
     private static String getString(DocumentSnapshot snapshot, String field, String fallback) {
         String value = snapshot.getString(field);
         return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+
+    private static boolean getBoolean(DocumentSnapshot snapshot, String field, boolean fallback) {
+        Boolean value = snapshot.getBoolean(field);
+        return value == null ? fallback : value;
     }
 
     @SuppressWarnings("unchecked")
@@ -139,6 +148,10 @@ public class UserEventRecord {
 
     public Timestamp getRegistrationEndDate() {
         return registrationEndDate;
+    }
+
+    public boolean isGeolocationRequired() {
+        return geolocationRequired;
     }
 
     public List<String> getWaitlistEntrantIds() {
