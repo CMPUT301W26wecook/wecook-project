@@ -127,10 +127,8 @@ public class OrganizerFlowTest {
                 "Original Event",
                 new Date(126, 3, 1),   // 2026-04-01
                 new Date(126, 3, 30),  // 2026-04-30
-                "Open to all",
                 25,
                 0,
-                "System generates",
                 false,
                 "Edmonton",
                 "Original description"
@@ -275,7 +273,7 @@ public class OrganizerFlowTest {
 
     /**
      * test7: Filling all mandatory Create Event fields (name, dates via text
-     * input, max waitlist, and both radio groups) and tapping "Create Event"
+     * input, and max waitlist) and tapping "Create Event"
      * should save to Firestore and navigate back to OrganizerHomeActivity.
      *
      * <p>Date fields accept "yyyy-MM-dd" text directly because
@@ -301,9 +299,6 @@ public class OrganizerFlowTest {
                 .perform(replaceText("2026-04-10"), closeSoftKeyboard());
         onView(withId(R.id.et_max_waitlist))
                 .perform(replaceText("50"), closeSoftKeyboard());
-
-        onView(withId(R.id.rb_open_to_all)).perform(click());
-        onView(withId(R.id.rb_system_generates)).perform(click());
 
         onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
 
@@ -331,10 +326,8 @@ public class OrganizerFlowTest {
                 "Test Event Details",
                 new Date(126, 0, 1),  // 2026-01-01
                 new Date(126, 1, 2),  // 2026-02-02
-                "Open",
                 100,
                 50,
-                "Random",
                 false,
                 "Edmonton",
                 "Test description"
@@ -385,8 +378,8 @@ public class OrganizerFlowTest {
 
     /**
      * test10: Editing only the event name in OrganizerEditEventActivity should
-     * persist the new name to Firestore while leaving all other original fields
-     * (enrollmentCriteria, maxWaitlist, lotteryMethodology) unchanged.
+     * persist the new name to Firestore while leaving the other original fields
+     * such as maxWaitlist unchanged.
      */
     @Test
     public void test10_EditEventUpdateSingleFieldUpdatesFirestore() throws InterruptedException {
@@ -418,9 +411,7 @@ public class OrganizerFlowTest {
         DocumentSnapshot snapshot = snapshotRef.get();
         assertTrue("Event document must exist", snapshot != null && snapshot.exists());
         assertEquals("Updated Event Name",  snapshot.getString("eventName"));
-        assertEquals("Open to all",         snapshot.getString("enrollmentCriteria"));
         assertEquals(Long.valueOf(25),       snapshot.getLong("maxWaitlist"));
-        assertEquals("System generates",    snapshot.getString("lotteryMethodology"));
 
         scenario.close();
     }
@@ -441,10 +432,8 @@ public class OrganizerFlowTest {
                 "Lottery With Entrants Test Event",
                 new Date(126, 2, 1),   // 2026-03-01 (registration start)
                 new Date(126, 2, 10),  // 2026-03-10 (registration end - in the past)
-                "Open to all",
                 25,
                 0,
-                "System generates",
                 false,
                 "Edmonton",
                 "Test event for lottery with entrants"

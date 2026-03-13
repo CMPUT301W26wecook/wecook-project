@@ -77,10 +77,10 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
                                 tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
                                 
-                                String description = "Enrollment: " + event.getEnrollmentCriteria() + "\n" +
-                                                     "Methodology: " + event.getLotteryMethodology() + "\n" +
-                                                     event.getDescription();
-                                tvEventDescription.setText(description.trim());
+                                String description = event.getDescription() == null
+                                        ? ""
+                                        : event.getDescription().trim();
+                                tvEventDescription.setText(description);
                             }
                         } else {
                             // Event was deleted or doesn't exist

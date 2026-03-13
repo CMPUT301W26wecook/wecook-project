@@ -6,8 +6,6 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import android.annotation.SuppressLint;
@@ -50,8 +48,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         TextInputEditText etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         TextInputEditText etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         TextInputEditText etMaxWaitlist = findViewById(R.id.et_max_waitlist);
-        RadioGroup rgEnrollmentCriteria = findViewById(R.id.rg_enrollment_criteria);
-        RadioGroup rgLotteryMethod = findViewById(R.id.rg_lottery_method);
 
         // Set up date picker for start date
         etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
@@ -122,17 +118,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return;
             }
 
-            int selectedEnrollmentId = rgEnrollmentCriteria.getCheckedRadioButtonId();
-            int selectedLotteryId = rgLotteryMethod.getCheckedRadioButtonId();
-
-            if (selectedEnrollmentId == -1 || selectedLotteryId == -1) {
-                Toast.makeText(this, "Please select criteria and methodology", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            String enrollmentCriteria = ((RadioButton) findViewById(selectedEnrollmentId)).getText().toString();
-            String lotteryMethodology = ((RadioButton) findViewById(selectedLotteryId)).getText().toString();
-
             int maxWaitlist;
             try {
                 maxWaitlist = Integer.parseInt(maxWaitlistStr);
@@ -151,10 +136,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     eventName,
                     registrationStartDate,
                     registrationEndDate,
-                    enrollmentCriteria,
                     maxWaitlist,
                     0, // currentWaitlistCount starts at 0
-                    lotteryMethodology,
                     false, // Default geolocation
                     "Location TBD", // Default location
                     "" // Default description

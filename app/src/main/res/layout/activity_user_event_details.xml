@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FAF8F9"
+    android:fitsSystemWindows="true"
     tools:context=".UserEventDetailsActivity">
 
     <androidx.core.widget.NestedScrollView
@@ -161,6 +162,16 @@
                 android:text="Description"
                 android:textColor="@color/text_muted"
                 android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_view_lottery_criteria"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/btn_secondary_bg"
+                android:text="View Lottery Criteria"
+                android:textAllCaps="false"
+                android:textColor="@color/text_dark" />
 
             <LinearLayout
                 android:layout_width="match_parent"

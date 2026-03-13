@@ -165,46 +165,6 @@
                     android:clickable="true" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Enrollment Criteria label -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Enrollment Criteria"
-                android:textSize="14sp"
-                android:textColor="@color/text_muted"
-                android:layout_marginTop="16dp" />
-
-            <RadioGroup
-                android:id="@+id/rg_enrollment_criteria"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <RadioButton
-                    android:id="@+id/rb_open_to_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Open to all"
-                    android:textSize="13sp" />
-
-                <RadioButton
-                    android:id="@+id/rb_by_invitation"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="By invitation only"
-                    android:textSize="13sp"
-                    android:layout_marginStart="12dp" />
-
-                <RadioButton
-                    android:id="@+id/rb_age_restricted"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Age restricted (18+)"
-                    android:textSize="13sp"
-                    android:layout_marginStart="12dp" />
-            </RadioGroup>
-
             <!-- Maximum Waitlist Number -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_max_waitlist"
@@ -218,46 +178,6 @@
                     android:layout_height="wrap_content"
                     android:inputType="number" />
             </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Lottery Pickup Methodology label -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Lottery Pickup Methodology"
-                android:textSize="14sp"
-                android:textColor="@color/text_muted"
-                android:layout_marginTop="16dp" />
-
-            <RadioGroup
-                android:id="@+id/rg_lottery_method"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <RadioButton
-                    android:id="@+id/rb_organizer_picks"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Organizer picks"
-                    android:textSize="13sp" />
-
-                <RadioButton
-                    android:id="@+id/rb_system_generates"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="System generates"
-                    android:textSize="13sp"
-                    android:layout_marginStart="16dp" />
-            </RadioGroup>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Choose how winners will be selected."
-                android:textSize="12sp"
-                android:textColor="@color/text_muted"
-                android:layout_marginTop="4dp" />
 
             <!-- Buttons row -->
             <LinearLayout

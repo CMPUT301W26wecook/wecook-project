@@ -17,8 +17,6 @@ public class UserEventRecord {
     private final String location;
     private final String organizerId;
     private final String description;
-    private final String enrollmentCriteria;
-    private final String lotteryMethodology;
     private final String posterPath;
     private final int maxWaitlist;
     private final String entrantId;
@@ -33,8 +31,6 @@ public class UserEventRecord {
                            String location,
                            String organizerId,
                            String description,
-                           String enrollmentCriteria,
-                           String lotteryMethodology,
                            String posterPath,
                            int maxWaitlist,
                            String entrantId,
@@ -47,8 +43,6 @@ public class UserEventRecord {
         this.location = location;
         this.organizerId = organizerId;
         this.description = description;
-        this.enrollmentCriteria = enrollmentCriteria;
-        this.lotteryMethodology = lotteryMethodology;
         this.posterPath = posterPath;
         this.maxWaitlist = maxWaitlist;
         this.entrantId = entrantId;
@@ -74,8 +68,6 @@ public class UserEventRecord {
                 getString(snapshot, "location", "Location TBD"),
                 getString(snapshot, "organizerId", "Unknown Organizer"),
                 getString(snapshot, "description", "No event description available."),
-                getString(snapshot, "enrollmentCriteria", "Open to all"),
-                getString(snapshot, "lotteryMethodology", "System generates"),
                 getString(snapshot, "posterPath", null),
                 maxWaitlist,
                 entrantId,
@@ -115,14 +107,6 @@ public class UserEventRecord {
 
     public String getDescription() {
         return description;
-    }
-
-    public String getEnrollmentCriteria() {
-        return enrollmentCriteria;
-    }
-
-    public String getLotteryMethodology() {
-        return lotteryMethodology;
     }
 
     public String getPosterPath() {

@@ -14,6 +14,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Wecookproject">
         <activity
+            android:name=".UserLotteryCriteriaActivity"
+            android:exported="false" />
+        <activity
             android:name=".UserEventDetailsActivity"
             android:exported="false" />
         <activity

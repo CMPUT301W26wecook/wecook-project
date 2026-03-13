@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.webkit.MimeTypeMap;
 import android.widget.FrameLayout;
-import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -56,8 +55,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private TextInputEditText etRegistrationStartDate;
     private TextInputEditText etRegistrationEndDate;
     private TextInputEditText etMaxWaitlist;
-    private RadioGroup rgEnrollmentCriteria;
-    private RadioGroup rgLotteryMethod;
     private String originalPosterUrl;
     private String pendingPosterUrl;
     private boolean posterCommitted;
@@ -84,8 +81,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         etMaxWaitlist = findViewById(R.id.et_max_waitlist);
-        rgEnrollmentCriteria = findViewById(R.id.rg_enrollment_criteria);
-        rgLotteryMethod = findViewById(R.id.rg_lottery_method);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
 
         posterPickerLauncher = registerForActivityResult(
@@ -209,16 +204,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             }
         }
 
-        String enrollmentCriteria = getEnrollmentCriteriaValue(rgEnrollmentCriteria.getCheckedRadioButtonId());
-        if (enrollmentCriteria != null) {
-            updates.put("enrollmentCriteria", enrollmentCriteria);
-        }
-
-        String lotteryMethodology = getLotteryMethodValue(rgLotteryMethod.getCheckedRadioButtonId());
-        if (lotteryMethodology != null) {
-            updates.put("lotteryMethodology", lotteryMethodology);
-        }
-
         if (!TextUtils.isEmpty(pendingPosterUrl)) {
             updates.put("posterUrl", pendingPosterUrl);
         }
@@ -327,26 +312,4 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
     }
 
-    private String getEnrollmentCriteriaValue(int checkedId) {
-        if (checkedId == R.id.rb_open_to_all) {
-            return "Open to all";
-        }
-        if (checkedId == R.id.rb_by_invitation) {
-            return "By invitation only";
-        }
-        if (checkedId == R.id.rb_age_restricted) {
-            return "Age restricted (18+)";
-        }
-        return null;
-    }
-
-    private String getLotteryMethodValue(int checkedId) {
-        if (checkedId == R.id.rb_organizer_picks) {
-            return "Organizer picks";
-        }
-        if (checkedId == R.id.rb_system_generates) {
-            return "System generates";
-        }
-        return null;
-    }
 }
