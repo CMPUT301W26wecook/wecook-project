@@ -53,9 +53,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-@RunWith(AndroidJUnit4.class)
-@LargeTest
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 /**
  * End-to-end instrumentation tests for the organizer-part application flow. This class
  * exercises the main organizer journey across login/signup routing, profile access, event
@@ -90,6 +87,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * - Several tests interact with real Firestore state, so failures can be influenced by network,
  *   emulator timing, or shared backend conditions.
  */
+@RunWith(AndroidJUnit4.class)
+@LargeTest
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class OrganizerFlowTest {
 
     // Sleep durations (ms) generous enough for Firestore + UI transitions on CI/emulator
