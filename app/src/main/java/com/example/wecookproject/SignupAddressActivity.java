@@ -44,6 +44,8 @@ public class SignupAddressActivity extends AppCompatActivity {
             String firstName = intentFromDetails.getStringExtra("firstName");
             String lastName = intentFromDetails.getStringExtra("lastName");
             String birthday = intentFromDetails.getStringExtra("birthday");
+            String clickedRole = intentFromDetails.getStringExtra("clickedRole");
+            String role = "ORGANIZER".equals(clickedRole) ? "organizer" : "entrant";
 
             // Navigate immediately — Firestore write happens in the background
             String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -57,15 +59,15 @@ public class SignupAddressActivity extends AppCompatActivity {
             userData.put("city", city);
             userData.put("postalCode", postalCode);
             userData.put("country", country);
+            userData.put("role", role);
             userData.put("profileCompleted", true);
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("users").document(androidId).set(userData)
                 .addOnSuccessListener(aVoid -> {
                     // Go to appropriate Activity only after Firestore success
-                    String role = intentFromDetails.getStringExtra("clickedRole");
                     Intent intent;
-                    if ("ORGANIZER".equals(role)) {
+                    if ("ORGANIZER".equals(clickedRole)) {
                         intent = new Intent(SignupAddressActivity.this, OrganizerHomeActivity.class);
                     } else {
                         intent = new Intent(SignupAddressActivity.this, UserEventActivity.class);

@@ -186,6 +186,7 @@ public class UserFlowTest {
         Map<String, Object> user = new HashMap<>();
         user.put("firstName", "Integration");
         user.put("lastName", "Tester");
+        user.put("role", "entrant");
         user.put("profileCompleted", true);
         db.collection("users").document(androidId).set(user).addOnCompleteListener(t -> latch.countDown());
         try { latch.await(3, TimeUnit.SECONDS); } catch (Exception ignored) {}
