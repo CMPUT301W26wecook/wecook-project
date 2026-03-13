@@ -122,13 +122,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         });
         
         findViewById(R.id.btn_registration_map).setOnClickListener(v -> {
-             if (eventId != null) {
-                 Intent intent = new Intent(this, OrganizerEventMapActivity.class);
-                 intent.putExtra("eventId", eventId);
-                 startActivity(intent);
-             } else {
-                 Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
-             }
+             Toast.makeText(this, "Map clicked", Toast.LENGTH_SHORT).show();
         });
 
         findViewById(R.id.btn_show_qr).setOnClickListener(v -> {

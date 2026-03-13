@@ -19,6 +19,28 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Enable Geolocation toggle -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Enable Geolocation Requirement"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_dark" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_geolocation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
             <!-- Event Header Row -->
             <LinearLayout
                 android:layout_width="match_parent"

@@ -143,7 +143,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     maxWaitlist,
                     0, // currentWaitlistCount starts at 0
                     lotteryMethodology,
-                    true, // Geolocation is mandatory
+                    false, // Default geolocation
                     "Location TBD", // Default location
                     "" // Default description
             );

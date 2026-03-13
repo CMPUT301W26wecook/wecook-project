@@ -1,9 +1,6 @@
 package com.example.wecookproject;
 
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.location.Location;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
@@ -13,20 +10,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.Priority;
-import com.google.android.gms.tasks.CancellationTokenSource;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.GeoPoint;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,8 +29,6 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     private String entrantId;
     private String eventId;
     private UserEventRecord currentEvent;
-    private FusedLocationProviderClient fusedLocationClient;
-    private ActivityResultLauncher<String[]> locationPermissionLauncher;
 
     private TextView tvAvatar;
     private TextView tvHeaderName;
@@ -62,19 +49,6 @@ public class UserEventDetailsActivity extends AppCompatActivity {
 
         entrantId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         eventId = getIntent().getStringExtra("eventId");
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        locationPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestMultiplePermissions(),
-                result -> {
-                    boolean granted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION))
-                            || Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
-                    if (granted) {
-                        fetchLocationAndJoinWaitlist();
-                    } else {
-                        Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
-                    }
-                }
-        );
 
         if (eventId == null || eventId.trim().isEmpty()) {
             Toast.makeText(this, "Missing event details", Toast.LENGTH_SHORT).show();
@@ -217,75 +191,29 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         }
 
         btnPrimary.setText("Join the Waitlist");
-        btnPrimary.setOnClickListener(v -> requestLocationAndJoinWaitlist());
+        btnPrimary.setOnClickListener(v -> joinWaitlist());
     }
 
-    private void requestLocationAndJoinWaitlist() {
-        if (hasLocationPermission()) {
-            fetchLocationAndJoinWaitlist();
-            return;
-        }
-        locationPermissionLauncher.launch(new String[]{
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-        });
-    }
-
-    private void fetchLocationAndJoinWaitlist() {
-        if (!hasLocationPermission()) {
-            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    if (location != null) {
-                        joinWaitlist(location);
-                        return;
-                    }
-
-                    CancellationTokenSource tokenSource = new CancellationTokenSource();
-                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
-                            .addOnSuccessListener(currentLocation -> {
-                                if (currentLocation == null) {
-                                    Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                joinWaitlist(currentLocation);
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
-    }
-
-    private boolean hasLocationPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void joinWaitlist(Location entrantLocation) {
-        updateWaitlistMembership(true, UserEventRecord.STATUS_WAITLISTED, false, "Joined waiting list successfully", entrantLocation);
+    private void joinWaitlist() {
+        updateWaitlistMembership(true, UserEventRecord.STATUS_WAITLISTED, false, "Joined waiting list successfully");
     }
 
     private void leaveWaitlist() {
-        updateWaitlistMembership(false, null, true, "Left waiting list", null);
+        updateWaitlistMembership(false, null, true, "Left waiting list");
     }
 
     private void acceptInvitation() {
-        updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted", null);
+        updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted");
     }
 
     private void declineInvitation() {
-        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null);
+        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined");
     }
 
     private void updateWaitlistMembership(boolean addEntrant,
                                           String newStatus,
                                           boolean deleteHistory,
-                                          String successMessage,
-                                          Location entrantLocation) {
+                                          String successMessage) {
         DocumentReference eventReference = db.collection("events").document(eventId);
 
         db.runTransaction(transaction -> {
@@ -306,9 +234,6 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             int maxWaitlist = maxWaitlistValue == null ? 0 : maxWaitlistValue.intValue();
 
             if (addEntrant) {
-                if (entrantLocation == null) {
-                    throw new IllegalStateException("Location is required to join this waitlist");
-                }
                 if (waitlistEntrants.contains(entrantId)) {
                     throw new IllegalStateException("You already joined this waiting list");
                 }
@@ -320,13 +245,9 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 waitlistEntrants.remove(entrantId);
             }
 
-            Object locationValue = addEntrant
-                    ? new GeoPoint(entrantLocation.getLatitude(), entrantLocation.getLongitude())
-                    : FieldValue.delete();
             transaction.update(eventReference,
                     "waitlistEntrantIds", waitlistEntrants,
-                    "currentWaitlistCount", waitlistEntrants.size(),
-                    "waitlistEntrantLocations." + entrantId, locationValue);
+                    "currentWaitlistCount", waitlistEntrants.size());
             return waitlistEntrants;
         }).addOnSuccessListener(updatedWaitlist -> {
             currentEvent.setWaitlistEntrantIds(updatedWaitlist);
