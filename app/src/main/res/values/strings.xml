@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">wecookproject</string>
     <string name="AdminLogin"> <u>Admin login here.</u> </string>
+    <string name="google_maps_key">AIzaSyDRvcf79E5lm2Q7mwDMCsRGc2avJF8BaXs</string>
 </resources>
