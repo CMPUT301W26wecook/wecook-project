@@ -64,6 +64,7 @@
         <activity
             android:name=".OrganizerEntrantListActivity"
             android:exported="false" />
+        
     </application>
 
 </manifest>
