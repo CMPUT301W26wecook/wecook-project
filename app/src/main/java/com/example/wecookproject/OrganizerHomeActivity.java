@@ -18,6 +18,18 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Activity for organizers to view the list of events they manage and navigate into event-specific
+ * management screens. Within the app it acts as the UI controller for the organizer home/dashboard
+ * flow, binding Firestore event updates to a RecyclerView-backed list.
+ *
+ * Outstanding issues:
+ * - Event loading depends directly on the device Android ID as the organizer identifier, which is a
+ *   weak coupling point for account identity and portability.
+ * - Firestore listener and list-management logic are handled directly in the Activity, which
+ *   tightly couples UI and data logic instead of separating them through a repository or
+ *   ViewModel-style layer.
+ */
 public class OrganizerHomeActivity extends AppCompatActivity {
     
     private EventAdapter eventAdapter;

@@ -16,6 +16,18 @@ import com.google.firebase.firestore.ListenerRegistration;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
+/**
+ * Activity for organizers to view an event's details, observe live updates, and navigate to
+ * related management flows such as editing the event or reviewing its waitlist. Within the app it
+ * acts as the UI controller for the organizer event-details screen, binding Firestore snapshot
+ * data directly to the view layer.
+ *
+ * Outstanding issues:
+ * - Some actions are incomplete or placeholder-driven, including the registration map button and
+ *   the QR-code flow and will be implemented in part 4.
+ * - Presentation and Firestore listener logic are handled directly in the Activity
+ *  
+ */
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
     
     private ListenerRegistration eventListener;
@@ -87,10 +99,10 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 geolocationSwitch.setChecked(event.isGeolocationRequired());
                                 suppressSwitchCallback = false;
                                 
-                                String description = "Enrollment: " + event.getEnrollmentCriteria() + "\n" +
-                                                     "Methodology: " + event.getLotteryMethodology() + "\n" +
-                                                     event.getDescription();
-                                tvEventDescription.setText(description.trim());
+                                String description = event.getDescription() == null
+                                        ? ""
+                                        : event.getDescription().trim();
+                                tvEventDescription.setText(description);
                             }
                         } else {
                             // Event was deleted or doesn't exist

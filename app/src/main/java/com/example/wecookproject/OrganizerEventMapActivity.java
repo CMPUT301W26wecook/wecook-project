@@ -24,6 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Activity intended to show organizers a map-oriented view related to an event. Within the app it
+ * acts as the UI controller stub for the organizer event-map flow and provides navigation back into
+ * the broader organizer feature set.
+ *
+ * Outstanding issues:
+ * - The QR-code action is still a placeholder and does not yet present the expected organizer
+ *   workflow.
+ */
+
 public class OrganizerEventMapActivity extends AppCompatActivity implements OnMapReadyCallback {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private GoogleMap googleMap;

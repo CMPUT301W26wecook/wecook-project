@@ -55,9 +55,7 @@ public final class UserEventUiUtils {
     }
 
     public static String buildDescription(UserEventRecord eventRecord) {
-        return "Enrollment: " + eventRecord.getEnrollmentCriteria() + "\n"
-                + "Lottery: " + eventRecord.getLotteryMethodology() + "\n\n"
-                + eventRecord.getDescription();
+        return eventRecord.getDescription();
     }
 
     public static void applyStatusChip(TextView textView, String status, boolean invitedAsPicked) {

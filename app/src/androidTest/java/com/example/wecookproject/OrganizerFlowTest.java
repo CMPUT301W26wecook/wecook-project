@@ -53,6 +53,40 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * End-to-end instrumentation tests for the organizer-part application flow. This class
+ * exercises the main organizer journey across login/signup routing, profile access, event
+ * creation, event-detail navigation, event editing, and lottery behavior while verifying the
+ * expected UI state and Firestore side effects for each scenario.
+ *
+ * Test case summary:
+ * - `test1_OrganizerLoginWithoutExistingUserRoutesToSignup`: verifies that organizer login routes
+ *   a device without an existing user record to the signup details screen.
+ * - `test2_OrganizerProfileMandatoryNamesBlockUpdate`: verifies that profile updates are blocked
+ *   when required organizer name fields are left blank.
+ * - `test3_CreateEventWithoutNameIsBlocked`: verifies that event creation is blocked when the
+ *   required event name is missing.
+ * - `test4_BottomNavSwitchesBetweenTabs`: verifies that organizer bottom navigation switches
+ *   correctly between events, create-event, and profile screens.
+ * - `test5_OrganizerProfileUpdateWithValidNames`: verifies that entering valid profile names and
+ *   tapping update keeps the organizer on the profile screen without error.
+ * - `test6_NotificationScreenIsReachableAndShowsHintField`: verifies that the organizer
+ *   notification screen opens and shows its message input field.
+ * - `test7_CreateEventAndVerifyInList`: verifies that submitting a valid create-event form returns
+ *   the organizer to the home screen after the event is saved.
+ * - `test8_EventDetailsScreenDisplaysCorrectly`: verifies that the event-details screen loads the
+ *   expected core UI elements for a valid event.
+ * - `test9_EditEventLaunchWithoutIdFinishesActivity`: verifies that the edit-event screen exits
+ *   immediately when launched without a required event ID.
+ * - `test10_EditEventUpdateSingleFieldUpdatesFirestore`: verifies that editing only the event name
+ *   updates that field in Firestore without changing unrelated event fields.
+ * - `test11_LotteryAvailableOnlyAfterRegistrationEnds`: verifies that a lottery draw after
+ *   registration closes selects the requested number of entrants and saves them to Firestore.
+ *
+ * Outstanding issues:
+ * - Several tests interact with real Firestore state, so failures can be influenced by network,
+ *   emulator timing, or shared backend conditions.
+ */
 @RunWith(AndroidJUnit4.class)
 @LargeTest
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -93,10 +127,8 @@ public class OrganizerFlowTest {
                 "Original Event",
                 new Date(126, 3, 1),   // 2026-04-01
                 new Date(126, 3, 30),  // 2026-04-30
-                "Open to all",
                 25,
                 0,
-                "System generates",
                 false,
                 "Edmonton",
                 "Original description"
@@ -175,7 +207,8 @@ public class OrganizerFlowTest {
     }
 
     /**
-     * test4: Bottom navigation bar correctly switches among the three organizer
+     * test4: Bottom navigation should switch correctly among the organizer Events,
+     * Create Event, and Profile tabs.
      */
     @Test
     public void test4_BottomNavSwitchesBetweenTabs() {
@@ -240,7 +273,7 @@ public class OrganizerFlowTest {
 
     /**
      * test7: Filling all mandatory Create Event fields (name, dates via text
-     * input, max waitlist, and both radio groups) and tapping "Create Event"
+     * input, and max waitlist) and tapping "Create Event"
      * should save to Firestore and navigate back to OrganizerHomeActivity.
      *
      * <p>Date fields accept "yyyy-MM-dd" text directly because
@@ -266,9 +299,6 @@ public class OrganizerFlowTest {
                 .perform(replaceText("2026-04-10"), closeSoftKeyboard());
         onView(withId(R.id.et_max_waitlist))
                 .perform(replaceText("50"), closeSoftKeyboard());
-
-        onView(withId(R.id.rb_open_to_all)).perform(click());
-        onView(withId(R.id.rb_system_generates)).perform(click());
 
         onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
 
@@ -296,11 +326,9 @@ public class OrganizerFlowTest {
                 "Test Event Details",
                 new Date(126, 0, 1),  // 2026-01-01
                 new Date(126, 1, 2),  // 2026-02-02
-                "Open",
                 100,
                 50,
-                "Random",
-                true,
+                false,
                 "Edmonton",
                 "Test description"
         );
@@ -356,8 +384,8 @@ public class OrganizerFlowTest {
 
     /**
      * test10: Editing only the event name in OrganizerEditEventActivity should
-     * persist the new name to Firestore while leaving all other original fields
-     * (enrollmentCriteria, maxWaitlist, lotteryMethodology) unchanged.
+     * persist the new name to Firestore while leaving the other original fields
+     * such as maxWaitlist unchanged.
      */
     @Test
     public void test10_EditEventUpdateSingleFieldUpdatesFirestore() throws InterruptedException {
@@ -389,17 +417,14 @@ public class OrganizerFlowTest {
         DocumentSnapshot snapshot = snapshotRef.get();
         assertTrue("Event document must exist", snapshot != null && snapshot.exists());
         assertEquals("Updated Event Name",  snapshot.getString("eventName"));
-        assertEquals("Open to all",         snapshot.getString("enrollmentCriteria"));
         assertEquals(Long.valueOf(25),       snapshot.getLong("maxWaitlist"));
-        assertEquals("System generates",    snapshot.getString("lotteryMethodology"));
 
         scenario.close();
     }
 
     /**
-     * test11: Lottery with entrants should select winners and update the event status.
-     * This test creates an event with entrants on the waitlist, performs lottery,
-     * and verifies that winners are selected.
+     * test11: Running a lottery after registration has ended should select the requested
+     * number of winners from the waitlist and persist them to Firestore.
      */
     @Test
     public void test11_LotteryAvailableOnlyAfterRegistrationEnds() throws InterruptedException {
@@ -413,10 +438,8 @@ public class OrganizerFlowTest {
                 "Lottery With Entrants Test Event",
                 new Date(126, 2, 1),   // 2026-03-01 (registration start)
                 new Date(126, 2, 10),  // 2026-03-10 (registration end - in the past)
-                "Open to all",
                 25,
                 0,
-                "System generates",
                 false,
                 "Edmonton",
                 "Test event for lottery with entrants"
@@ -481,9 +504,8 @@ public class OrganizerFlowTest {
     }
 
     /**
-     * Drives the full organizer signup flow that is launched from LoginActivity
-     * (Details screen Address screen) and waits until OrganizerHomeActivity
-     * is visible.
+     * Drives the full organizer signup flow launched from LoginActivity, progressing through the
+     * Details and Address screens until OrganizerHomeActivity becomes visible.
      */
     private void performFullSignup() {
         // LoginActivity was already launched by setUp()

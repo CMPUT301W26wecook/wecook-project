@@ -22,6 +22,19 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * Activity for organizers to review an event's waitlist, search entrants, and run a lottery draw
+ * after registration closes. Within the app it acts as the UI controller for the organizer
+ * entrant-management flow, coordinating list presentation, filtering, and Firestore updates from a
+ * single screen.
+ *
+ * Outstanding issues:
+ * - Several organizer actions are still placeholders, including invitations, invited-list viewing,
+ *   redraw, and bulk deletion and will be implemented in part 4.
+ * - Firestore reads and lottery-write logic are handled directly in the Activity, which puts
+ *   UI and data logic together instead of separating them through a repository or ViewModel-style
+ *   layer.
+ */
 public class OrganizerEntrantListActivity extends AppCompatActivity {
     private final List<OrganizerWaitlistItem> allEntrants = new ArrayList<>();
 

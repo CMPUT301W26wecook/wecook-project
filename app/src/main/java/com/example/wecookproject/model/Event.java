@@ -11,10 +11,8 @@ public class Event {
     private String eventName;
     private Date registrationStartDate;
     private Date registrationEndDate;
-    private String enrollmentCriteria;
     private int maxWaitlist;
     private int currentWaitlistCount;
-    private String lotteryMethodology;
     private boolean geolocationRequired;
     private String location; // As seen in details "Edmonton"
     private String description;
@@ -31,17 +29,15 @@ public class Event {
     }
 
     public Event(String eventId, String organizerId, String eventName, Date registrationStartDate, Date registrationEndDate,
-                 String enrollmentCriteria, int maxWaitlist, int currentWaitlistCount, String lotteryMethodology,
+                 int maxWaitlist, int currentWaitlistCount,
                  boolean geolocationRequired, String location, String description) {
         this.eventId = eventId;
         this.organizerId = organizerId;
         this.eventName = eventName;
         this.registrationStartDate = registrationStartDate;
         this.registrationEndDate = registrationEndDate;
-        this.enrollmentCriteria = enrollmentCriteria;
         this.maxWaitlist = maxWaitlist;
         this.currentWaitlistCount = currentWaitlistCount;
-        this.lotteryMethodology = lotteryMethodology;
         this.geolocationRequired = geolocationRequired;
         this.location = location;
         this.description = description;
@@ -87,14 +83,6 @@ public class Event {
         this.registrationEndDate = registrationEndDate;
     }
 
-    public String getEnrollmentCriteria() {
-        return enrollmentCriteria;
-    }
-
-    public void setEnrollmentCriteria(String enrollmentCriteria) {
-        this.enrollmentCriteria = enrollmentCriteria;
-    }
-
     public int getMaxWaitlist() {
         return maxWaitlist;
     }
@@ -109,14 +97,6 @@ public class Event {
 
     public void setCurrentWaitlistCount(int currentWaitlistCount) {
         this.currentWaitlistCount = currentWaitlistCount;
-    }
-
-    public String getLotteryMethodology() {
-        return lotteryMethodology;
-    }
-
-    public void setLotteryMethodology(String lotteryMethodology) {
-        this.lotteryMethodology = lotteryMethodology;
     }
 
     public boolean isGeolocationRequired() {
