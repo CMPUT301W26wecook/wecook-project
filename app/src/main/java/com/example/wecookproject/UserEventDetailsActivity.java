@@ -1,29 +1,18 @@
 package com.example.wecookproject;
 
 import android.Manifest;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.location.Location;
-import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AlertDialog;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
@@ -33,7 +22,6 @@ import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
-import com.google.zxing.WriterException;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -107,13 +95,8 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         btnPrimary = findViewById(R.id.btn_detail_primary);
 
         findViewById(R.id.iv_detail_back).setOnClickListener(v -> finish());
-        findViewById(R.id.btn_detail_show_qr).setOnClickListener(v -> {
-            if (eventId == null || eventId.trim().isEmpty()) {
-                Toast.makeText(this, "Missing event details", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            showQrDialog(QrCodeUtils.buildPromotionalEventLink(eventId));
-        });
+        findViewById(R.id.btn_detail_show_qr).setOnClickListener(v ->
+                Toast.makeText(this, "QR code preview coming soon", Toast.LENGTH_SHORT).show());
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_events);
@@ -183,7 +166,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         tvDateRange.setText(UserEventUiUtils.formatDateRange(currentEvent.getRegistrationStartDate(), currentEvent.getRegistrationEndDate()));
         tvWaitlist.setText(UserEventUiUtils.formatWaitlistSummary(currentEvent));
         tvDescription.setText(UserEventUiUtils.buildDescription(currentEvent));
-        PosterLoader.loadInto(ivPoster, currentEvent.getPosterUrl());
+        PosterLoader.loadInto(ivPoster, currentEvent.getPosterPath());
 
         if (currentEvent.getEffectiveStatus().isEmpty()) {
             tvStatus.setVisibility(View.GONE);
@@ -383,7 +366,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         historyData.put("eventName", currentEvent.getEventName());
         historyData.put("location", currentEvent.getLocation());
         historyData.put("organizerId", currentEvent.getOrganizerId());
-        historyData.put("posterUrl", currentEvent.getPosterUrl());
+        historyData.put("posterPath", currentEvent.getPosterPath());
         historyData.put("registrationStartDate", currentEvent.getRegistrationStartDate());
         historyData.put("registrationEndDate", currentEvent.getRegistrationEndDate());
         historyData.put("description", currentEvent.getDescription());
@@ -405,66 +388,5 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 .collection("eventHistory")
                 .document(currentEvent.getEventId())
                 .delete();
-    }
-
-    private void showQrDialog(String payload) {
-        try {
-            int qrSize = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP,
-                    280,
-                    getResources().getDisplayMetrics()
-            );
-            Bitmap qrBitmap = QrCodeUtils.generateQrBitmap(payload, qrSize);
-            ImageView qrImage = new ImageView(this);
-            qrImage.setLayoutParams(new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            ));
-            qrImage.setAdjustViewBounds(true);
-            qrImage.setImageBitmap(qrBitmap);
-
-            TextView linkView = new TextView(this);
-            linkView.setLayoutParams(new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            ));
-            linkView.setText(payload);
-            linkView.setTextColor(Color.BLUE);
-            linkView.setPaintFlags(linkView.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
-            linkView.setOnClickListener(v -> {
-                Intent openIntent = new Intent(this, PublicEventLandingActivity.class);
-                openIntent.setData(Uri.parse(payload));
-                startActivity(openIntent);
-            });
-            linkView.setOnLongClickListener(v -> {
-                ClipboardManager clipboard =
-                        (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                if (clipboard != null) {
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Event link", payload));
-                    Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show();
-                }
-                return true;
-            });
-            int topPadding = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, 12, getResources().getDisplayMetrics());
-            linkView.setPadding(0, topPadding, 0, 0);
-
-            LinearLayout dialogContent = new LinearLayout(this);
-            dialogContent.setOrientation(LinearLayout.VERTICAL);
-            dialogContent.setGravity(Gravity.CENTER_HORIZONTAL);
-            int padding = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
-            dialogContent.setPadding(padding, padding, padding, padding);
-            dialogContent.addView(qrImage);
-            dialogContent.addView(linkView);
-
-            new AlertDialog.Builder(this)
-                    .setTitle("Event QR Code")
-                    .setView(dialogContent)
-                    .setPositiveButton("Close", null)
-                    .show();
-        } catch (WriterException e) {
-            Toast.makeText(this, "Failed to generate QR code", Toast.LENGTH_SHORT).show();
-        }
     }
 }

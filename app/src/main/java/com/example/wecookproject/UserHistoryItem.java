@@ -7,7 +7,7 @@ public class UserHistoryItem {
     private final String eventId;
     private final String eventName;
     private final String location;
-    private final String posterUrl;
+    private final String posterPath;
     private final String status;
     private final Timestamp registrationStartDate;
     private final Timestamp registrationEndDate;
@@ -15,14 +15,14 @@ public class UserHistoryItem {
     public UserHistoryItem(String eventId,
                            String eventName,
                            String location,
-                           String posterUrl,
+                           String posterPath,
                            String status,
                            Timestamp registrationStartDate,
                            Timestamp registrationEndDate) {
         this.eventId = eventId;
         this.eventName = eventName;
         this.location = location;
-        this.posterUrl = posterUrl;
+        this.posterPath = posterPath;
         this.status = status;
         this.registrationStartDate = registrationStartDate;
         this.registrationEndDate = registrationEndDate;
@@ -33,7 +33,7 @@ public class UserHistoryItem {
                 value(snapshot.getString("eventId"), snapshot.getId()),
                 value(snapshot.getString("eventName"), "Unnamed Event"),
                 value(snapshot.getString("location"), "Location TBD"),
-                getPosterUrl(snapshot),
+                snapshot.getString("posterPath"),
                 value(snapshot.getString("status"), UserEventRecord.STATUS_WAITLISTED),
                 snapshot.getTimestamp("registrationStartDate"),
                 snapshot.getTimestamp("registrationEndDate")
@@ -56,20 +56,8 @@ public class UserHistoryItem {
         return location;
     }
 
-    public String getPosterUrl() {
-        return posterUrl;
-    }
-
     public String getPosterPath() {
-        return posterUrl;
-    }
-
-    private static String getPosterUrl(com.google.firebase.firestore.DocumentSnapshot snapshot) {
-        String url = snapshot.getString("posterUrl");
-        if (url != null && !url.trim().isEmpty()) {
-            return url;
-        }
-        return snapshot.getString("posterPath");
+        return posterPath;
     }
 
     public String getStatus() {

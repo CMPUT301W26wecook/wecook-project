@@ -12,7 +12,6 @@ import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
 import android.provider.Settings;
@@ -35,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.UUID;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
@@ -171,30 +169,14 @@ public class UserFlowTest {
         onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
     }
 
+
     @Test
-    public void test20_EventDetailsShowQrDisplaysPromotionalLink() throws InterruptedException {
+    public void test19_BottomNav_ScanToast() {
         prepareTestUser();
-        String eventId = "user-qr-" + UUID.randomUUID();
-        createEventForQrTest(eventId);
-        createHistoryForQrTest(eventId);
+        ActivityScenario.launch(UserEventActivity.class);
+        onView(withId(R.id.nav_scan)).perform(click());
 
-        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), UserEventDetailsActivity.class);
-        intent.putExtra("eventId", eventId);
-        ActivityScenario<UserEventDetailsActivity> scenario = ActivityScenario.launch(intent);
-
-        safeSleep(1500);
-        onView(withId(R.id.btn_detail_show_qr)).perform(click());
-        onView(withText("Event QR Code")).check(matches(isDisplayed()));
-        onView(withText(QrCodeUtils.buildPromotionalEventLink(eventId))).check(matches(isDisplayed()));
-        onView(withText(QrCodeUtils.buildPromotionalEventLink(eventId))).perform(click());
-        safeSleep(1000);
-        onView(withId(R.id.tv_public_event_name)).check(matches(withText("User QR Test Event")));
-        pressBack();
-        safeSleep(500);
-
-        scenario.close();
-        db.collection("users").document(androidId).collection("eventHistory").document(eventId).delete();
-        db.collection("events").document(eventId).delete();
+        onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
     }
 
 
@@ -221,43 +203,6 @@ public class UserFlowTest {
         CountDownLatch latch = new CountDownLatch(1);
         db.collection("events").document(testEventId).set(eventData).addOnCompleteListener(t -> latch.countDown());
         try { latch.await(3, TimeUnit.SECONDS); } catch (Exception ignored) {}
-    }
-
-    private void createEventForQrTest(String eventId) throws InterruptedException {
-        Map<String, Object> eventData = new HashMap<>();
-        eventData.put("eventId", eventId);
-        eventData.put("eventName", "User QR Test Event");
-        eventData.put("location", "Edmonton");
-        eventData.put("organizerId", "org-test");
-        eventData.put("description", "QR details test");
-        eventData.put("enrollmentCriteria", "Open to all");
-        eventData.put("lotteryMethodology", "System generates");
-        eventData.put("maxWaitlist", 50L);
-        eventData.put("waitlistEntrantIds", new ArrayList<String>());
-        eventData.put("currentWaitlistCount", 0L);
-        eventData.put("geolocationRequired", true);
-
-        CountDownLatch latch = new CountDownLatch(1);
-        db.collection("events").document(eventId)
-                .set(eventData)
-                .addOnCompleteListener(t -> latch.countDown());
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
-    }
-
-    private void createHistoryForQrTest(String eventId) throws InterruptedException {
-        Map<String, Object> historyData = new HashMap<>();
-        historyData.put("eventId", eventId);
-        historyData.put("status", "");
-        historyData.put("updatedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
-
-        CountDownLatch latch = new CountDownLatch(1);
-        db.collection("users")
-                .document(androidId)
-                .collection("eventHistory")
-                .document(eventId)
-                .set(historyData)
-                .addOnCompleteListener(t -> latch.countDown());
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
     }
 
     private void safeSleep(long ms) {

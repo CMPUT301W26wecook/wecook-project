@@ -19,7 +19,7 @@ public class UserEventRecord {
     private final String description;
     private final String enrollmentCriteria;
     private final String lotteryMethodology;
-    private final String posterUrl;
+    private final String posterPath;
     private final int maxWaitlist;
     private final String entrantId;
     private final Timestamp registrationStartDate;
@@ -36,7 +36,7 @@ public class UserEventRecord {
                            String description,
                            String enrollmentCriteria,
                            String lotteryMethodology,
-                           String posterUrl,
+                           String posterPath,
                            int maxWaitlist,
                            String entrantId,
                            Timestamp registrationStartDate,
@@ -51,7 +51,7 @@ public class UserEventRecord {
         this.description = description;
         this.enrollmentCriteria = enrollmentCriteria;
         this.lotteryMethodology = lotteryMethodology;
-        this.posterUrl = posterUrl;
+        this.posterPath = posterPath;
         this.maxWaitlist = maxWaitlist;
         this.entrantId = entrantId;
         this.registrationStartDate = registrationStartDate;
@@ -79,7 +79,7 @@ public class UserEventRecord {
                 getString(snapshot, "description", "No event description available."),
                 getString(snapshot, "enrollmentCriteria", "Open to all"),
                 getString(snapshot, "lotteryMethodology", "System generates"),
-                getPosterUrl(snapshot),
+                getString(snapshot, "posterPath", null),
                 maxWaitlist,
                 entrantId,
                 snapshot.getTimestamp("registrationStartDate"),
@@ -104,14 +104,6 @@ public class UserEventRecord {
     private static List<String> getStringList(DocumentSnapshot snapshot, String field) {
         List<String> values = (List<String>) snapshot.get(field);
         return values == null ? new ArrayList<>() : new ArrayList<>(values);
-    }
-
-    private static String getPosterUrl(DocumentSnapshot snapshot) {
-        String url = snapshot.getString("posterUrl");
-        if (url != null && !url.trim().isEmpty()) {
-            return url;
-        }
-        return snapshot.getString("posterPath");
     }
 
     public String getEventId() {
@@ -142,12 +134,8 @@ public class UserEventRecord {
         return lotteryMethodology;
     }
 
-    public String getPosterUrl() {
-        return posterUrl;
-    }
-
     public String getPosterPath() {
-        return posterUrl;
+        return posterPath;
     }
 
     public int getMaxWaitlist() {
