@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/nav_users"
+        android:icon="@drawable/ic_user"
+        android:title="Users" />
+
+    <item android:title="Events"
+        android:icon="@drawable/ic_event"
+        android:id="@+id/nav_events" />
+
+    <item android:title="Organizers"
+        android:icon="@drawable/ic_organizer"
+        android:id="@+id/nav_organizers"/>
+
+    <item android:title="Notifications"
+        android:icon="@drawable/ic_notification"
+        android:id="@+id/nav_notifications"/>
+</menu>

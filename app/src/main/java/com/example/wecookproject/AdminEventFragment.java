@@ -1,0 +1,105 @@
+package com.example.wecookproject;
+
+import android.os.Bundle;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.wecookproject.model.Event;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class AdminEventFragment extends Fragment {
+
+    private RecyclerView recyclerView;
+    private ListElementAdapter<Event> adapter;
+    private List<Event> eventList;
+    private FirebaseFirestore db;
+    private AdminViewModel viewModel;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_admin_event_list, container, false);
+        db = FirebaseFirestore.getInstance();
+        viewModel = new ViewModelProvider(requireActivity()).get(AdminViewModel.class);
+
+        recyclerView = view.findViewById(R.id.rv_event_list);
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        eventList = new ArrayList<>();
+        adapter = new ListElementAdapter<>(eventList, viewModel);
+        adapter.setShowDetailOption(true);
+        adapter.setShowDeleteOption(true);
+        recyclerView.setAdapter(adapter);
+
+        loadEventsFromFirestore();
+
+        adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<Event>() {
+            @Override
+            public void onShowDetail(Event event) {
+                viewModel.selectEvent(event);
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new AdminEventDetailFragment())
+                        .addToBackStack(null)
+                        .commit();
+            }
+
+            @Override
+            public void onDelete(Event event, int position) {
+                db.collection("events").document(event.getEventId())
+                        .delete()
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(getContext(), "Event deleted", Toast.LENGTH_SHORT).show();
+                        })
+                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting event", Toast.LENGTH_SHORT).show());
+
+            }
+        });
+
+        view.findViewById(R.id.btn_delete_selected).setOnClickListener(v -> {
+            List<Boolean> selected = adapter.getSelectedList();
+            for (int i = 0; i < eventList.size(); i++) {
+                if (selected.get(i)) {
+                    Event event = eventList.get(i);
+                    db.collection("events").document(event.getEventId()).delete();
+                }
+            }
+            Toast.makeText(getContext(), "Selected events deleted", Toast.LENGTH_SHORT).show();
+        });
+        return view;
+    }
+
+    private void loadEventsFromFirestore() {
+        db.collection("events")
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        Log.w("AdminEventFragment", "Listen failed.", error);
+                        return;
+                    }
+
+                    eventList.clear();
+                    adapter.getSelectedList().clear();
+                    if (value != null) {
+                        for (QueryDocumentSnapshot doc : value) {
+                            Event event = doc.toObject(Event.class);
+                            eventList.add(event);
+                            adapter.getSelectedList().add(false);
+                        }
+                    }
+                    adapter.notifyDataSetChanged();
+                });
+    }
+}

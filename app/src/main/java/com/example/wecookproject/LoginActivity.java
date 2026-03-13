@@ -87,7 +87,10 @@ public class LoginActivity extends AppCompatActivity {
 
     private void routeUser() {
         Intent jumpIntent;
-        if (isUserExists) {
+        if (clickedRole.equals("ADMIN")) {
+            jumpIntent = new Intent(LoginActivity.this, AdminLoginActivity.class);
+        }
+        else if (isUserExists) {
             if ("ORGANIZER".equals(clickedRole)) {
                 jumpIntent = new Intent(LoginActivity.this, OrganizerHomeActivity.class);
             } else {
