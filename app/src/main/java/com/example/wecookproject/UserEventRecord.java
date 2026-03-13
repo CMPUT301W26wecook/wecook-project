@@ -71,7 +71,7 @@ public class UserEventRecord {
                 getString(snapshot, "location", "Location TBD"),
                 getString(snapshot, "organizerId", "Unknown Organizer"),
                 getString(snapshot, "description", "No event description available."),
-                getString(snapshot, "posterPath", null),
+                getPosterPath(snapshot),
                 maxWaitlist,
                 entrantId,
                 snapshot.getTimestamp("registrationStartDate"),
@@ -85,6 +85,15 @@ public class UserEventRecord {
     private static String getString(DocumentSnapshot snapshot, String field, String fallback) {
         String value = snapshot.getString(field);
         return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+
+    private static String getPosterPath(DocumentSnapshot snapshot) {
+        String posterPath = snapshot.getString("posterPath");
+        if (posterPath != null && !posterPath.trim().isEmpty()) {
+            return posterPath;
+        }
+        String legacyPosterUrl = snapshot.getString("posterUrl");
+        return legacyPosterUrl == null || legacyPosterUrl.trim().isEmpty() ? null : legacyPosterUrl;
     }
 
     private static boolean getBoolean(DocumentSnapshot snapshot, String field, boolean fallback) {

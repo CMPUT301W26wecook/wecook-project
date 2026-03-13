@@ -37,8 +37,8 @@ import java.util.Locale;
  * Outstanding issues:
  * - Existing event fields are not preloaded into the form, so the screen currently behaves like a
  *   partial-update form rather than a full edit view.
- * - Firestore and Storage access are handled directly in the Activity, which tightly which puts
- *   UI and data logic together instead of separating them through a repository or ViewModel-style layer.
+ * - Firestore and Storage access are handled directly in the Activity, which is not implemented yet,
+ *   as connecting to Firebase storage require addition setup that might incur extra costs.
  */
 public class OrganizerEditEventActivity extends AppCompatActivity {
     private Date registrationStartDate;
@@ -205,7 +205,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         if (!TextUtils.isEmpty(pendingPosterUrl)) {
-            updates.put("posterUrl", pendingPosterUrl);
+            updates.put("posterPath", pendingPosterUrl);
         }
 
         if (hasError) {
@@ -284,7 +284,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         db.collection("events")
                 .document(eventId)
                 .get()
-                .addOnSuccessListener(documentSnapshot -> originalPosterUrl = documentSnapshot.getString("posterUrl"));
+                .addOnSuccessListener(documentSnapshot -> {
+                    originalPosterUrl = documentSnapshot.getString("posterPath");
+                    if (TextUtils.isEmpty(originalPosterUrl)) {
+                        originalPosterUrl = documentSnapshot.getString("posterUrl");
+                    }
+                });
     }
 
     private void cancelAndExit() {

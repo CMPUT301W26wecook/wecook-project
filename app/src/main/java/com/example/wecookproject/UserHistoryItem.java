@@ -33,7 +33,7 @@ public class UserHistoryItem {
                 value(snapshot.getString("eventId"), snapshot.getId()),
                 value(snapshot.getString("eventName"), "Unnamed Event"),
                 value(snapshot.getString("location"), "Location TBD"),
-                snapshot.getString("posterPath"),
+                posterPath(snapshot),
                 value(snapshot.getString("status"), UserEventRecord.STATUS_WAITLISTED),
                 snapshot.getTimestamp("registrationStartDate"),
                 snapshot.getTimestamp("registrationEndDate")
@@ -42,6 +42,15 @@ public class UserHistoryItem {
 
     private static String value(String text, String fallback) {
         return text == null || text.trim().isEmpty() ? fallback : text;
+    }
+
+    private static String posterPath(DocumentSnapshot snapshot) {
+        String posterPath = snapshot.getString("posterPath");
+        if (posterPath != null && !posterPath.trim().isEmpty()) {
+            return posterPath;
+        }
+        String legacyPosterUrl = snapshot.getString("posterUrl");
+        return legacyPosterUrl == null || legacyPosterUrl.trim().isEmpty() ? null : legacyPosterUrl;
     }
 
     public String getEventId() {

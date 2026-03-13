@@ -33,6 +33,8 @@ import java.util.UUID;
  * - Firestore writes and organizer-identity lookup are handled directly in the Activity, which
  *   tightly couples UI and data logic instead of separating them through a repository or
  *   ViewModel-style layer.
+ * - Firestore and Storage access are handled directly in the Activity, which is not implemented yet,
+ *   as connecting to Firebase storage require addition setup that might incur extra costs.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private Date registrationStartDate;

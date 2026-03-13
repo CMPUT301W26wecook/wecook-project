@@ -14,7 +14,7 @@ import java.util.List;
 /**
  * RecyclerView adapter for rendering organizer waitlist entrants in a scrollable list. Within the
  * app it acts as the presentation adapter for the entrant-management flow, binding
- *  OrganizerWaitlistItem} data objects to the waitlist row layout.
+ * {@link OrganizerWaitlistItem} data objects to the waitlist row layout.
  *
  * Outstanding issues:
  * - The adapter is display-only and does not yet expose row interactions for selection, bulk

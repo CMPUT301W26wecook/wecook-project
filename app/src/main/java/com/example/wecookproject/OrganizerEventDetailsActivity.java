@@ -25,8 +25,9 @@ import java.util.Locale;
  * Outstanding issues:
  * - Some actions are incomplete or placeholder-driven, including the registration map button and
  *   the QR-code flow and will be implemented in part 4.
- * - Presentation and Firestore listener logic are handled directly in the Activity
- *  
+ * - Presentation and Firestore listener logic are handled directly in the Activity, which tightly
+ *   couples UI and data updates instead of separating them through a repository or ViewModel-style
+ *   layer.
  */
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
     
