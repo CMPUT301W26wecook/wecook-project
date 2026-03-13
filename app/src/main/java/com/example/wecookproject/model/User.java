@@ -1,4 +1,4 @@
-package com.example.wecookproject;
+package com.example.wecookproject.model;
 
 import java.util.HashMap;
 import java.util.Map;

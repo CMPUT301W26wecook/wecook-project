@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.wecookproject.model.User;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
@@ -22,7 +23,7 @@ import java.util.List;
 public class AdminOrganizerFragment extends Fragment {
 
     private RecyclerView recyclerView;
-    private ListElementAdapter adapter;
+    private ListElementAdapter<User> adapter;
     private List<User> organizerList;
     private FirebaseFirestore db;
     private AdminViewModel viewModel;
@@ -35,18 +36,18 @@ public class AdminOrganizerFragment extends Fragment {
         db = FirebaseFirestore.getInstance();
         viewModel = new ViewModelProvider(requireActivity()).get(AdminViewModel.class);
         
-        recyclerView = view.findViewById(R.id.rv_user_list);
+        recyclerView = view.findViewById(R.id.rv_organizer_list);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         organizerList = new ArrayList<>();
-        adapter = new ListElementAdapter(organizerList, viewModel);
+        adapter = new ListElementAdapter<>(organizerList, viewModel);
         adapter.setShowDetailOption(false);
         adapter.setShowDeleteOption(true);
         recyclerView.setAdapter(adapter);
 
         loadOrganizersFromFirestore();
 
-        adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener() {
+        adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<User>() {
             @Override
             public void onDelete(User user, int position) {
                 db.collection("users").document(user.getAndroidId())

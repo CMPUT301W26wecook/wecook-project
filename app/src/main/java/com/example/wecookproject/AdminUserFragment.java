@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.wecookproject.model.User;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
@@ -22,7 +23,7 @@ import java.util.List;
 public class AdminUserFragment extends Fragment {
 
     private RecyclerView recyclerView;
-    private ListElementAdapter adapter;
+    private ListElementAdapter<User> adapter;
     private List<User> userList;
     private FirebaseFirestore db;
     private AdminViewModel viewModel;
@@ -39,14 +40,14 @@ public class AdminUserFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         userList = new ArrayList<>();
-        adapter = new ListElementAdapter(userList, viewModel);
+        adapter = new ListElementAdapter<>(userList, viewModel);
         adapter.setShowDetailOption(true);
         adapter.setShowDeleteOption(true);
         recyclerView.setAdapter(adapter);
 
         loadUsersFromFirestore();
 
-        adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener() {
+        adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<User>() {
             @Override
             public void onShowDetail(User user) {
                 viewModel.selectUser(user);

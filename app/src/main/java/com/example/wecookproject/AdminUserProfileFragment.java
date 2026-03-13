@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.wecookproject.model.User;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 public class AdminUserProfileFragment extends Fragment {
@@ -23,7 +24,6 @@ public class AdminUserProfileFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Initialize the Shared ViewModel scoped to the Activity
         viewModel = new ViewModelProvider(requireActivity()).get(AdminViewModel.class);
     }
 
@@ -41,7 +41,6 @@ public class AdminUserProfileFragment extends Fragment {
         TextView tvPostalCode = view.findViewById(R.id.tv_postal_code);
         TextView tvCountry = view.findViewById(R.id.tv_country);
 
-        // Observe the selected user from the ViewModel
         viewModel.getSelectedUser().observe(getViewLifecycleOwner(), selectedUser -> {
             if (selectedUser != null) {
                 this.user = selectedUser;
@@ -64,7 +63,6 @@ public class AdminUserProfileFragment extends Fragment {
             if (user != null) {
                 user.clearProfile();
 
-                // Refresh UI text immediately
                 tvFirstName.setText("First Name: Deleted");
                 tvLastName.setText("Last Name: User");
                 tvDob.setText("Birthday: ");
@@ -74,7 +72,6 @@ public class AdminUserProfileFragment extends Fragment {
                 tvPostalCode.setText("Postal Code: ");
                 tvCountry.setText("Country: ");
 
-                // Update the cleared profile in Firestore
                 db.collection("users").document(user.getAndroidId())
                         .set(user.toFirestoreMap())
                         .addOnSuccessListener(aVoid -> {

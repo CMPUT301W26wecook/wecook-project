@@ -10,33 +10,36 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.wecookproject.model.Event;
+import com.example.wecookproject.model.User;
+
 import java.util.ArrayList;
 import java.util.List;
 
-public class ListElementAdapter extends RecyclerView.Adapter<ListElementAdapter.ListElementViewHolder> {
+public class ListElementAdapter<T> extends RecyclerView.Adapter<ListElementAdapter.ListElementViewHolder> {
 
-    public static abstract class OnMenuActionListener {
-        public void onShowDetail(User user) {}
-        public void onDelete(User user, int position) {}
+    public static abstract class OnMenuActionListener<T> {
+        public void onShowDetail(T item) {}
+        public void onDelete(T item, int position) {}
     }
 
-    private final List<User> userList;
+    private final List<T> itemList;
     private final List<Boolean> selectedList;
-    private OnMenuActionListener menuActionListener;
-    private AdminViewModel viewModel;
+    private OnMenuActionListener<T> menuActionListener;
+    private final AdminViewModel viewModel;
     private boolean showDetailOption = true;
     private boolean showDeleteOption = true;
 
-    public ListElementAdapter(List<User> userList, AdminViewModel viewModel) {
-        this.userList = userList;
+    public ListElementAdapter(List<T> itemList, AdminViewModel viewModel) {
+        this.itemList = itemList;
         this.viewModel = viewModel;
         this.selectedList = new ArrayList<>();
-        for (int i = 0; i < userList.size(); i++) {
+        for (int i = 0; i < itemList.size(); i++) {
             selectedList.add(false);
         }
     }
 
-    public void setOnMenuActionListener(OnMenuActionListener listener) {
+    public void setOnMenuActionListener(OnMenuActionListener<T> listener) {
         this.menuActionListener = listener;
     }
 
@@ -57,8 +60,16 @@ public class ListElementAdapter extends RecyclerView.Adapter<ListElementAdapter.
 
     @Override
     public void onBindViewHolder(@NonNull ListElementViewHolder holder, int position) {
-        User user = userList.get(position);
-        holder.tvElementName.setText(user.getName());
+        T item = itemList.get(position);
+        
+        String displayName = "";
+        if (item instanceof User) {
+            displayName = ((User) item).getName();
+        } else if (item instanceof Event) {
+            displayName = ((Event) item).getEventName();
+        }
+        
+        holder.tvElementName.setText(displayName);
 
         holder.cbSelectElement.setOnCheckedChangeListener(null);
         holder.cbSelectElement.setChecked(selectedList.get(holder.getBindingAdapterPosition()));
@@ -79,15 +90,15 @@ public class ListElementAdapter extends RecyclerView.Adapter<ListElementAdapter.
                 popup.getMenu().add("Delete");
             }
             
-            popup.setOnMenuItemClickListener(item -> {
+            popup.setOnMenuItemClickListener(menuItem -> {
                 if (menuActionListener != null) {
-                    if (item.getTitle().equals("Show Detail")) {
+                    if (menuItem.getTitle().equals("Show Detail")) {
                         if (viewModel != null) {
-                            viewModel.selectUser(user);
+                            viewModel.selectItem(item);
                         }
-                        menuActionListener.onShowDetail(user);
-                    } else if (item.getTitle().equals("Delete")) {
-                        menuActionListener.onDelete(user, holder.getBindingAdapterPosition());
+                        menuActionListener.onShowDetail(item);
+                    } else if (menuItem.getTitle().equals("Delete")) {
+                        menuActionListener.onDelete(item, holder.getBindingAdapterPosition());
                     }
                 }
                 return true;
@@ -100,7 +111,7 @@ public class ListElementAdapter extends RecyclerView.Adapter<ListElementAdapter.
 
     @Override
     public int getItemCount() {
-        return userList.size();
+        return itemList.size();
     }
 
     public List<Boolean> getSelectedList() {

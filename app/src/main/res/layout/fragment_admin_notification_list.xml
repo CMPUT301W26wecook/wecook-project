@@ -6,7 +6,7 @@
     android:padding="16dp">
 
     <androidx.appcompat.widget.SearchView
-        android:id="@+id/sv_user_search"
+        android:id="@+id/sv_notification_search"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_search_bar"
@@ -15,13 +15,13 @@
         app:queryHint="Search by Notification or Event" />
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_user_list"
+        android:id="@+id/rv_notification_list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="16dp"
         android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toTopOf="@id/btn_delete_selected"
-        app:layout_constraintTop_toBottomOf="@id/sv_user_search" />
+        app:layout_constraintTop_toBottomOf="@id/sv_notification_search" />
 
     <Button
         android:id="@+id/btn_delete_selected"
