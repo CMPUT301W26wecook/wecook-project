@@ -5,6 +5,16 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
+/**
+ * Activity for organizers to access the notification-sending screen from the organizer workflow.
+ * Within the app it acts as the UI controller for notification composition/navigation, connected to
+ * the organizer bottom-navigation structure.
+ *
+ * Outstanding issues:
+ * - It is more of a placeholder than a fully implemented feature, as the actual notification-sending logic 
+ *   is not yet implemented and the screen primarily serves as a navigation stub. The functionality will be 
+ *   implemented in part 4.
+ */
 public class OrganizerNotificationActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {

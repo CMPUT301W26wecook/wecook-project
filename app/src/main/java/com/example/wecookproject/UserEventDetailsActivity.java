@@ -97,6 +97,8 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         findViewById(R.id.iv_detail_back).setOnClickListener(v -> finish());
         findViewById(R.id.btn_detail_show_qr).setOnClickListener(v ->
                 Toast.makeText(this, "QR code preview coming soon", Toast.LENGTH_SHORT).show());
+        findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
+                startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_events);
@@ -370,8 +372,6 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         historyData.put("registrationStartDate", currentEvent.getRegistrationStartDate());
         historyData.put("registrationEndDate", currentEvent.getRegistrationEndDate());
         historyData.put("description", currentEvent.getDescription());
-        historyData.put("enrollmentCriteria", currentEvent.getEnrollmentCriteria());
-        historyData.put("lotteryMethodology", currentEvent.getLotteryMethodology());
         historyData.put("status", status);
         historyData.put("updatedAt", FieldValue.serverTimestamp());
 

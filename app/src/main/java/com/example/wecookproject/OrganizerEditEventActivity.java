@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.webkit.MimeTypeMap;
 import android.widget.FrameLayout;
-import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -30,6 +29,17 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
+/**
+ * Activity for organizers to edit an existing event's configurable details and optionally replace
+ * its poster image. Within the app it acts as the UI controller for the organizer edit-event flow,
+ * coordinating form input, validation, and Firebase persistence in a single screen.
+ *
+ * Outstanding issues:
+ * - Existing event fields are not preloaded into the form, so the screen currently behaves like a
+ *   partial-update form rather than a full edit view.
+ * - Firestore and Storage access are handled directly in the Activity, which tightly which puts
+ *   UI and data logic together instead of separating them through a repository or ViewModel-style layer.
+ */
 public class OrganizerEditEventActivity extends AppCompatActivity {
     private Date registrationStartDate;
     private Date registrationEndDate;
@@ -45,8 +55,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private TextInputEditText etRegistrationStartDate;
     private TextInputEditText etRegistrationEndDate;
     private TextInputEditText etMaxWaitlist;
-    private RadioGroup rgEnrollmentCriteria;
-    private RadioGroup rgLotteryMethod;
     private String originalPosterUrl;
     private String pendingPosterUrl;
     private boolean posterCommitted;
@@ -73,8 +81,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         etMaxWaitlist = findViewById(R.id.et_max_waitlist);
-        rgEnrollmentCriteria = findViewById(R.id.rg_enrollment_criteria);
-        rgLotteryMethod = findViewById(R.id.rg_lottery_method);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
 
         posterPickerLauncher = registerForActivityResult(
@@ -198,16 +204,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             }
         }
 
-        String enrollmentCriteria = getEnrollmentCriteriaValue(rgEnrollmentCriteria.getCheckedRadioButtonId());
-        if (enrollmentCriteria != null) {
-            updates.put("enrollmentCriteria", enrollmentCriteria);
-        }
-
-        String lotteryMethodology = getLotteryMethodValue(rgLotteryMethod.getCheckedRadioButtonId());
-        if (lotteryMethodology != null) {
-            updates.put("lotteryMethodology", lotteryMethodology);
-        }
-
         if (!TextUtils.isEmpty(pendingPosterUrl)) {
             updates.put("posterUrl", pendingPosterUrl);
         }
@@ -316,26 +312,4 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
     }
 
-    private String getEnrollmentCriteriaValue(int checkedId) {
-        if (checkedId == R.id.rb_open_to_all) {
-            return "Open to all";
-        }
-        if (checkedId == R.id.rb_by_invitation) {
-            return "By invitation only";
-        }
-        if (checkedId == R.id.rb_age_restricted) {
-            return "Age restricted (18+)";
-        }
-        return null;
-    }
-
-    private String getLotteryMethodValue(int checkedId) {
-        if (checkedId == R.id.rb_organizer_picks) {
-            return "Organizer picks";
-        }
-        if (checkedId == R.id.rb_system_generates) {
-            return "System generates";
-        }
-        return null;
-    }
 }

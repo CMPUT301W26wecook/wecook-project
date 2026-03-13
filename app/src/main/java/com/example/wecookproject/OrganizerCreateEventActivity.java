@@ -6,8 +6,6 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import android.annotation.SuppressLint;
@@ -24,6 +22,18 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * Activity for organizers to configure and create new events from a form-driven workflow. Within
+ * the app it acts as the UI controller for the organizer event-creation flow, validating input and
+ * persisting a new Event document directly to Firestore.
+ *
+ * Outstanding issues:
+ * - Creation relies on default placeholder values for fields such as location and description,
+ *   which leaves newly created events only partially configured.
+ * - Firestore writes and organizer-identity lookup are handled directly in the Activity, which
+ *   tightly couples UI and data logic instead of separating them through a repository or
+ *   ViewModel-style layer.
+ */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private Date registrationStartDate;
     private Date registrationEndDate;
@@ -38,8 +48,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         TextInputEditText etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         TextInputEditText etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         TextInputEditText etMaxWaitlist = findViewById(R.id.et_max_waitlist);
-        RadioGroup rgEnrollmentCriteria = findViewById(R.id.rg_enrollment_criteria);
-        RadioGroup rgLotteryMethod = findViewById(R.id.rg_lottery_method);
 
         // Set up date picker for start date
         etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
@@ -110,17 +118,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return;
             }
 
-            int selectedEnrollmentId = rgEnrollmentCriteria.getCheckedRadioButtonId();
-            int selectedLotteryId = rgLotteryMethod.getCheckedRadioButtonId();
-
-            if (selectedEnrollmentId == -1 || selectedLotteryId == -1) {
-                Toast.makeText(this, "Please select criteria and methodology", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            String enrollmentCriteria = ((RadioButton) findViewById(selectedEnrollmentId)).getText().toString();
-            String lotteryMethodology = ((RadioButton) findViewById(selectedLotteryId)).getText().toString();
-
             int maxWaitlist;
             try {
                 maxWaitlist = Integer.parseInt(maxWaitlistStr);
@@ -139,11 +136,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     eventName,
                     registrationStartDate,
                     registrationEndDate,
-                    enrollmentCriteria,
                     maxWaitlist,
                     0, // currentWaitlistCount starts at 0
-                    lotteryMethodology,
-                    true, // Geolocation is mandatory
+                    false, // Default geolocation
                     "Location TBD", // Default location
                     "" // Default description
             );

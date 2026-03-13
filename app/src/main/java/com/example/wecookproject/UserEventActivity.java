@@ -480,8 +480,6 @@ public class UserEventActivity extends AppCompatActivity {
         historyData.put("registrationStartDate", eventRecord.getRegistrationStartDate());
         historyData.put("registrationEndDate", eventRecord.getRegistrationEndDate());
         historyData.put("description", eventRecord.getDescription());
-        historyData.put("enrollmentCriteria", eventRecord.getEnrollmentCriteria());
-        historyData.put("lotteryMethodology", eventRecord.getLotteryMethodology());
         historyData.put("status", status);
         historyData.put("updatedAt", FieldValue.serverTimestamp());
 

@@ -5,6 +5,16 @@ import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
+/**
+ * Activity for organizers to access their profile screen and related account-management actions.
+ * Within the app it acts as the UI controller for the organizer profile flow and as one destination
+ * in the organizer bottom-navigation structure.
+ *
+ * Outstanding issues:
+ * - Profile update and account deletion actions are still unimplemented placeholders， but since these
+ *   requirements does not show in user stories, they will not be implemented in part 4. If there is 
+ *   extra time, we will implement these features.
+ */
 public class OrganizerProfileActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {

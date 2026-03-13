@@ -2,6 +2,15 @@ package com.example.wecookproject;
 
 import com.google.firebase.firestore.DocumentSnapshot;
 
+/**
+ * Lightweight model used to present entrant data in the organizer waitlist UI. Within the app it
+ * acts as a view-model-style adapter object, converting Firestore user documents into display-ready
+ * values for list rendering and search matching.
+ *
+ * Outstanding issues:
+ * - Search and avatar-label behavior rely on simple string transformations and do not account for
+ *   localization, or more robust name handling.
+ */
 public class OrganizerWaitlistItem {
     private final String entrantId;
     private final String displayName;
