@@ -13,6 +13,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
@@ -39,6 +40,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.hamcrest.Matcher;
 
 import java.util.Date;
@@ -52,7 +58,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class OrganizerFlowTest {
 
-    // Sleep durations (ms) 鈥?generous enough for Firestore + UI transitions on CI/emulator
+    // Sleep durations (ms) generous enough for Firestore + UI transitions on CI/emulator
     private static final int WAIT_SHORT  = 2000;
     private static final int WAIT_MEDIUM = 4000;
     private static final int WAIT_LONG   = 6000;
@@ -118,7 +124,6 @@ public class OrganizerFlowTest {
         }
     }
 
-    // 鈹€鈹€鈹€ Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     /**
      * test1: Without an existing Firestore user, tapping "Login as organizer"
@@ -133,7 +138,7 @@ public class OrganizerFlowTest {
 
     /**
      * test2: Tapping "Update Info" with both First Name and Last Name blank should
-     * keep the organizer on the Profile screen 鈥?both fields are mandatory.
+     * keep the organizer on the Profile screen both fields are mandatory.
      */
     @Test
     public void test2_OrganizerProfileMandatoryNamesBlockUpdate() {
@@ -152,7 +157,7 @@ public class OrganizerFlowTest {
 
     /**
      * test3: Submitting the Create Event form with no Event Name entered must
-     * be blocked 鈥?Event Name is required.
+     * be blocked Event Name is required.
      */
     @Test
     public void test3_CreateEventWithoutNameIsBlocked() {
@@ -171,7 +176,6 @@ public class OrganizerFlowTest {
 
     /**
      * test4: Bottom navigation bar correctly switches among the three organizer
-     * tabs: Events 鈫?Create Events 鈫?Profile 鈫?Events.
      */
     @Test
     public void test4_BottomNavSwitchesBetweenTabs() {
@@ -180,17 +184,17 @@ public class OrganizerFlowTest {
         ActivityScenario<OrganizerHomeActivity> homeScenario =
                 ActivityScenario.launch(OrganizerHomeActivity.class);
 
-        // Home 鈫?Create Events
+        // Home Create Events
         onView(withId(R.id.nav_create_events)).perform(click());
         safeSleep(WAIT_SHORT);
         onView(withId(R.id.btn_create_event)).check(matches(isDisplayed()));
 
-        // Create Events 鈫?Profile
+        // Create Events Profile
         onView(withId(R.id.nav_profile)).perform(click());
         safeSleep(WAIT_SHORT);
         onView(withId(R.id.tv_organizer_info_title)).check(matches(withText("Organizer Info")));
 
-        // Profile 鈫?Events
+        // Profile Events
         onView(withId(R.id.nav_events)).perform(click());
         safeSleep(WAIT_SHORT);
         onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
@@ -241,7 +245,7 @@ public class OrganizerFlowTest {
      *
      * <p>Date fields accept "yyyy-MM-dd" text directly because
      * OrganizerCreateEventActivity registers a TextWatcher that parses the
-     * typed value and sets the internal Date field 鈥?in addition to the
+     * typed value and sets the internal Date field in addition to the
      * DatePickerDialog that sets the same field when the user taps the view.</p>
      */
     @Test
@@ -390,6 +394,90 @@ public class OrganizerFlowTest {
         assertEquals("System generates",    snapshot.getString("lotteryMethodology"));
 
         scenario.close();
+    }
+
+    /**
+     * test11: Lottery with entrants should select winners and update the event status.
+     * This test creates an event with entrants on the waitlist, performs lottery,
+     * and verifies that winners are selected.
+     */
+    @Test
+    public void test11_LotteryAvailableOnlyAfterRegistrationEnds() throws InterruptedException {
+        String lotteryWithEntrantsEventId = "lottery-entrants-test-" + UUID.randomUUID();
+        
+        // Create an event with a past registration end date
+        @SuppressWarnings("deprecation")
+        Event lotteryTestEvent = new Event(
+                lotteryWithEntrantsEventId,
+                "organizer-test",
+                "Lottery With Entrants Test Event",
+                new Date(126, 2, 1),   // 2026-03-01 (registration start)
+                new Date(126, 2, 10),  // 2026-03-10 (registration end - in the past)
+                "Open to all",
+                25,
+                0,
+                "System generates",
+                false,
+                "Edmonton",
+                "Test event for lottery with entrants"
+        );
+        
+        // Add some entrants to the waitlist
+        List<String> entrants = Arrays.asList("entrant1", "entrant2", "entrant3", "entrant4", "entrant5");
+        lotteryTestEvent.setWaitlistEntrantIds(entrants);
+        lotteryTestEvent.setCurrentWaitlistCount(entrants.size());
+        
+        CountDownLatch eventCreateLatch = new CountDownLatch(1);
+        db.collection("events").document(lotteryWithEntrantsEventId)
+                .set(lotteryTestEvent)
+                .addOnCompleteListener(task -> eventCreateLatch.countDown());
+        awaitLatch(eventCreateLatch, 15, "lottery with entrants test event creation");
+        
+        // Launch OrganizerEntrantListActivity with the test event
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantListActivity.class);
+        intent.putExtra("eventId", lotteryWithEntrantsEventId);
+        
+        ActivityScenario<OrganizerEntrantListActivity> scenario =
+                ActivityScenario.launch(intent);
+        
+        safeSleep(WAIT_MEDIUM); // allow event data to load
+        
+        // Perform lottery draw for 3 winners
+        onView(withId(R.id.et_lottery_count)).perform(replaceText("3"), closeSoftKeyboard());
+        onView(withId(R.id.btn_lottery_draw)).perform(click());
+        
+        safeSleep(WAIT_LONG); // allow lottery operation and Firestore updates to complete
+        
+        // Verify that winners were selected by checking the event document
+        AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
+        CountDownLatch readLatch = new CountDownLatch(1);
+        db.collection("events").document(lotteryWithEntrantsEventId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    snapshotRef.set(snapshot);
+                    readLatch.countDown();
+                })
+                .addOnFailureListener(e -> readLatch.countDown());
+        
+        assertTrue("Timed out reading updated event after lottery", readLatch.await(15, TimeUnit.SECONDS));
+        DocumentSnapshot snapshot = snapshotRef.get();
+        assertTrue("Event document must exist after lottery", snapshot != null && snapshot.exists());
+        
+        // Check that selected entrants list exists and has 3 winners
+        List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+        assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
+        assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
+        
+        scenario.close();
+        
+        // Clean up: delete the test event
+        CountDownLatch eventDeleteLatch = new CountDownLatch(1);
+        db.collection("events").document(lotteryWithEntrantsEventId)
+                .delete()
+                .addOnCompleteListener(task -> eventDeleteLatch.countDown());
+        awaitLatch(eventDeleteLatch, 15, "lottery with entrants test event cleanup");
     }
 
     /**

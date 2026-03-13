@@ -75,6 +75,14 @@
                 android:text="View Invited"
                 android:layout_marginBottom="8dp" />
 
+            <EditText
+                android:id="@+id/et_lottery_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter number of attendees to draw"
+                android:inputType="number"
+                android:layout_marginBottom="8dp" />
+
             <Button
                 android:id="@+id/btn_lottery_draw"
                 android:layout_width="match_parent"

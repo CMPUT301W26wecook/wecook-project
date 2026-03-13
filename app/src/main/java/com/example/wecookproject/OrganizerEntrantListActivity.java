@@ -19,6 +19,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class OrganizerEntrantListActivity extends AppCompatActivity {
@@ -31,6 +32,10 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private TextView emptyStateView;
     private LinearLayout actionButtons;
     private String eventId;
+    private android.widget.EditText lotteryCountInput;
+    private final List<String> waitlistEntrantIds = new ArrayList<>();
+    private final List<String> selectedEntrantIds = new ArrayList<>();
+    private Date registrationEndDate;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +49,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         entrantsRecyclerView = findViewById(R.id.rv_entrants);
         emptyStateView = findViewById(R.id.tv_empty_state);
         actionButtons = findViewById(R.id.ll_action_buttons);
+        lotteryCountInput = findViewById(R.id.et_lottery_count);
 
         entrantsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new OrganizerWaitlistAdapter();
@@ -112,7 +118,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             Toast.makeText(this, "Invited list is not available yet", Toast.LENGTH_SHORT).show();
         });
         findViewById(R.id.btn_lottery_draw).setOnClickListener(v -> {
-            Toast.makeText(this, "Lottery draw is not available yet", Toast.LENGTH_SHORT).show();
+            performLotteryDraw();
         });
         findViewById(R.id.btn_redraw_entrants).setOnClickListener(v -> {
             Toast.makeText(this, "Redraw is not available yet", Toast.LENGTH_SHORT).show();
@@ -138,7 +144,24 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                         setTitle("Event Waitlist");
                     }
 
+                    // Extract and store the registration end date
+                    registrationEndDate = documentSnapshot.getDate("registrationEndDate");
+
                     List<String> entrantIds = readEntrantIds(documentSnapshot);
+
+                    waitlistEntrantIds.clear();
+                    waitlistEntrantIds.addAll(entrantIds);
+
+                    selectedEntrantIds.clear();
+                    Object rawSelected = documentSnapshot.get("selectedEntrantIds");
+                    if (rawSelected instanceof List<?>) {
+                        for (Object item : (List<?>) rawSelected) {
+                            if (item instanceof String) {
+                                selectedEntrantIds.add((String) item);
+                            }
+                        }
+                    }
+
                     loadEntrantProfiles(entrantIds);
                 })
                 .addOnFailureListener(e -> {
@@ -213,5 +236,67 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private void showEmptyState(boolean show) {
         emptyStateView.setVisibility(show ? View.VISIBLE : View.GONE);
         entrantsRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
+    }
+
+    private void performLotteryDraw() {
+        // Check if lottery is available (only after registration ends)
+        if (registrationEndDate == null) {
+            Toast.makeText(this, "Registration end date not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Date currentDate = new Date();
+        if (!currentDate.after(registrationEndDate)) {
+            Toast.makeText(this, "Lottery is available only after registration ends", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String input = lotteryCountInput.getText().toString().trim();
+
+        if (input.isEmpty()) {
+            Toast.makeText(this, "Please enter the number of attendees to draw", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int lotteryCount;
+        try {
+            lotteryCount = Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid lottery number", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (lotteryCount <= 0) {
+            Toast.makeText(this, "Lottery number must be greater than 0", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (waitlistEntrantIds.isEmpty()) {
+            Toast.makeText(this, "No entrants in the waitlist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (lotteryCount > waitlistEntrantIds.size()) {
+            Toast.makeText(this, "Lottery number exceeds waitlist size", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> shuffledEntrants = new ArrayList<>(waitlistEntrantIds);
+        java.util.Collections.shuffle(shuffledEntrants);
+
+        List<String> selected = new ArrayList<>(shuffledEntrants.subList(0, lotteryCount));
+
+        db.collection("events").document(eventId)
+                .update(
+                        "lotteryCount", lotteryCount,
+                        "selectedEntrantIds", selected
+                )
+                .addOnSuccessListener(unused -> {
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(selected);
+                    Toast.makeText(this, "Lottery draw completed", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to save lottery result", Toast.LENGTH_SHORT).show());
     }
 }

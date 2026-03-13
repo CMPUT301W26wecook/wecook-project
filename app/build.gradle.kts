@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.camera.camera2.pipe)
     implementation(libs.firebase.messaging)
     implementation(libs.recyclerview)
+    implementation(libs.firebase.auth)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
