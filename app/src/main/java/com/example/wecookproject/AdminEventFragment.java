@@ -76,8 +76,8 @@ public class AdminEventFragment extends Fragment {
                     Event event = eventList.get(i);
                     db.collection("events").document(event.getEventId()).delete();
                 }
-                Toast.makeText(getContext(), "Selected events deleted", Toast.LENGTH_SHORT).show();
             }
+            Toast.makeText(getContext(), "Selected events deleted", Toast.LENGTH_SHORT).show();
         });
         return view;
     }
