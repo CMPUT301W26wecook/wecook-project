@@ -90,8 +90,6 @@ public class LoginActivity extends AppCompatActivity {
         if (isUserExists) {
             if ("ORGANIZER".equals(clickedRole)) {
                 jumpIntent = new Intent(LoginActivity.this, OrganizerHomeActivity.class);
-            } else if ("ADMIN".equals(clickedRole)) {
-                jumpIntent = new Intent(LoginActivity.this, AdminEvent.class);
             } else {
                 jumpIntent = new Intent(LoginActivity.this, UserEventActivity.class);
             }
@@ -102,6 +100,9 @@ public class LoginActivity extends AppCompatActivity {
         startActivity(jumpIntent);
     }
 }
+
+
+
 
 
 
