@@ -12,20 +12,44 @@ import com.example.wecookproject.model.Event;
 
 import java.util.List;
 
+/**
+ * RecyclerView adapter for organizer event cards.
+ */
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
 
     private List<Event> eventList;
     private OnItemClickListener listener;
 
+    /**
+     * Callback for event row taps.
+     */
     public interface OnItemClickListener {
+        /**
+         * Called when an event row is clicked.
+         *
+         * @param eventId selected event id
+         */
         void onItemClick(String eventId);
     }
 
+    /**
+     * Creates an event adapter.
+     *
+     * @param eventList list of events to render
+     * @param listener click callback
+     */
     public EventAdapter(List<Event> eventList, OnItemClickListener listener) {
         this.eventList = eventList;
         this.listener = listener;
     }
 
+    /**
+     * Inflates one event row.
+     *
+     * @param parent parent RecyclerView
+     * @param viewType view type id
+     * @return created view holder
+     */
     @NonNull
     @Override
     public EventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -33,6 +57,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         return new EventViewHolder(view);
     }
 
+    /**
+     * Binds event data at position.
+     *
+     * @param holder row holder
+     * @param position adapter position
+     */
     @Override
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = eventList.get(position);
@@ -47,15 +77,26 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         });
     }
 
+    /**
+     * @return number of event rows
+     */
     @Override
     public int getItemCount() {
         return eventList.size();
     }
 
+    /**
+     * ViewHolder for event rows.
+     */
     static class EventViewHolder extends RecyclerView.ViewHolder {
         TextView tvEventName;
         TextView tvEventStatus;
 
+        /**
+         * Creates a view holder and binds row views.
+         *
+         * @param itemView row root view
+         */
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
             tvEventName = itemView.findViewById(R.id.tv_event_name);

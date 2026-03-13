@@ -22,6 +22,9 @@ import com.google.firebase.firestore.SetOptions;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Entrant profile screen for viewing and updating personal settings.
+ */
 public class UserProfileActivity extends AppCompatActivity {
 
     private MaterialButton btnUpdate;
@@ -44,6 +47,11 @@ public class UserProfileActivity extends AppCompatActivity {
     private boolean isEditing = false;
     private boolean notificationsEnabled = false;
 
+    /**
+     * Initializes profile views, loads user data, and wires interactions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -97,6 +105,9 @@ public class UserProfileActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Configures bottom-navigation actions for entrant pages.
+     */
     private void setupBottomNav() {
         bottomNav.setSelectedItemId(R.id.nav_profile);
 
@@ -128,6 +139,11 @@ public class UserProfileActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Toggles editability for profile fields.
+     *
+     * @param enabled true to enable editing
+     */
     private void setEditable(boolean enabled) {
         etFirstName.setEnabled(enabled);
         etLastName.setEnabled(enabled);
@@ -139,16 +155,40 @@ public class UserProfileActivity extends AppCompatActivity {
         switchAutoLogin.setEnabled(enabled);
     }
 
+    /**
+     * Adds birthday auto-formatting as {@code MM/DD/YYYY}.
+     */
     private void setupBirthdayWatcher() {
         etBirthday.addTextChangedListener(new TextWatcher() {
             private boolean isFormatting = false;
 
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param count changed length
+             * @param after replacement length
+             */
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
 
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param before replaced length
+             * @param count inserted length
+             */
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) { }
 
+            /**
+             * Normalizes typed birthday digits into slash-separated format.
+             *
+             * @param s editable field content
+             */
             @Override
             public void afterTextChanged(Editable s) {
                 if (isFormatting) return;
@@ -173,6 +213,9 @@ public class UserProfileActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Loads profile fields from Firestore.
+     */
     private void loadUserProfile() {
         db.collection("users").document(androidId).get()
                 .addOnSuccessListener(documentSnapshot -> {
@@ -200,6 +243,9 @@ public class UserProfileActivity extends AppCompatActivity {
                         Toast.makeText(UserProfileActivity.this, "Error loading profile", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Validates and persists profile updates.
+     */
     private void saveUserProfile() {
         String firstName = textOf(etFirstName);
         String lastName = textOf(etLastName);
@@ -240,6 +286,9 @@ public class UserProfileActivity extends AppCompatActivity {
                         Toast.makeText(UserProfileActivity.this, "Error updating profile", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Displays a confirmation dialog before deleting account.
+     */
     private void showDeleteAccountConfirm() {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Account")
@@ -260,10 +309,22 @@ public class UserProfileActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * Returns a non-null string.
+     *
+     * @param value input value
+     * @return input value or empty string
+     */
     private String safe(String value) {
         return value == null ? "" : value;
     }
 
+    /**
+     * Reads and trims text from an input field.
+     *
+     * @param editText source input
+     * @return trimmed text, or empty string when null
+     */
     private String textOf(TextInputEditText editText) {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
     }

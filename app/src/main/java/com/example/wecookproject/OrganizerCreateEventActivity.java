@@ -41,6 +41,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private Date registrationEndDate;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
+    /**
+     * Initializes event creation form, validators, and navigation.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -159,6 +164,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Opens a date picker for registration start date.
+     *
+     * @param editText target input field
+     */
     private void showStartDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
         DatePickerDialog datePickerDialog = new DatePickerDialog(
@@ -175,6 +185,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         datePickerDialog.show();
     }
 
+    /**
+     * Opens a date picker for registration end date.
+     *
+     * @param editText target input field
+     */
     private void showEndDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
         if (registrationStartDate != null) {

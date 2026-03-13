@@ -23,6 +23,13 @@ import java.util.List;
 public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWaitlistAdapter.WaitlistViewHolder> {
     private final List<OrganizerWaitlistItem> items = new ArrayList<>();
 
+    /**
+     * Inflates one waitlist row.
+     *
+     * @param parent parent RecyclerView
+     * @param viewType view type id
+     * @return created view holder
+     */
     @NonNull
     @Override
     public WaitlistViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -31,6 +38,12 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         return new WaitlistViewHolder(view);
     }
 
+    /**
+     * Binds one waitlist row.
+     *
+     * @param holder row holder
+     * @param position adapter position
+     */
     @Override
     public void onBindViewHolder(@NonNull WaitlistViewHolder holder, int position) {
         OrganizerWaitlistItem item = items.get(position);
@@ -39,11 +52,19 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         holder.tvSubtitle.setText(item.getSubtitle());
     }
 
+    /**
+     * @return number of rows
+     */
     @Override
     public int getItemCount() {
         return items.size();
     }
 
+    /**
+     * Replaces adapter data and refreshes list.
+     *
+     * @param newItems replacement items
+     */
     public void submitList(List<OrganizerWaitlistItem> newItems) {
         items.clear();
         items.addAll(newItems);
@@ -55,6 +76,11 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         private final TextView tvName;
         private final TextView tvSubtitle;
 
+        /**
+         * Creates a view holder and binds subviews.
+         *
+         * @param itemView row root view
+         */
         WaitlistViewHolder(@NonNull View itemView) {
             super(itemView);
             tvAvatar = itemView.findViewById(R.id.tv_entrant_avatar);
