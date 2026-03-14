@@ -37,10 +37,9 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     private ListenerRegistration eventsListener;
 
     /**
-     * Initializes the organizer home screen and starts observing the organizer's events.
+     * Initializes organizer home list and bottom navigation.
      *
-     * @param savedInstanceState the previously saved instance state, or {@code null} when the
-     *                           activity is being created for the first time
+     * @param savedInstanceState previously saved state, or {@code null}
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,9 +75,7 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     }
     
     /**
-     * Starts the Firestore listener that loads and refreshes events owned by the current organizer.
-     *
-     * @return no value; results are applied directly to the activity's adapter state
+     * Subscribes to organizer events with real-time updates.
      */
     private void loadEvents() {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -105,9 +102,7 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     }
     
     /**
-     * Removes the active Firestore listener when the activity is being destroyed.
-     *
-     * @return no value
+     * Removes Firestore listeners to avoid leaks.
      */
     @Override
     protected void onDestroy() {

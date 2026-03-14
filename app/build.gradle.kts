@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.firebase.auth)
     testImplementation(libs.junit)
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation(platform("com.google.firebase:firebase-bom:34.10.0"))

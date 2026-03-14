@@ -13,7 +13,15 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Captures address information for signup and creates the initial user profile.
+ */
 public class SignupAddressActivity extends AppCompatActivity {
+    /**
+     * Initializes address inputs and navigation actions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -28,56 +36,80 @@ public class SignupAddressActivity extends AppCompatActivity {
         EditText etCountry = findViewById(R.id.et_country);
 
         backButton.setOnClickListener(v -> finish());
+        continueButton.setOnClickListener(v -> handleContinue(
+                etAddressLine1,
+                etAddressLine2,
+                etCity,
+                etPostalCode,
+                etCountry
+        ));
+    }
 
-        continueButton.setOnClickListener(v -> {
-            String addressLine1 = etAddressLine1.getText().toString().trim();
-            String addressLine2 = etAddressLine2.getText().toString().trim();
-            String city = etCity.getText().toString().trim();
-            String postalCode = etPostalCode.getText().toString().trim();
-            String country = etCountry.getText().toString().trim();
-            if (addressLine1.isEmpty() || city.isEmpty() || postalCode.isEmpty()) {
-                Toast.makeText(this, "Address line 1, City, and Postal code cannot be empty", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            
-            Intent intentFromDetails = getIntent();
-            String firstName = intentFromDetails.getStringExtra("firstName");
-            String lastName = intentFromDetails.getStringExtra("lastName");
-            String birthday = intentFromDetails.getStringExtra("birthday");
-            String clickedRole = intentFromDetails.getStringExtra("clickedRole");
-            String role = "ORGANIZER".equals(clickedRole) ? "organizer" : "entrant";
+    /**
+     * Validates address fields, persists profile data, and routes by role.
+     *
+     * @param addressLine1Input first address line field
+     * @param addressLine2Input second address line field
+     * @param cityInput city field
+     * @param postalCodeInput postal-code field
+     * @param countryInput country field
+     */
+    private void handleContinue(EditText addressLine1Input,
+                                EditText addressLine2Input,
+                                EditText cityInput,
+                                EditText postalCodeInput,
+                                EditText countryInput) {
+        String addressLine1 = addressLine1Input.getText().toString().trim();
+        String addressLine2 = addressLine2Input.getText().toString().trim();
+        String city = cityInput.getText().toString().trim();
+        String postalCode = postalCodeInput.getText().toString().trim();
+        String country = countryInput.getText().toString().trim();
+        if (addressLine1.isEmpty() || city.isEmpty() || postalCode.isEmpty()) {
+            Toast.makeText(this, "Address line 1, City, and Postal code cannot be empty", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            // Navigate immediately — Firestore write happens in the background
-            String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            Map<String, Object> userData = new HashMap<>();
-            userData.put("androidId", androidId);
-            userData.put("firstName", firstName != null ? firstName : "");
-            userData.put("lastName", lastName != null ? lastName : "");
-            userData.put("birthday", birthday != null ? birthday : "");
-            userData.put("addressLine1", addressLine1);
-            userData.put("addressLine2", addressLine2);
-            userData.put("city", city);
-            userData.put("postalCode", postalCode);
-            userData.put("country", country);
-            userData.put("role", role);
-            userData.put("profileCompleted", true);
+        Intent intentFromDetails = getIntent();
+        String firstName = intentFromDetails.getStringExtra("firstName");
+        String lastName = intentFromDetails.getStringExtra("lastName");
+        String birthday = intentFromDetails.getStringExtra("birthday");
+        String clickedRole = intentFromDetails.getStringExtra("clickedRole");
+        String role = "ORGANIZER".equals(clickedRole) ? "organizer" : "entrant";
 
-            FirebaseFirestore db = FirebaseFirestore.getInstance();
-            db.collection("users").document(androidId).set(userData)
-                .addOnSuccessListener(aVoid -> {
-                    // Go to appropriate Activity only after Firestore success
-                    Intent intent;
-                    if ("ORGANIZER".equals(clickedRole)) {
-                        intent = new Intent(SignupAddressActivity.this, OrganizerHomeActivity.class);
-                    } else {
-                        intent = new Intent(SignupAddressActivity.this, UserEventActivity.class);
-                    }
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to save profile. " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
-        });
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("androidId", androidId);
+        userData.put("firstName", firstName != null ? firstName : "");
+        userData.put("lastName", lastName != null ? lastName : "");
+        userData.put("birthday", birthday != null ? birthday : "");
+        userData.put("addressLine1", addressLine1);
+        userData.put("addressLine2", addressLine2);
+        userData.put("city", city);
+        userData.put("postalCode", postalCode);
+        userData.put("country", country);
+        userData.put("role", role);
+        userData.put("profileCompleted", true);
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        db.collection("users").document(androidId).set(userData)
+            .addOnSuccessListener(aVoid -> routeAfterSuccessfulSignup(clickedRole))
+            .addOnFailureListener(e ->
+                    Toast.makeText(this, "Failed to save profile. " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Routes to the post-signup home screen.
+     *
+     * @param clickedRole original role selected on login
+     */
+    private void routeAfterSuccessfulSignup(String clickedRole) {
+        Intent intent;
+        if ("ORGANIZER".equals(clickedRole)) {
+            intent = new Intent(SignupAddressActivity.this, OrganizerHomeActivity.class);
+        } else {
+            intent = new Intent(SignupAddressActivity.this, UserEventActivity.class);
+        }
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
     }
 }

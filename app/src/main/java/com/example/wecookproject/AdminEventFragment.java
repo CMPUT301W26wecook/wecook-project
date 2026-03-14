@@ -62,6 +62,11 @@ public class AdminEventFragment extends Fragment {
         loadEventsFromFirestore();
 
         adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<Event>() {
+            /**
+             * Opens selected event detail screen.
+             *
+             * @param event selected event
+             */
             @Override
             public void onShowDetail(Event event) {
                 viewModel.selectEvent(event);
@@ -71,6 +76,12 @@ public class AdminEventFragment extends Fragment {
                         .commit();
             }
 
+            /**
+             * Deletes selected event document.
+             *
+             * @param event selected event
+             * @param position adapter position
+             */
             @Override
             public void onDelete(Event event, int position) {
                 db.collection("events").document(event.getEventId())

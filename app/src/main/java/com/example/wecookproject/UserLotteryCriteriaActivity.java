@@ -8,8 +8,18 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
+/**
+ * Displays lottery criteria information for entrants.
+ *
+ * <p>This screen also provides bottom-navigation shortcuts to other entrant areas.</p>
+ */
 public class UserLotteryCriteriaActivity extends AppCompatActivity {
 
+    /**
+     * Initializes criteria content and bottom-navigation actions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

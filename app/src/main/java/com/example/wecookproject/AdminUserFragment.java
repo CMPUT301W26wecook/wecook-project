@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  * Fragment for the Administrator to browse and manage the list of all Entrants in the system.
- * It provides functionality to view Entrant profiles and clear profile information.
+ * It provides functionality to view Entrant profiles and delete entrant accounts.
  */
 public class AdminUserFragment extends Fragment {
 
@@ -35,7 +35,7 @@ public class AdminUserFragment extends Fragment {
     /**
      * Let fragment show Entrant List UI
      * It initializes the RecyclerView, adapter,
-     * and setup event listeners for the menu actions and Entrant profile clearing.
+        * and setup event listeners for the menu actions and entrant account deletion.
      *
      * @param inflater           Parent view to which the fragment's UI should be attached.
      * @param container          Parent view for the fragment's UI.
@@ -62,6 +62,11 @@ public class AdminUserFragment extends Fragment {
         loadUsersFromFirestore();
 
         adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<User>() {
+            /**
+             * Opens selected user detail screen.
+             *
+             * @param user selected user
+             */
             @Override
             public void onShowDetail(User user) {
                 viewModel.selectUser(user);
@@ -71,35 +76,40 @@ public class AdminUserFragment extends Fragment {
                         .commit();
             }
 
+            /**
+             * Deletes selected user account document.
+             *
+             * @param user selected user
+             * @param position adapter position
+             */
             @Override
             public void onDelete(User user, int position) {
-                user.clearProfile();
                 db.collection("users").document(user.getAndroidId())
-                        .set(user.toFirestoreMap())
+                        .delete()
                         .addOnSuccessListener(aVoid -> {
-                            adapter.notifyItemChanged(position);
-                            Toast.makeText(getContext(), "User profile info cleared", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "User account deleted", Toast.LENGTH_SHORT).show();
                         })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error clearing profile", Toast.LENGTH_SHORT).show());
+                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
             }
         });
 
         view.findViewById(R.id.btn_delete_selected).setOnClickListener(v -> {
             List<Boolean> selected = adapter.getSelectedList();
+            List<String> userIdsToDelete = new ArrayList<>();
+
             for (int i = 0; i < userList.size(); i++) {
                 if (selected.get(i)) {
-                    final int index = i;
-                    User user = userList.get(index);
-                    user.clearProfile();
-                    db.collection("users").document(user.getAndroidId())
-                            .set(user.toFirestoreMap())
-                            .addOnSuccessListener(aVoid -> {
-                                selected.set(index, false);
-                                adapter.notifyItemChanged(index);
-                            });
+                    userIdsToDelete.add(userList.get(i).getAndroidId());
                 }
             }
-            Toast.makeText(getContext(), "Selected profiles cleared", Toast.LENGTH_SHORT).show();
+
+            for (String userId : userIdsToDelete) {
+                db.collection("users").document(userId)
+                        .delete()
+                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+            }
+
+            Toast.makeText(getContext(), "Selected accounts deleted", Toast.LENGTH_SHORT).show();
         });
 
         return view;

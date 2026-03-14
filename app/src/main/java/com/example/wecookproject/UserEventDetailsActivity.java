@@ -33,6 +33,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Displays detailed event information for entrants and manages status actions.
+ */
 public class UserEventDetailsActivity extends AppCompatActivity {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -55,6 +58,11 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     private Button btnSecondary;
     private Button btnPrimary;
 
+    /**
+     * Initializes details UI, navigation, and event loading.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -129,12 +137,18 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         loadEvent();
     }
 
+    /**
+     * Reloads event details when returning to the foreground.
+     */
     @Override
     protected void onResume() {
         super.onResume();
         loadEvent();
     }
 
+    /**
+     * Loads history status and event document, then binds UI.
+     */
     private void loadEvent() {
         db.collection("users")
                 .document(entrantId)
@@ -152,6 +166,12 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Binds event content to view fields.
+     *
+     * @param eventSnapshot event document snapshot
+     * @param historyStatus entrant history status
+     */
     private void bindEvent(DocumentSnapshot eventSnapshot, String historyStatus) {
         if (!eventSnapshot.exists()) {
             Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
@@ -180,6 +200,9 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         configureActionButtons();
     }
 
+    /**
+     * Configures action buttons based on effective entrant status.
+     */
     private void configureActionButtons() {
         String status = currentEvent.getEffectiveStatus();
         btnSecondary.setVisibility(View.GONE);
@@ -222,6 +245,9 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         btnPrimary.setOnClickListener(v -> requestLocationAndJoinWaitlist());
     }
 
+    /**
+     * Requests location permission when needed and starts join flow.
+     */
     private void requestLocationAndJoinWaitlist() {
         if (!currentEvent.isGeolocationRequired()) {
             joinWaitlist(null);
@@ -237,6 +263,9 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Reads current location and proceeds with waitlist join.
+     */
     private void fetchLocationAndJoinWaitlist() {
         if (!hasLocationPermission()) {
             Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
@@ -266,27 +295,53 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                         Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * @return true when coarse or fine location permission is granted
+     */
     private boolean hasLocationPermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
+    /**
+     * Adds entrant to waitlist.
+     *
+     * @param entrantLocation entrant location, if available
+     */
     private void joinWaitlist(Location entrantLocation) {
         updateWaitlistMembership(true, UserEventRecord.STATUS_WAITLISTED, false, "Joined waiting list successfully", entrantLocation);
     }
 
+    /**
+     * Removes entrant from waitlist and history.
+     */
     private void leaveWaitlist() {
         updateWaitlistMembership(false, null, true, "Left waiting list", null);
     }
 
+    /**
+     * Accepts an invitation.
+     */
     private void acceptInvitation() {
         updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted", null);
     }
 
+    /**
+     * Declines an invitation.
+     */
     private void declineInvitation() {
         updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null);
     }
 
+    /**
+     * Updates waitlist membership and history status in a transaction.
+     *
+     * @param addEntrant true to add entrant, false to remove
+     * @param newStatus new history status to persist
+     * @param deleteHistory true to delete history item
+     * @param successMessage toast message for success
+     * @param entrantLocation entrant location when required
+     */
     private void updateWaitlistMembership(boolean addEntrant,
                                           String newStatus,
                                           boolean deleteHistory,
@@ -362,6 +417,11 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Upserts event history entry for current entrant.
+     *
+     * @param status status to store
+     */
     private void upsertHistoryDocument(String status) {
         Map<String, Object> historyData = new HashMap<>();
         historyData.put("eventId", currentEvent.getEventId());
@@ -382,6 +442,9 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 .set(historyData);
     }
 
+    /**
+     * Deletes current event history entry.
+     */
     private void deleteHistoryDocument() {
         db.collection("users")
                 .document(entrantId)

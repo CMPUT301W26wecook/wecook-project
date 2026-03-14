@@ -51,10 +51,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private Date registrationEndDate;
 
     /**
-     * Initializes the organizer waitlist screen and loads entrant data for the selected event.
+     * Initializes organizer entrant management screen and loads waitlist data.
      *
-     * @param savedInstanceState the previously saved instance state, or {@code null} when the
-     *                           activity is created for the first time
+     * @param savedInstanceState previously saved state, or {@code null}
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,9 +87,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Configures the organizer bottom navigation for the waitlist screen.
-     *
-     * @return no value
+     * Configures organizer bottom navigation actions.
      */
     private void setupBottomNav() {
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
@@ -115,17 +112,15 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Configures search callbacks for filtering the displayed entrant list.
-     *
-     * @return no value
+     * Configures waitlist search behavior.
      */
     private void setupSearch() {
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             /**
-             * Applies the current search query when the organizer submits it.
+             * Handles submitted search query.
              *
-             * @param query the submitted search text
-             * @return {@code true} to indicate that the submission was handled
+             * @param query submitted query text
+             * @return true when handled
              */
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -134,10 +129,10 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             }
 
             /**
-             * Updates the visible waitlist rows while the organizer edits the search query.
+             * Handles live search text changes.
              *
-             * @param newText the updated search text
-             * @return {@code true} to indicate that the text change was handled
+             * @param newText updated query text
+             * @return true when handled
              */
             @Override
             public boolean onQueryTextChange(String newText) {
@@ -148,9 +143,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Wires the organizer action buttons shown beneath the entrant list.
-     *
-     * @return no value
+     * Wires action buttons on the entrant-management panel.
      */
     private void setupActionButtons() {
         actionButtons.setVisibility(View.VISIBLE);
@@ -181,9 +174,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Loads the selected event document and extracts the waitlist-related data needed by the screen.
-     *
-     * @return no value
+     * Loads event waitlist metadata and entrant profiles.
      */
     private void loadWaitlist() {
         db.collection("events").document(eventId).get()
@@ -228,10 +219,10 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Reads the waitlist entrant identifiers from an event document.
+     * Reads waitlist entrant IDs from an event document.
      *
-     * @param documentSnapshot the event document snapshot containing waitlist data
-     * @return the list of entrant identifiers currently on the waitlist
+     * @param documentSnapshot source event snapshot
+     * @return extracted entrant IDs
      */
     private List<String> readEntrantIds(DocumentSnapshot documentSnapshot) {
         List<String> entrantIds = new ArrayList<>();
@@ -247,10 +238,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Loads organizer-facing entrant profile rows for the provided waitlist identifiers.
+     * Loads entrant profile documents for given entrant IDs.
      *
-     * @param entrantIds the entrant identifiers whose profiles should be loaded
-     * @return no value
+     * @param entrantIds entrant identifiers
      */
     private void loadEntrantProfiles(List<String> entrantIds) {
         if (entrantIds.isEmpty()) {
@@ -289,10 +279,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Filters the loaded entrant list using the current organizer search query.
+     * Applies text filtering to the waitlist dataset.
      *
-     * @param query the text used to filter the organizer waitlist rows
-     * @return no value
+     * @param query filter query
      */
     private void applyFilter(String query) {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
@@ -309,10 +298,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Toggles the empty-state message and waitlist recycler visibility.
+     * Toggles empty-state views.
      *
-     * @param show {@code true} to show the empty state; {@code false} to show the entrant list
-     * @return no value
+     * @param show true to show empty state
      */
     private void showEmptyState(boolean show) {
         emptyStateView.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -320,9 +308,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
-     * Performs a random lottery draw from the current event waitlist and stores the result.
-     *
-     * @return no value
+     * Runs lottery draw and persists selected entrants.
      */
     private void performLotteryDraw() {
         // Check if lottery is available (only after registration ends)

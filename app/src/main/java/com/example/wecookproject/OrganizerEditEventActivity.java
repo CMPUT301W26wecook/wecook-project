@@ -61,10 +61,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private ActivityResultLauncher<String> posterPickerLauncher;
 
     /**
-     * Initializes the organizer event editing screen and its form bindings.
+     * Initializes edit form, poster picker, and navigation actions.
      *
-     * @param savedInstanceState the previously saved instance state, or {@code null} when the
-     *                           activity is created for the first time
+     * @param savedInstanceState previously saved state, or {@code null}
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,9 +127,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
 
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             /**
-             * Handles system back navigation by cleaning up unsaved poster uploads first.
-             *
-             * @return no value
+             * Handles system back press and applies cancel cleanup behavior.
              */
             @Override
             public void handleOnBackPressed() {
@@ -140,10 +137,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows a date picker for the registration start date field.
+     * Opens date picker for registration start date.
      *
-     * @param editText the input field that should receive the chosen start date
-     * @return no value
+     * @param editText target input field
      */
     private void showStartDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
@@ -162,10 +158,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows a date picker for the registration end date field.
+     * Opens date picker for registration end date.
      *
-     * @param editText the input field that should receive the chosen end date
-     * @return no value
+     * @param editText target input field
      */
     private void showEndDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
@@ -194,9 +189,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Validates the edit form and persists any changed event fields to Firestore.
-     *
-     * @return no value
+     * Validates changed fields and submits event updates.
      */
     private void updateEvent() {
         tilEventName.setError(null);
@@ -269,10 +262,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Validates and uploads a newly selected poster image for the event.
+     * Handles selected poster image and uploads it.
      *
-     * @param imageUri the content URI of the selected poster image
-     * @return no value
+     * @param imageUri selected image uri
      */
     private void handlePosterSelection(Uri imageUri) {
         if (imageUri == null) {
@@ -314,11 +306,10 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Checks whether the selected poster MIME type is allowed.
+     * Validates poster MIME type.
      *
-     * @param mimeType the MIME type reported for the selected image
-     * @return {@code true} when the MIME type is a supported poster image format; otherwise
-     *         {@code false}
+     * @param mimeType detected MIME type
+     * @return true when supported image MIME type
      */
     private boolean isValidPosterMimeType(String mimeType) {
         return "image/jpeg".equalsIgnoreCase(mimeType)
@@ -327,9 +318,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Loads the currently saved poster URL for the event being edited.
-     *
-     * @return no value
+     * Loads currently stored poster URL for cleanup/replacement logic.
      */
     private void loadCurrentPosterUrl() {
         db.collection("events")
@@ -344,9 +333,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Cancels the edit flow and deletes any uncommitted uploaded poster file.
-     *
-     * @return no value
+     * Cancels edit flow and cleans up uncommitted poster uploads.
      */
     private void cancelAndExit() {
         if (!posterCommitted && !TextUtils.isEmpty(pendingPosterUrl)) {
@@ -357,10 +344,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Deletes a file from Firebase Storage when a valid download URL is available.
+     * Deletes a storage object by URL when possible.
      *
-     * @param fileUrl the Firebase Storage download URL of the file to delete
-     * @return no value
+     * @param fileUrl storage URL
      */
     private void deleteStorageFile(String fileUrl) {
         if (TextUtils.isEmpty(fileUrl)) {
@@ -376,10 +362,10 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Reads and trims the text contents of a material text field.
+     * Returns trimmed text from an input field.
      *
-     * @param editText the input field whose current text should be normalized
-     * @return the trimmed text value, or an empty string when the field has no text
+     * @param editText source input
+     * @return trimmed text or empty string
      */
     private String getTrimmedText(TextInputEditText editText) {
         return editText.getText() == null ? "" : editText.getText().toString().trim();

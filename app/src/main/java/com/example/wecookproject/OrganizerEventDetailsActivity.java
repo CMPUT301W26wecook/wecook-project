@@ -35,11 +35,11 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
     /**
-     * Initializes the organizer event detail screen and subscribes to event updates.
+     * Initializes event detail rendering and related navigation actions.
      *
-     * @param savedInstanceState the previously saved instance state, or {@code null} when the
-     *                           activity is created for the first time
+     * @param savedInstanceState previously saved state, or {@code null}
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -180,11 +180,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
             // TODO: show QR code dialog
         });
     }
-
+    
     /**
-     * Removes the active event listener when the activity is destroyed.
-     *
-     * @return no value
+     * Removes snapshot listeners to avoid leaks.
      */
     @Override
     protected void onDestroy() {

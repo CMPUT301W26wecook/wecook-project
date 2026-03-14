@@ -42,10 +42,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
     /**
-     * Initializes the organizer event creation form and its input handlers.
+     * Initializes event creation form, validators, and navigation.
      *
-     * @param savedInstanceState the previously saved instance state, or {@code null} when the
-     *                           activity is created for the first time
+     * @param savedInstanceState previously saved state, or {@code null}
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,27 +60,29 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
         etRegistrationStartDate.addTextChangedListener(new TextWatcher() {
             /**
-             * Called before the start-date text changes.
+             * No-op callback required by {@link TextWatcher}.
              *
-             * @param s the current text before the change
-             * @param start the start index of the change
-             * @param count the number of characters that will be replaced
-             * @param after the number of characters that will replace the old text
+             * @param s current text
+             * @param start changed start index
+             * @param count changed length
+             * @param after replacement length
              */
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
             /**
-             * Called while the start-date text is changing.
+             * No-op callback required by {@link TextWatcher}.
              *
-             * @param s the text being displayed during the change
-             * @param start the start index of the change
-             * @param before the number of characters replaced
-             * @param count the number of characters added
+             * @param s current text
+             * @param start changed start index
+             * @param before replaced length
+             * @param count inserted length
              */
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
             /**
-             * Parses the organizer-entered start date after the field changes.
+             * Parses typed start-date text into internal date state.
              *
-             * @param s the updated editable contents of the start-date field
+             * @param s editable content
              */
             @Override
             public void afterTextChanged(Editable s) {
@@ -97,27 +98,29 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etRegistrationEndDate.setOnClickListener(v -> showEndDatePicker(etRegistrationEndDate));
         etRegistrationEndDate.addTextChangedListener(new TextWatcher() {
             /**
-             * Called before the end-date text changes.
+             * No-op callback required by {@link TextWatcher}.
              *
-             * @param s the current text before the change
-             * @param start the start index of the change
-             * @param count the number of characters that will be replaced
-             * @param after the number of characters that will replace the old text
+             * @param s current text
+             * @param start changed start index
+             * @param count changed length
+             * @param after replacement length
              */
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
             /**
-             * Called while the end-date text is changing.
+             * No-op callback required by {@link TextWatcher}.
              *
-             * @param s the text being displayed during the change
-             * @param start the start index of the change
-             * @param before the number of characters replaced
-             * @param count the number of characters added
+             * @param s current text
+             * @param start changed start index
+             * @param before replaced length
+             * @param count inserted length
              */
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
             /**
-             * Parses the organizer-entered end date after the field changes.
+             * Parses typed end-date text into internal date state.
              *
-             * @param s the updated editable contents of the end-date field
+             * @param s editable content
              */
             @Override
             public void afterTextChanged(Editable s) {
@@ -211,10 +214,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows a date picker for the registration start date and writes the selection into the field.
+     * Opens a date picker for registration start date.
      *
-     * @param editText the text field that should receive the chosen start date
-     * @return no value
+     * @param editText target input field
      */
     private void showStartDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
@@ -233,10 +235,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows a date picker for the registration end date and writes the selection into the field.
+     * Opens a date picker for registration end date.
      *
-     * @param editText the text field that should receive the chosen end date
-     * @return no value
+     * @param editText target input field
      */
     private void showEndDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();

@@ -21,6 +21,9 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Displays entrant event history and supports history-item removal.
+ */
 public class UserHistoryActivity extends AppCompatActivity {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -32,6 +35,11 @@ public class UserHistoryActivity extends AppCompatActivity {
     private String entrantId;
     private BottomNavigationView bottomNav;
 
+    /**
+     * Initializes history list, adapter, and bottom navigation.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,6 +52,11 @@ public class UserHistoryActivity extends AppCompatActivity {
 
         rvHistory.setLayoutManager(new LinearLayoutManager(this));
         adapter = new UserHistoryAdapter(historyItems, new UserHistoryAdapter.Listener() {
+            /**
+             * Opens event details for a selected history item.
+             *
+             * @param item selected history item
+             */
             @Override
             public void onHistoryClicked(UserHistoryItem item) {
                 Intent intent = new Intent(UserHistoryActivity.this, UserEventDetailsActivity.class);
@@ -51,6 +64,11 @@ public class UserHistoryActivity extends AppCompatActivity {
                 startActivity(intent);
             }
 
+            /**
+             * Deletes the selected history item.
+             *
+             * @param item selected history item
+             */
             @Override
             public void onDeleteClicked(UserHistoryItem item) {
                 deleteHistoryItem(item);
@@ -63,6 +81,9 @@ public class UserHistoryActivity extends AppCompatActivity {
         loadHistory();
     }
 
+    /**
+     * Configures entrant bottom-navigation behavior.
+     */
     private void setupBottomNav() {
         bottomNav.setSelectedItemId(R.id.nav_history);
 
@@ -94,12 +115,18 @@ public class UserHistoryActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Reloads history whenever the activity returns to foreground.
+     */
     @Override
     protected void onResume() {
         super.onResume();
         loadHistory();
     }
 
+    /**
+     * Loads history entries from Firestore ordered by update time.
+     */
     private void loadHistory() {
         db.collection("users")
                 .document(entrantId)
@@ -117,6 +144,11 @@ public class UserHistoryActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Deletes one history item and removes current entrant from event waitlist when present.
+     *
+     * @param item history item to remove
+     */
     private void deleteHistoryItem(UserHistoryItem item) {
         DocumentReference eventRef = db.collection("events").document(item.getEventId());
         DocumentReference historyRef = db.collection("users")
@@ -145,6 +177,9 @@ public class UserHistoryActivity extends AppCompatActivity {
         }).addOnFailureListener(e -> Toast.makeText(this, "Failed to delete history", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Toggles empty-state visibility based on current adapter data.
+     */
     private void updateEmptyState() {
         if (historyItems.isEmpty()) {
             tvEmptyState.setVisibility(View.VISIBLE);

@@ -24,11 +24,11 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     private final List<OrganizerWaitlistItem> items = new ArrayList<>();
 
     /**
-     * Creates a new view holder for an organizer waitlist row.
+     * Inflates one waitlist row.
      *
-     * @param parent the parent view group that will host the row
-     * @param viewType the adapter view type for the row
-     * @return a newly created waitlist view holder
+     * @param parent parent RecyclerView
+     * @param viewType view type id
+     * @return created view holder
      */
     @NonNull
     @Override
@@ -39,11 +39,10 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     }
 
     /**
-     * Binds a waitlist item to the provided row view holder.
+     * Binds one waitlist row.
      *
-     * @param holder the holder whose views should be populated
-     * @param position the adapter position of the item to bind
-     * @return no value
+     * @param holder row holder
+     * @param position adapter position
      */
     @Override
     public void onBindViewHolder(@NonNull WaitlistViewHolder holder, int position) {
@@ -54,9 +53,7 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     }
 
     /**
-     * Returns the number of waitlist rows currently available to render.
-     *
-     * @return the total number of waitlist items in the adapter
+     * @return number of rows
      */
     @Override
     public int getItemCount() {
@@ -64,10 +61,9 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     }
 
     /**
-     * Replaces the adapter contents with a new waitlist snapshot.
+     * Replaces adapter data and refreshes list.
      *
-     * @param newItems the items that should replace the current adapter contents
-     * @return no value
+     * @param newItems replacement items
      */
     public void submitList(List<OrganizerWaitlistItem> newItems) {
         items.clear();
@@ -76,7 +72,7 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     }
 
     /**
-     * View holder for a single organizer waitlist row.
+     * ViewHolder for organizer waitlist rows.
      */
     static class WaitlistViewHolder extends RecyclerView.ViewHolder {
         private final TextView tvAvatar;
@@ -84,9 +80,9 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         private final TextView tvSubtitle;
 
         /**
-         * Creates a view holder backed by the provided item view.
+         * Creates a view holder and binds subviews.
          *
-         * @param itemView the inflated row view used to display entrant details
+         * @param itemView row root view
          */
         WaitlistViewHolder(@NonNull View itemView) {
             super(itemView);

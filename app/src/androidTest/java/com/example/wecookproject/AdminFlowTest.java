@@ -1,8 +1,8 @@
 package com.example.wecookproject;
 
 import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
@@ -12,6 +12,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.fail;
+
+import android.view.View;
 
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -19,29 +22,71 @@ import androidx.test.filters.LargeTest;
 
 import com.example.wecookproject.model.Event;
 import com.example.wecookproject.model.User;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import org.hamcrest.Matcher;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
-import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.concurrent.CountDownLatch;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class AdminFlowTest {
+
+    private static final long FIRESTORE_TIMEOUT_SECONDS = 30;
+    private static final int WAIT_RETRY_COUNT = 30;
+    private static final long WAIT_INTERVAL_MS = 600;
+    private static final long UI_SETTLE_MS = 350;
+    private static final String RUN_ID = String.valueOf(System.currentTimeMillis());
+
+    private static final String USER_1_ID = "adminflow_user_1_" + RUN_ID;
+    private static final String USER_2_ID = "adminflow_user_2_" + RUN_ID;
+    private static final String USER_3_ID = "adminflow_user_3_" + RUN_ID;
+    private static final String USER_4_ID = "adminflow_user_4_" + RUN_ID;
+
+    private static final String ORG_1_ID = "adminflow_org_1_" + RUN_ID;
+    private static final String ORG_2_ID = "adminflow_org_2_" + RUN_ID;
+    private static final String ORG_3_ID = "adminflow_org_3_" + RUN_ID;
+
+    private static final String EVENT_1_ID = "adminflow_event_1_" + RUN_ID;
+    private static final String EVENT_2_ID = "adminflow_event_2_" + RUN_ID;
+    private static final String EVENT_3_ID = "adminflow_event_3_" + RUN_ID;
+
+    private static final String USER_1_NAME = "AFEntrant1 " + RUN_ID;
+    private static final String USER_2_NAME = "AFEntrant2 " + RUN_ID;
+
+    private static final String ORG_1_NAME = "AFOrganizer1 " + RUN_ID;
+    private static final String ORG_2_NAME = "AFOrganizer2 " + RUN_ID;
+    private static final String ORG_3_NAME = "AFOrganizer3 " + RUN_ID;
+
+    private static final String EVENT_1_NAME = "AF Event 1 " + RUN_ID;
+    private static final String EVENT_2_NAME = "AF Event 2 " + RUN_ID;
+    private static final String EVENT_3_NAME = "AF Event 3 " + RUN_ID;
+
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+    private final List<String> seededUserIds = Arrays.asList(
+            USER_1_ID, USER_2_ID, USER_3_ID, USER_4_ID,
+            ORG_1_ID, ORG_2_ID, ORG_3_ID
+    );
+    private final List<String> seededEventIds = Arrays.asList(EVENT_1_ID, EVENT_2_ID, EVENT_3_ID);
+
     @Rule
     public ActivityScenarioRule<LoginActivity> activityRule = new ActivityScenarioRule<>(LoginActivity.class);
 
     @Before
     public void setUp() {
+        cleanupTestData();
         setupTestData();
     }
 
@@ -51,25 +96,40 @@ public class AdminFlowTest {
     }
 
     @Test
-    public void testBrowseUserList() {
+    public void adminStoryLoginAndNavigateTabs() {
         navigateToAdminMainMenu();
 
-        onView(withId(R.id.rv_user_list)).check(matches(isDisplayed()));
+        waitUntilVisible(withId(R.id.rv_user_list));
+        waitUntilVisible(withText(USER_1_NAME));
 
-        onView(withText("Entrant1 Test")).check(matches(isDisplayed()));
-        onView(withText("Entrant5 Test")).check(matches(isDisplayed()));
+        onView(withId(R.id.nav_organizers)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.rv_organizer_list));
+        waitUntilVisible(withText(ORG_1_NAME));
+
+        onView(withId(R.id.nav_events)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.rv_event_list));
+        waitUntilVisible(withText(EVENT_1_NAME));
+
+        onView(withId(R.id.nav_notifications)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.rv_notification_list));
     }
 
     @Test
-    public void testBrowseUserProfile() {
+    public void adminStoryViewEntrantProfileDetails() {
         navigateToAdminMainMenu();
+        waitUntilVisible(withText(USER_1_NAME));
 
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Entrant1 Test")))).perform(click());
-
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(USER_1_NAME)))).perform(click());
+        waitUntilVisible(withText("Show Detail"));
         onView(withText("Show Detail")).perform(click());
+        safeSleep(UI_SETTLE_MS);
 
-        onView(withId(R.id.tv_first_name)).check(matches(withText(containsString("Entrant1"))));
-        onView(withId(R.id.tv_last_name)).check(matches(withText(containsString("Test"))));
+        waitUntilVisible(withId(R.id.tv_first_name));
+        onView(withId(R.id.tv_first_name)).check(matches(withText(containsString("AFEntrant1"))));
+        onView(withId(R.id.tv_last_name)).check(matches(withText(containsString(RUN_ID))));
         onView(withId(R.id.tv_dob)).check(matches(withText(containsString("1995-05-05"))));
         onView(withId(R.id.tv_address1)).check(matches(withText(containsString("User Ave 1"))));
         onView(withId(R.id.tv_city)).check(matches(withText(containsString("Calgary"))));
@@ -78,225 +138,384 @@ public class AdminFlowTest {
     }
 
     @Test
-    public void testDeleteUserProfile() {
+    public void adminStoryDeleteEntrantFromListAndDetail() {
         navigateToAdminMainMenu();
+        waitUntilVisible(withText(USER_1_NAME));
+        waitUntilVisible(withText(USER_2_NAME));
 
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Entrant1 Test")))).perform(click());
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(USER_1_NAME)))).perform(click());
         onView(withText("Delete")).perform(click());
-        safeSleep(1000);
-        onView(withText("Entrant1 Test")).check(doesNotExist());
+        waitUntilUserDeleted(USER_1_ID);
+        waitUntilGone(withText(USER_1_NAME));
 
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Entrant2 Test")))).perform(click());
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(USER_2_NAME)))).perform(click());
+        waitUntilVisible(withText("Show Detail"));
         onView(withText("Show Detail")).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.btn_delete_account));
         onView(withId(R.id.btn_delete_account)).perform(click());
-        pressBack();
-        safeSleep(1000);
-        onView(withText("Entrant2 Test")).check(doesNotExist());
+        safeSleep(UI_SETTLE_MS);
 
-        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText("Entrant3 Test")))).perform(click());
-        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText("Entrant4 Test")))).perform(click());
-        onView(withId(R.id.btn_delete_selected)).perform(click());
-        safeSleep(1000);
-        onView(withText("Entrant3 Test")).check(doesNotExist());
-        onView(withText("Entrant4 Test")).check(doesNotExist());
-    }
-    
-    @Test
-    public void testBrowseOrganizerList() {
-        navigateToAdminMainMenu();
+        waitUntilUserDeleted(USER_2_ID);
 
-        onView(withId(R.id.nav_organizers)).perform(click());
-        safeSleep(1000);
-
-        onView(withId(R.id.rv_organizer_list)).check(matches(isDisplayed()));
-
-        onView(withText("Organizer1 Test")).check(matches(isDisplayed()));
-        onView(withText("Organizer3 Test")).check(matches(isDisplayed()));
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.rv_user_list));
+        waitUntilGone(withText(USER_2_NAME));
     }
 
     @Test
-    public void testDeleteOrganizer() {
+    public void adminStoryDeleteOrganizersSingleAndBulk() {
         navigateToAdminMainMenu();
 
         onView(withId(R.id.nav_organizers)).perform(click());
-        safeSleep(1000);
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Organizer1 Test")))).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.rv_organizer_list));
+        waitUntilVisible(withText(ORG_1_NAME));
+        waitUntilVisible(withText(ORG_2_NAME));
+        waitUntilVisible(withText(ORG_3_NAME));
+
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(ORG_1_NAME)))).perform(click());
         onView(withText("Delete")).perform(click());
-        safeSleep(1000);
-        onView(withText("Organizer1 Test")).check(doesNotExist());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilUserDeleted(ORG_1_ID);
+        waitUntilGone(withText(ORG_1_NAME));
 
-        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText("Organizer2 Test")))).perform(click());
-        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText("Organizer3 Test")))).perform(click());
+        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText(ORG_2_NAME)))).perform(click());
+        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText(ORG_3_NAME)))).perform(click());
         onView(withId(R.id.btn_delete_selected)).perform(click());
-        safeSleep(1000);
-        onView(withText("Organizer2 Test")).check(doesNotExist());
-        onView(withText("Organizer3 Test")).check(doesNotExist());
+        safeSleep(UI_SETTLE_MS);
+
+        waitUntilUserDeleted(ORG_2_ID);
+        waitUntilUserDeleted(ORG_3_ID);
+        waitUntilGone(withText(ORG_2_NAME));
+        waitUntilGone(withText(ORG_3_NAME));
     }
 
     @Test
-    public void testBrowseEventList() {
+    public void adminStoryViewEventDetailAndDeletePoster() {
         navigateToAdminMainMenu();
 
         onView(withId(R.id.nav_events)).perform(click());
-        safeSleep(1000);
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withText(EVENT_1_NAME));
 
-        onView(withId(R.id.rv_event_list)).check(matches(isDisplayed()));
-
-        onView(withText("Test Event 1")).check(matches(isDisplayed()));
-        onView(withText("Test Event 3")).check(matches(isDisplayed()));
-    }
-
-    @Test
-    public void testBrowseEventDetail() {
-        navigateToAdminMainMenu();
-
-        onView(withId(R.id.nav_events)).perform(click());
-        safeSleep(1000);
-
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Test Event 1")))).perform(click());
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(EVENT_1_NAME)))).perform(click());
+        waitUntilVisible(withText("Show Detail"));
         onView(withText("Show Detail")).perform(click());
-        safeSleep(1000);
+        safeSleep(UI_SETTLE_MS);
 
-        onView(withId(R.id.tv_event_name_header)).check(matches(withText("Test Event 1")));
+        waitUntilVisible(withId(R.id.tv_event_name_header));
+        onView(withId(R.id.tv_event_name_header)).check(matches(withText(EVENT_1_NAME)));
         onView(withId(R.id.tv_event_location)).check(matches(withText("Sample Location")));
-    }
 
-    @Test
-    public void testDeleteEvent() {
-        navigateToAdminMainMenu();
-
-        onView(withId(R.id.nav_events)).perform(click());
-        safeSleep(1000);
-
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Test Event 1")))).perform(click());
-        onView(withText("Show Detail")).perform(click());
-        safeSleep(1000);
-        onView(withId(R.id.btn_delete_event)).perform(click());
-        safeSleep(1000);
-        onView(withText("Test Event 1")).check(doesNotExist());
-
-        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText("Test Event 2")))).perform(click());
-        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText("Test Event 3")))).perform(click());
-        onView(withId(R.id.btn_delete_selected)).perform(click());
-        safeSleep(1000);
-        onView(withText("Test Event 2")).check(doesNotExist());
-        onView(withText("Test Event 3")).check(doesNotExist());
-    }
-
-    @Test
-    public void testDeletePosterImage() {
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
-        navigateToAdminMainMenu();
-
-        onView(withId(R.id.nav_events)).perform(click());
-        safeSleep(1000);
-
-        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText("Test Event 1")))).perform(click());
-        onView(withText("Show Detail")).perform(click());
-        safeSleep(1000);
         onView(withId(R.id.btn_delete_poster)).perform(click());
-        safeSleep(1000);
+        safeSleep(UI_SETTLE_MS);
+        waitUntilPosterCleared(EVENT_1_ID);
+    }
 
-        CountDownLatch latch = new CountDownLatch(1);
-        db.collection("events").document("test_event_1").get().addOnCompleteListener(task -> {
-            if (task.isSuccessful() && task.getResult() != null) {
-                String path = task.getResult().getString("posterPath");
-                Assert.assertTrue("Poster path should be null or empty", path == null || path.isEmpty());
-            } else {
-                Assert.fail("Firestore fetch failed");
-            }
-            latch.countDown();
-        });
+    @Test
+    public void adminStoryDeleteEventsSingleAndBulk() {
+        navigateToAdminMainMenu();
+
+        onView(withId(R.id.nav_events)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withText(EVENT_1_NAME));
+        waitUntilVisible(withText(EVENT_2_NAME));
+        waitUntilVisible(withText(EVENT_3_NAME));
+
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(EVENT_1_NAME)))).perform(click());
+        onView(withText("Delete")).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        waitUntilEventDeleted(EVENT_1_ID);
+        waitUntilGone(withText(EVENT_1_NAME));
+
+        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText(EVENT_2_NAME)))).perform(click());
+        onView(allOf(withId(R.id.cb_select_element), hasSibling(withText(EVENT_3_NAME)))).perform(click());
+        onView(withId(R.id.btn_delete_selected)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+
+        waitUntilEventDeleted(EVENT_2_ID);
+        waitUntilEventDeleted(EVENT_3_ID);
+        waitUntilGone(withText(EVENT_2_NAME));
+        waitUntilGone(withText(EVENT_3_NAME));
     }
 
     private void cleanupTestData() {
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        List<Task<Void>> tasks = new ArrayList<>();
 
-        for (int i = 1; i <= 3; i++) {
-            db.collection("users").document("test_org_" + i).delete();
+        for (String userId : seededUserIds) {
+            tasks.add(db.collection("users").document(userId).delete());
         }
 
-        for (int i = 1; i <= 5; i++) {
-            db.collection("users").document("test_user_" + i).delete();
+        for (String eventId : seededEventIds) {
+            tasks.add(db.collection("events").document(eventId).delete());
         }
 
-        for (int i = 1; i <= 3; i++) {
-            db.collection("events").document("test_event_" + i).delete();
-        }
+        awaitTaskList(tasks, "cleanup");
     }
 
     private void setupTestData() {
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        List<Task<Void>> tasks = new ArrayList<>();
 
-        for (int i = 1; i <= 3; i++) {
-            String id = "test_org_" + i;
-            User org = new User(
-                    "Org St " + i,
-                    "",
-                    id,
-                    "1980-01-01",
-                    "Edmonton",
-                    "Canada",
-                    "Organizer" + i,
-                    "Test",
-                    "T6G 2R3",
-                    true,
-                    "organizer"
-            );
-            db.collection("users").document(id).set(org.toFirestoreMap());
-        }
+        User organizer1 = new User(
+                "Org St 1",
+                "",
+                ORG_1_ID,
+                "1980-01-01",
+                "Edmonton",
+                "Canada",
+                "AFOrganizer1",
+                RUN_ID,
+                "T6G 2R3",
+                true,
+                "organizer"
+        );
+        User organizer2 = new User(
+                "Org St 2",
+                "",
+                ORG_2_ID,
+                "1980-01-01",
+                "Edmonton",
+                "Canada",
+                "AFOrganizer2",
+                RUN_ID,
+                "T6G 2R3",
+                true,
+                "organizer"
+        );
+        User organizer3 = new User(
+                "Org St 3",
+                "",
+                ORG_3_ID,
+                "1980-01-01",
+                "Edmonton",
+                "Canada",
+                "AFOrganizer3",
+                RUN_ID,
+                "T6G 2R3",
+                true,
+                "organizer"
+        );
 
-        for (int i = 1; i <= 5; i++) {
-            String id = "test_user_" + i;
-            User user = new User(
-                    "User Ave " + i,
-                    "",
-                    id,
-                    "1995-05-05",
-                    "Calgary",
-                    "Canada",
-                    "Entrant" + i,
-                    "Test",
-                    "T2P 2M5",
-                    true,
-                    "entrant"
-            );
-            db.collection("users").document(id).set(user.toFirestoreMap());
-        }
+        tasks.add(db.collection("users").document(ORG_1_ID).set(organizer1.toFirestoreMap()));
+        tasks.add(db.collection("users").document(ORG_2_ID).set(organizer2.toFirestoreMap()));
+        tasks.add(db.collection("users").document(ORG_3_ID).set(organizer3.toFirestoreMap()));
 
-        for (int i = 1; i <= 3; i++) {
-            String eventId = "test_event_" + i;
-            Event event = new Event(
-                    eventId,
-                    "test_org_1",
-                    "Test Event " + i,
-                    new Date(),
-                    new Date(System.currentTimeMillis() + 604800000L),
-                    50,
-                    10,
-                    false,
-                    "Sample Location",
-                    "This is a sample description for test event " + i
-            );
-            event.setPosterPath("http://example.com/poster" + i + ".jpg");
-            db.collection("events").document(eventId).set(event);
+        User user1 = new User(
+                "User Ave 1",
+                "",
+                USER_1_ID,
+                "1995-05-05",
+                "Calgary",
+                "Canada",
+                "AFEntrant1",
+                RUN_ID,
+                "T2P 2M5",
+                true,
+                "entrant"
+        );
+        User user2 = new User(
+                "User Ave 2",
+                "",
+                USER_2_ID,
+                "1995-05-05",
+                "Calgary",
+                "Canada",
+                "AFEntrant2",
+                RUN_ID,
+                "T2P 2M5",
+                true,
+                "entrant"
+        );
+        User user3 = new User(
+                "User Ave 3",
+                "",
+                USER_3_ID,
+                "1995-05-05",
+                "Calgary",
+                "Canada",
+                "AFEntrant3",
+                RUN_ID,
+                "T2P 2M5",
+                true,
+                "entrant"
+        );
+        User user4 = new User(
+                "User Ave 4",
+                "",
+                USER_4_ID,
+                "1995-05-05",
+                "Calgary",
+                "Canada",
+                "AFEntrant4",
+                RUN_ID,
+                "T2P 2M5",
+                true,
+                "entrant"
+        );
+
+        tasks.add(db.collection("users").document(USER_1_ID).set(user1.toFirestoreMap()));
+        tasks.add(db.collection("users").document(USER_2_ID).set(user2.toFirestoreMap()));
+        tasks.add(db.collection("users").document(USER_3_ID).set(user3.toFirestoreMap()));
+        tasks.add(db.collection("users").document(USER_4_ID).set(user4.toFirestoreMap()));
+
+        Date now = new Date();
+        Date weekLater = new Date(System.currentTimeMillis() + 604800000L);
+
+        Event event1 = new Event(
+                EVENT_1_ID,
+                ORG_1_ID,
+                EVENT_1_NAME,
+                now,
+                weekLater,
+                50,
+                10,
+                false,
+                "Sample Location",
+                "Sample description 1"
+        );
+        event1.setPosterPath("http://example.com/poster1.jpg");
+
+        Event event2 = new Event(
+                EVENT_2_ID,
+                ORG_1_ID,
+                EVENT_2_NAME,
+                now,
+                weekLater,
+                50,
+                11,
+                false,
+                "Sample Location",
+                "Sample description 2"
+        );
+        event2.setPosterPath("http://example.com/poster2.jpg");
+
+        Event event3 = new Event(
+                EVENT_3_ID,
+                ORG_1_ID,
+                EVENT_3_NAME,
+                now,
+                weekLater,
+                50,
+                12,
+                false,
+                "Sample Location",
+                "Sample description 3"
+        );
+        event3.setPosterPath("http://example.com/poster3.jpg");
+
+        tasks.add(db.collection("events").document(EVENT_1_ID).set(event1));
+        tasks.add(db.collection("events").document(EVENT_2_ID).set(event2));
+        tasks.add(db.collection("events").document(EVENT_3_ID).set(event3));
+
+        awaitTaskList(tasks, "seed");
+    }
+
+    private void awaitTaskList(List<? extends Task<?>> tasks, String operation) {
+        try {
+            Tasks.await(Tasks.whenAllComplete(tasks), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            fail("Firestore " + operation + " failed: " + e.getMessage());
         }
+    }
+
+    private void waitUntilPosterCleared(String eventId) {
+        for (int i = 0; i < WAIT_RETRY_COUNT; i++) {
+            try {
+                String posterPath = Tasks.await(
+                        db.collection("events").document(eventId).get(),
+                        FIRESTORE_TIMEOUT_SECONDS,
+                        TimeUnit.SECONDS
+                ).getString("posterPath");
+
+                if (posterPath == null || posterPath.isEmpty()) {
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+            safeSleep(WAIT_INTERVAL_MS);
+        }
+        fail("Poster path was not cleared in time.");
+    }
+
+    private void waitUntilUserDeleted(String userId) {
+        for (int i = 0; i < WAIT_RETRY_COUNT; i++) {
+            try {
+                boolean exists = Tasks.await(
+                        db.collection("users").document(userId).get(),
+                        FIRESTORE_TIMEOUT_SECONDS,
+                        TimeUnit.SECONDS
+                ).exists();
+
+                if (!exists) {
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+            safeSleep(WAIT_INTERVAL_MS);
+        }
+        fail("User was not deleted in time for userId=" + userId);
+    }
+
+    private void waitUntilEventDeleted(String eventId) {
+        for (int i = 0; i < WAIT_RETRY_COUNT; i++) {
+            try {
+                boolean exists = Tasks.await(
+                        db.collection("events").document(eventId).get(),
+                        FIRESTORE_TIMEOUT_SECONDS,
+                        TimeUnit.SECONDS
+                ).exists();
+
+                if (!exists) {
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+            safeSleep(WAIT_INTERVAL_MS);
+        }
+        fail("Event was not deleted in time for eventId=" + eventId);
+    }
+
+    private void waitUntilVisible(Matcher<View> matcher) {
+        for (int i = 0; i < WAIT_RETRY_COUNT; i++) {
+            try {
+                onView(matcher).check(matches(isDisplayed()));
+                return;
+            } catch (Throwable ignored) {
+            }
+            safeSleep(WAIT_INTERVAL_MS);
+        }
+        onView(matcher).check(matches(isDisplayed()));
+    }
+
+    private void waitUntilGone(Matcher<View> matcher) {
+        for (int i = 0; i < WAIT_RETRY_COUNT; i++) {
+            try {
+                onView(matcher).check(doesNotExist());
+                return;
+            } catch (Throwable ignored) {
+            }
+            safeSleep(WAIT_INTERVAL_MS);
+        }
+        onView(matcher).check(doesNotExist());
     }
 
     private void safeSleep(long millis) {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
         }
     }
 
-    private void navigateToAdminMainMenu(){
+    private void navigateToAdminMainMenu() {
         onView(withId(R.id.text_Admin_login)).perform(click());
-        safeSleep(1000);
-        onView(withId(R.id.et_username)).perform(replaceText("admin"));
-        onView(withId(R.id.et_password)).perform(replaceText("admin"));
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.et_username));
+        onView(withId(R.id.et_username)).perform(replaceText("admin"), closeSoftKeyboard());
+        onView(withId(R.id.et_password)).perform(replaceText("admin"), closeSoftKeyboard());
         onView(withId(R.id.btn_login)).perform(click());
-        safeSleep(1000);
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.bottom_nav));
     }
 }

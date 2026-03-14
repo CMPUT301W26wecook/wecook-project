@@ -17,11 +17,11 @@ public class OrganizerWaitlistItem {
     private final String subtitle;
 
     /**
-     * Creates a waitlist item with preformatted display text.
+     * Creates one organizer waitlist item.
      *
-     * @param entrantId the unique identifier of the entrant represented by the row
-     * @param displayName the display name shown to the organizer
-     * @param subtitle the secondary label shown beneath the display name
+     * @param entrantId entrant identifier
+     * @param displayName display name text
+     * @param subtitle subtitle text
      */
     public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle) {
         this.entrantId = entrantId;
@@ -30,11 +30,11 @@ public class OrganizerWaitlistItem {
     }
 
     /**
-     * Builds a waitlist item from a Firestore entrant profile document.
+     * Maps a Firestore user snapshot to waitlist item data.
      *
-     * @param entrantId the unique identifier of the entrant whose document was loaded
-     * @param snapshot the Firestore document snapshot containing entrant profile data
-     * @return a waitlist item populated from the snapshot contents
+     * @param entrantId entrant identifier
+     * @param snapshot user profile snapshot
+     * @return mapped waitlist item
      */
     public static OrganizerWaitlistItem fromSnapshot(String entrantId, DocumentSnapshot snapshot) {
         String firstName = safe(snapshot.getString("firstName"));
@@ -56,37 +56,31 @@ public class OrganizerWaitlistItem {
     }
 
     /**
-     * Creates a fallback item when an entrant profile cannot be loaded.
+     * Creates fallback waitlist item when profile data is unavailable.
      *
-     * @param entrantId the identifier of the entrant whose profile is unavailable
-     * @return a fallback waitlist item using placeholder display text
+     * @param entrantId entrant identifier
+     * @return fallback item
      */
     public static OrganizerWaitlistItem fallback(String entrantId) {
         return new OrganizerWaitlistItem(entrantId, entrantId, "Entrant profile unavailable");
     }
 
     /**
-     * Returns the organizer-facing display name for the entrant.
-     *
-     * @return the formatted entrant display name
+     * @return display name
      */
     public String getDisplayName() {
         return displayName;
     }
 
     /**
-     * Returns the secondary text shown under the entrant name.
-     *
-     * @return the subtitle text for the waitlist row
+     * @return subtitle text
      */
     public String getSubtitle() {
         return subtitle;
     }
 
     /**
-     * Computes the avatar label shown for the entrant.
-     *
-     * @return the first uppercased character of the display name, or {@code "?"} when unavailable
+     * @return one-character avatar label
      */
     public String getAvatarLabel() {
         if (displayName == null || displayName.trim().isEmpty()) {
@@ -96,11 +90,10 @@ public class OrganizerWaitlistItem {
     }
 
     /**
-     * Checks whether this waitlist item matches a search query.
+     * Checks whether this entrant matches a search query.
      *
-     * @param query the user-entered search text to compare against the row contents
-     * @return {@code true} when the query matches the entrant id, display name, or subtitle;
-     *         otherwise {@code false}
+     * @param query search text
+     * @return true when matched by name, subtitle, or id
      */
     public boolean matches(String query) {
         String normalized = query == null ? "" : query.toLowerCase();
@@ -110,10 +103,10 @@ public class OrganizerWaitlistItem {
     }
 
     /**
-     * Converts a nullable string value into trimmed display text.
+     * Returns trimmed non-null text.
      *
-     * @param value the raw string value to normalize
-     * @return an empty string when the value is {@code null}; otherwise the trimmed value
+     * @param value input text
+     * @return trimmed text or empty string
      */
     private static String safe(String value) {
         return value == null ? "" : value.trim();
