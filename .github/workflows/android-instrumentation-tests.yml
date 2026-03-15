@@ -4,7 +4,8 @@ on:
   pull_request:
     branches:
       - '**'
-      - '!Will-Halfway-Checkpoint'
+    branches-ignore:
+      - Will-Halfway-Checkpoint
   workflow_dispatch:
 
 permissions:
