@@ -195,6 +195,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     "Location TBD", // Default location
                     "" // Default description
             );
+            newEvent.setQrCodePath(QrCodeUtils.buildPromotionalEventLink(eventId));
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("events").document(eventId)

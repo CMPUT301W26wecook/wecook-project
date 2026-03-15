@@ -1,19 +1,26 @@
 package com.example.wecookproject;
 
 import android.Manifest;
-import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.content.pm.PackageManager;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,11 +28,13 @@ import androidx.annotation.NonNull;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.wecookproject.model.Event;
+import com.google.zxing.WriterException;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -275,7 +284,7 @@ public class UserEventActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(true);
 
         btnShowQr.setOnClickListener(v ->
-                Toast.makeText(this, "QR code preview coming soon", Toast.LENGTH_SHORT).show());
+                showQrDialog(QrCodeUtils.buildPromotionalEventLink(eventRecord.getEventId())));
 
         configureDialogActions(dialog, eventRecord, btnJoinWaitlist, btnSecondary);
         dialog.show();
@@ -369,28 +378,35 @@ public class UserEventActivity extends AppCompatActivity {
             Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
             return;
         }
+        try {
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> {
+                        if (location != null) {
+                            joinWaitingList(eventRecord, dialog, location);
+                            return;
+                        }
 
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    if (location != null) {
-                        joinWaitingList(eventRecord, dialog, location);
-                        return;
-                    }
-
-                    CancellationTokenSource tokenSource = new CancellationTokenSource();
-                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
-                            .addOnSuccessListener(currentLocation -> {
-                                if (currentLocation == null) {
-                                    Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                joinWaitingList(eventRecord, dialog, currentLocation);
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+                        CancellationTokenSource tokenSource = new CancellationTokenSource();
+                        try {
+                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
+                                    .addOnSuccessListener(currentLocation -> {
+                                        if (currentLocation == null) {
+                                            Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
+                                            return;
+                                        }
+                                        joinWaitingList(eventRecord, dialog, currentLocation);
+                                    })
+                                    .addOnFailureListener(e ->
+                                            Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+                        } catch (SecurityException securityException) {
+                            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+        } catch (SecurityException securityException) {
+            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**
@@ -576,7 +592,7 @@ public class UserEventActivity extends AppCompatActivity {
         historyData.put("eventName", eventRecord.getEventName());
         historyData.put("location", eventRecord.getLocation());
         historyData.put("organizerId", eventRecord.getOrganizerId());
-        historyData.put("posterPath", eventRecord.getPosterPath());
+        historyData.put("posterUrl", eventRecord.getPosterPath());
         historyData.put("registrationStartDate", eventRecord.getRegistrationStartDate());
         historyData.put("registrationEndDate", eventRecord.getRegistrationEndDate());
         historyData.put("description", eventRecord.getDescription());
@@ -697,5 +713,66 @@ public class UserEventActivity extends AppCompatActivity {
          * @param eventRecord selected event record
          */
         void onEventClick(UserEventRecord eventRecord);
+    }
+
+    private void showQrDialog(String payload) {
+        try {
+            int qrSize = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    280,
+                    getResources().getDisplayMetrics()
+            );
+            Bitmap qrBitmap = QrCodeUtils.generateQrBitmap(payload, qrSize);
+            ImageView qrImage = new ImageView(this);
+            qrImage.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            qrImage.setAdjustViewBounds(true);
+            qrImage.setImageBitmap(qrBitmap);
+
+            TextView linkView = new TextView(this);
+            linkView.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            linkView.setText(payload);
+            linkView.setTextColor(Color.BLUE);
+            linkView.setPaintFlags(linkView.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+            linkView.setOnClickListener(v -> {
+                Intent openIntent = new Intent(this, PublicEventLandingActivity.class);
+                openIntent.setData(Uri.parse(payload));
+                startActivity(openIntent);
+            });
+            linkView.setOnLongClickListener(v -> {
+                ClipboardManager clipboard =
+                        (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Event link", payload));
+                    Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            });
+            int topPadding = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 12, getResources().getDisplayMetrics());
+            linkView.setPadding(0, topPadding, 0, 0);
+
+            LinearLayout dialogContent = new LinearLayout(this);
+            dialogContent.setOrientation(LinearLayout.VERTICAL);
+            dialogContent.setGravity(Gravity.CENTER_HORIZONTAL);
+            int padding = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
+            dialogContent.setPadding(padding, padding, padding, padding);
+            dialogContent.addView(qrImage);
+            dialogContent.addView(linkView);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Event QR Code")
+                    .setView(dialogContent)
+                    .setPositiveButton("Close", null)
+                    .show();
+        } catch (WriterException e) {
+            Toast.makeText(this, "Failed to generate QR code", Toast.LENGTH_SHORT).show();
+        }
     }
 }

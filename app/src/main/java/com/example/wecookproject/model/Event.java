@@ -19,7 +19,7 @@ public class Event {
     private String location; // As seen in details "Edmonton"
     private String description;
 
-    private String posterPath;
+    private String posterUrl;
     private String qrCodePath;
     private List<String> waitlistEntrantIds = new ArrayList<>();
     private List<String> selectedEntrantIds = new ArrayList<>();

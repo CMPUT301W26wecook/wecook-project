@@ -75,7 +75,7 @@ public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.
         holder.tvEventName.setText(item.getEventName());
         holder.tvMeta.setText(item.getLocation() + " • " + UserEventUiUtils.formatDateRange(item.getRegistrationStartDate(), item.getRegistrationEndDate()));
         UserEventUiUtils.applyStatusChip(holder.tvStatus, item.getStatus(), false);
-        PosterLoader.loadInto(holder.ivPoster, item.getPosterPath());
+        PosterLoader.loadInto(holder.ivPoster, item.getPosterUrl());
 
         holder.itemView.setOnClickListener(v -> listener.onHistoryClicked(item));
         holder.btnDelete.setOnClickListener(v -> listener.onDeleteClicked(item));

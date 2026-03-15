@@ -10,7 +10,7 @@ public class UserHistoryItem {
     private final String eventId;
     private final String eventName;
     private final String location;
-    private final String posterPath;
+    private final String posterUrl;
     private final String status;
     private final Timestamp registrationStartDate;
     private final Timestamp registrationEndDate;
@@ -29,14 +29,14 @@ public class UserHistoryItem {
     public UserHistoryItem(String eventId,
                            String eventName,
                            String location,
-                           String posterPath,
+                           String posterUrl,
                            String status,
                            Timestamp registrationStartDate,
                            Timestamp registrationEndDate) {
         this.eventId = eventId;
         this.eventName = eventName;
         this.location = location;
-        this.posterPath = posterPath;
+        this.posterUrl = posterUrl;
         this.status = status;
         this.registrationStartDate = registrationStartDate;
         this.registrationEndDate = registrationEndDate;
@@ -112,6 +112,14 @@ public class UserHistoryItem {
      */
     public String getPosterPath() {
         return posterPath;
+    }
+
+    private static String getPosterUrl(com.google.firebase.firestore.DocumentSnapshot snapshot) {
+        String url = snapshot.getString("posterUrl");
+        if (url != null && !url.trim().isEmpty()) {
+            return url;
+        }
+        return snapshot.getString("posterPath");
     }
 
     /**
