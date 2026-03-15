@@ -100,8 +100,10 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
             return true;
         });
 
+        // Returns to the previous organizer event screen.
         findViewById(R.id.btn_back_to_event).setOnClickListener(v -> finish());
 
+        // Reserved for showing the event QR code once that feature is implemented.
         findViewById(R.id.btn_show_qr).setOnClickListener(v -> {
             // TODO: show QR code dialog
         });
