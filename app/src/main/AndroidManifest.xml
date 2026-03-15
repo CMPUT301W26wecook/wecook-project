@@ -22,6 +22,9 @@
             android:name=".UserEventDetailsActivity"
             android:exported="false" />
         <activity
+            android:name=".UserLotteryCriteriaActivity"
+            android:exported="false" />
+        <activity
             android:name=".UserHistoryActivity"
             android:exported="false" />
         <activity
