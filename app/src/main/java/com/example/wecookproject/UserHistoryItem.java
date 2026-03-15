@@ -21,7 +21,7 @@ public class UserHistoryItem {
      * @param eventId event identifier
      * @param eventName event name
      * @param location event location label
-     * @param posterPath poster URL/path
+     * @param posterUrl poster URL/path
      * @param status history status
      * @param registrationStartDate registration start timestamp
      * @param registrationEndDate registration end timestamp
@@ -111,7 +111,7 @@ public class UserHistoryItem {
      * @return poster path/url, or {@code null}
      */
     public String getPosterPath() {
-        return posterPath;
+        return posterUrl;
     }
 
     private static String getPosterUrl(com.google.firebase.firestore.DocumentSnapshot snapshot) {

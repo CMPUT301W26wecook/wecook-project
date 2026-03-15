@@ -205,14 +205,14 @@ public class Event {
      * @return poster path/url
      */
     public String getPosterPath() {
-        return posterPath;
+        return posterUrl;
     }
 
     /**
      * @param posterPath poster path/url
      */
     public void setPosterPath(String posterPath) {
-        this.posterPath = posterPath;
+        this.posterUrl = posterPath;
     }
 
     /**
