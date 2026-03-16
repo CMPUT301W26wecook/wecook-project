@@ -12,12 +12,23 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+/**
+ * Entry point for role-based login routing.
+ *
+ * <p>This activity identifies the current device, preloads user existence from Firestore,
+ * and routes to the appropriate screen based on role and profile state.</p>
+ */
 public class LoginActivity extends AppCompatActivity {
     private boolean isDbQueryReady = false;
     private boolean isUserExists = false;
     private boolean isLoginClicked = false;
     private String clickedRole = "";
 
+    /**
+     * Initializes login controls and starts prefetching login context.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -37,6 +48,12 @@ public class LoginActivity extends AppCompatActivity {
         prefetchLoginData();
     }
 
+    /**
+     * Prefetches Firebase token and user existence for the current device.
+     *
+     * <p>When prefetch completes and the user has already tapped a login role,
+     * routing continues automatically.</p>
+     */
     private void prefetchLoginData() {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
@@ -73,6 +90,11 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Handles a role-selection click from the login screen.
+     *
+     * @param role selected role identifier ({@code ENTRANT}, {@code ORGANIZER}, or {@code ADMIN})
+     */
     private void handleLogin(String role) {
         clickedRole = role; // Store if needed later
         isLoginClicked = true;
@@ -85,6 +107,9 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Routes the user to the next activity according to role and profile existence.
+     */
     private void routeUser() {
         Intent jumpIntent;
         if (clickedRole.equals("ADMIN")) {

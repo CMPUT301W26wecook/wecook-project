@@ -36,7 +36,7 @@ public class AdminUserProfileFragment extends Fragment {
     }
 
     /**
-     * Show User Profile UI and handles Admin interactions for cleaning profile information.
+        * Show User Profile UI and handles Admin interactions for deleting the account.
      *
      * @param inflater           Parent view to which the fragment's UI should be attached.
      * @param container          Parent view for the fragment's UI.
@@ -77,23 +77,13 @@ public class AdminUserProfileFragment extends Fragment {
         
         view.findViewById(R.id.btn_delete_account).setOnClickListener(v -> {
             if (user != null) {
-                user.clearProfile();
-
-                tvFirstName.setText("First Name: Deleted");
-                tvLastName.setText("Last Name: User");
-                tvDob.setText("Birthday: ");
-                tvAddress1.setText("Address Line 1: ");
-                tvAddress2.setText("Address Line 2: ");
-                tvCity.setText("City: ");
-                tvPostalCode.setText("Postal Code: ");
-                tvCountry.setText("Country: ");
-
                 db.collection("users").document(user.getAndroidId())
-                        .set(user.toFirestoreMap())
+                        .delete()
                         .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "User profile info cleared", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "User account deleted", Toast.LENGTH_SHORT).show();
+                            getParentFragmentManager().popBackStack();
                         })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error clearing profile", Toast.LENGTH_SHORT).show());
+                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
             }
         });
 

@@ -60,6 +60,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private boolean posterCommitted;
     private ActivityResultLauncher<String> posterPickerLauncher;
 
+    /**
+     * Initializes edit form, poster picker, and navigation actions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -116,6 +121,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         findViewById(R.id.btn_update_event).setOnClickListener(v -> updateEvent());
 
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            /**
+             * Handles system back press and applies cancel cleanup behavior.
+             */
             @Override
             public void handleOnBackPressed() {
                 cancelAndExit();
@@ -123,6 +131,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Opens date picker for registration start date.
+     *
+     * @param editText target input field
+     */
     private void showStartDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
         DatePickerDialog datePickerDialog = new DatePickerDialog(
@@ -139,6 +152,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         datePickerDialog.show();
     }
 
+    /**
+     * Opens date picker for registration end date.
+     *
+     * @param editText target input field
+     */
     private void showEndDatePicker(TextInputEditText editText) {
         Calendar calendar = Calendar.getInstance();
         if (registrationStartDate != null) {
@@ -165,6 +183,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         datePickerDialog.show();
     }
 
+    /**
+     * Validates changed fields and submits event updates.
+     */
     private void updateEvent() {
         tilEventName.setError(null);
         tilRegistrationStartDate.setError(null);
@@ -235,6 +256,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                         Toast.makeText(this, "Failed to update event", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Handles selected poster image and uploads it.
+     *
+     * @param imageUri selected image uri
+     */
     private void handlePosterSelection(Uri imageUri) {
         if (imageUri == null) {
             return;
@@ -274,12 +300,21 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                         Toast.makeText(this, "Failed to upload poster", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Validates poster MIME type.
+     *
+     * @param mimeType detected MIME type
+     * @return true when supported image MIME type
+     */
     private boolean isValidPosterMimeType(String mimeType) {
         return "image/jpeg".equalsIgnoreCase(mimeType)
                 || "image/jpg".equalsIgnoreCase(mimeType)
                 || "image/png".equalsIgnoreCase(mimeType);
     }
 
+    /**
+     * Loads currently stored poster URL for cleanup/replacement logic.
+     */
     private void loadCurrentPosterUrl() {
         db.collection("events")
                 .document(eventId)
@@ -292,6 +327,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 });
     }
 
+    /**
+     * Cancels edit flow and cleans up uncommitted poster uploads.
+     */
     private void cancelAndExit() {
         if (!posterCommitted && !TextUtils.isEmpty(pendingPosterUrl)) {
             deleteStorageFile(pendingPosterUrl);
@@ -300,6 +338,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         finish();
     }
 
+    /**
+     * Deletes a storage object by URL when possible.
+     *
+     * @param fileUrl storage URL
+     */
     private void deleteStorageFile(String fileUrl) {
         if (TextUtils.isEmpty(fileUrl)) {
             return;
@@ -313,6 +356,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Returns trimmed text from an input field.
+     *
+     * @param editText source input
+     * @return trimmed text or empty string
+     */
     private String getTrimmedText(TextInputEditText editText) {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
     }

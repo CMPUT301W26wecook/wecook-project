@@ -10,7 +10,18 @@ import android.widget.ImageView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
+/**
+ * Captures user detail inputs during signup.
+ *
+ * <p>This screen validates role-specific required fields and forwards valid
+ * data to the address step.</p>
+ */
 public class SignupDetailsActivity extends AppCompatActivity {
+    /**
+     * Initializes views, input formatting, and navigation actions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -23,17 +34,46 @@ public class SignupDetailsActivity extends AppCompatActivity {
         EditText etBirthday = findViewById(R.id.et_birthday);
 
         backButton.setOnClickListener(v -> finish());
+        setupBirthdayFormatting(etBirthday);
+        continueButton.setOnClickListener(v -> handleContinue(etFirstName, etLastName, etBirthday));
+    }
 
-        // Auto-format birthday as MM/DD/YYYY while user types
-        etBirthday.addTextChangedListener(new TextWatcher() {
+    /**
+     * Adds birthday auto-formatting in {@code MM/DD/YYYY} format.
+     *
+     * @param birthdayInput birthday input field
+     */
+    private void setupBirthdayFormatting(EditText birthdayInput) {
+        birthdayInput.addTextChangedListener(new TextWatcher() {
             private boolean isFormatting = false;
 
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param count changed length
+             * @param after replacement length
+             */
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
+            /**
+             * No-op callback required by {@link TextWatcher}.
+             *
+             * @param s current text
+             * @param start changed start index
+             * @param before replaced length
+             * @param count inserted length
+             */
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
+            /**
+             * Normalizes user-entered digits into birthday format.
+             *
+             * @param s editable text to normalize
+             */
             @Override
             public void afterTextChanged(Editable s) {
                 if (isFormatting) return;
@@ -61,33 +101,40 @@ public class SignupDetailsActivity extends AppCompatActivity {
                 isFormatting = false;
             }
         });
+    }
 
-        continueButton.setOnClickListener(v -> {
-            String firstName = etFirstName.getText().toString().trim();
-            String lastName = etLastName.getText().toString().trim();
-            String birthday = etBirthday.getText().toString().trim();
-            
-            String clickedRole = getIntent().getStringExtra("clickedRole");
-            if ("ORGANIZER".equals(clickedRole)) {
-                if (firstName.isEmpty() || lastName.isEmpty() || birthday.isEmpty()) {
-                    Toast.makeText(this, "First name, Last name, and Birthday cannot be empty", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            } else {
-                if (firstName.isEmpty() || birthday.isEmpty()) {
-                    Toast.makeText(this, "First name and Birthday cannot be empty", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
+    /**
+     * Validates detail fields and proceeds to the address step.
+     *
+     * @param firstNameInput first-name field
+     * @param lastNameInput last-name field
+     * @param birthdayInput birthday field
+     */
+    private void handleContinue(EditText firstNameInput, EditText lastNameInput, EditText birthdayInput) {
+        String firstName = firstNameInput.getText().toString().trim();
+        String lastName = lastNameInput.getText().toString().trim();
+        String birthday = birthdayInput.getText().toString().trim();
 
-            Intent intent = new Intent(SignupDetailsActivity.this, SignupAddressActivity.class);
-            intent.putExtra("firstName", firstName);
-            intent.putExtra("lastName", lastName);
-            intent.putExtra("birthday", birthday);
-            if (getIntent().hasExtra("clickedRole")) {
-                intent.putExtra("clickedRole", clickedRole);
+        String clickedRole = getIntent().getStringExtra("clickedRole");
+        if ("ORGANIZER".equals(clickedRole)) {
+            if (firstName.isEmpty() || lastName.isEmpty() || birthday.isEmpty()) {
+                Toast.makeText(this, "First name, Last name, and Birthday cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
             }
-            startActivity(intent);
-        });
+        } else {
+            if (firstName.isEmpty() || birthday.isEmpty()) {
+                Toast.makeText(this, "First name and Birthday cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        Intent intent = new Intent(SignupDetailsActivity.this, SignupAddressActivity.class);
+        intent.putExtra("firstName", firstName);
+        intent.putExtra("lastName", lastName);
+        intent.putExtra("birthday", birthday);
+        if (getIntent().hasExtra("clickedRole")) {
+            intent.putExtra("clickedRole", clickedRole);
+        }
+        startActivity(intent);
     }
 }

@@ -36,6 +36,11 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     private List<Event> eventList;
     private ListenerRegistration eventsListener;
 
+    /**
+     * Initializes organizer home list and bottom navigation.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,6 +74,9 @@ public class OrganizerHomeActivity extends AppCompatActivity {
         });
     }
     
+    /**
+     * Subscribes to organizer events with real-time updates.
+     */
     private void loadEvents() {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -93,6 +101,9 @@ public class OrganizerHomeActivity extends AppCompatActivity {
                 });
     }
     
+    /**
+     * Removes Firestore listeners to avoid leaks.
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();

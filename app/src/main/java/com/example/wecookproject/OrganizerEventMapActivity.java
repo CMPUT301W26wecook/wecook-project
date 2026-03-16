@@ -41,6 +41,11 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
 
+    /**
+     * Initializes map screen, event context, and navigation actions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -102,6 +107,11 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
         });
     }
 
+    /**
+     * Receives map readiness callback and loads location markers.
+     *
+     * @param map initialized GoogleMap instance
+     */
     @Override
     public void onMapReady(GoogleMap map) {
         googleMap = map;
@@ -110,6 +120,9 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
         loadEntrantLocations();
     }
 
+    /**
+     * Loads event header metadata and geolocation toggle state.
+     */
     private void loadEventHeader() {
         db.collection("events").document(eventId).get()
                 .addOnSuccessListener(snapshot -> {
@@ -133,6 +146,9 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Loads and renders entrant location markers on the map.
+     */
     private void loadEntrantLocations() {
         if (googleMap == null) {
             return;
@@ -171,6 +187,12 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load waitlist locations", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Extracts map markers from raw Firestore location payload.
+     *
+     * @param rawLocations raw waitlistEntrantLocations object
+     * @return marker data list
+     */
     private List<MarkerData> extractMarkers(Object rawLocations) {
         List<MarkerData> markers = new ArrayList<>();
         if (!(rawLocations instanceof Map<?, ?>)) {
@@ -202,11 +224,21 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
         return markers;
     }
 
+    /**
+     * Lightweight marker DTO.
+     */
     private static class MarkerData {
         private final double latitude;
         private final double longitude;
         private final String title;
 
+        /**
+         * Creates marker data for map rendering.
+         *
+         * @param latitude marker latitude
+         * @param longitude marker longitude
+         * @param title marker title
+         */
         private MarkerData(double latitude, double longitude, String title) {
             this.latitude = latitude;
             this.longitude = longitude;

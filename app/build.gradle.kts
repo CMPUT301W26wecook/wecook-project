@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.firebase.auth)
     testImplementation(libs.junit)
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
@@ -55,6 +56,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-maps:19.2.0")
+    implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.navigation:navigation-fragment:2.9.7")
     implementation("androidx.navigation:navigation-ui:2.9.7")
 }

@@ -6,6 +6,9 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Immutable-ish record used by entrant event screens.
+ */
 public class UserEventRecord {
     public static final String STATUS_WAITLISTED = "waitlisted";
     public static final String STATUS_INVITED = "invited";
@@ -27,6 +30,23 @@ public class UserEventRecord {
     private List<String> waitlistEntrantIds;
     private String historyStatus;
 
+    /**
+     * Creates an event record.
+     *
+     * @param eventId event identifier
+     * @param eventName event name
+     * @param location location label
+     * @param organizerId organizer identifier
+     * @param description event description
+     * @param posterPath poster path/url
+     * @param maxWaitlist waitlist capacity
+     * @param entrantId current entrant identifier
+     * @param registrationStartDate registration start timestamp
+     * @param registrationEndDate registration end timestamp
+     * @param geolocationRequired geolocation requirement flag
+     * @param waitlistEntrantIds current waitlist entrant ids
+     * @param historyStatus current entrant history status
+     */
     public UserEventRecord(String eventId,
                            String eventName,
                            String location,
@@ -55,6 +75,14 @@ public class UserEventRecord {
         this.historyStatus = historyStatus == null ? "" : historyStatus;
     }
 
+    /**
+     * Maps Firestore event data into a UI record.
+     *
+     * @param snapshot event document snapshot
+     * @param entrantId current entrant id
+     * @param historyStatus known history status
+     * @return populated user event record
+     */
     public static UserEventRecord fromEventSnapshot(DocumentSnapshot snapshot, String entrantId, String historyStatus) {
         List<String> waitlistEntrants = getStringList(snapshot, "waitlistEntrantIds");
         String resolvedStatus = historyStatus;
@@ -82,11 +110,25 @@ public class UserEventRecord {
         );
     }
 
+    /**
+     * Reads a non-blank string field with fallback.
+     *
+     * @param snapshot source document
+     * @param field field name
+     * @param fallback fallback value
+     * @return resolved string value
+     */
     private static String getString(DocumentSnapshot snapshot, String field, String fallback) {
         String value = snapshot.getString(field);
         return value == null || value.trim().isEmpty() ? fallback : value;
     }
 
+    /**
+     * Resolves poster path from current and legacy keys.
+     *
+     * @param snapshot source document
+     * @return poster path/url, or {@code null}
+     */
     private static String getPosterPath(DocumentSnapshot snapshot) {
         String posterPath = snapshot.getString("posterPath");
         if (posterPath != null && !posterPath.trim().isEmpty()) {
@@ -96,81 +138,151 @@ public class UserEventRecord {
         return legacyPosterUrl == null || legacyPosterUrl.trim().isEmpty() ? null : legacyPosterUrl;
     }
 
+    /**
+     * Reads a boolean with fallback.
+     *
+     * @param snapshot source document
+     * @param field field name
+     * @param fallback fallback value
+     * @return resolved boolean value
+     */
     private static boolean getBoolean(DocumentSnapshot snapshot, String field, boolean fallback) {
         Boolean value = snapshot.getBoolean(field);
         return value == null ? fallback : value;
     }
 
+    /**
+     * Reads a list of strings and returns a defensive copy.
+     *
+     * @param snapshot source document
+     * @param field field name
+     * @return string list (never {@code null})
+     */
     @SuppressWarnings("unchecked")
     private static List<String> getStringList(DocumentSnapshot snapshot, String field) {
         List<String> values = (List<String>) snapshot.get(field);
         return values == null ? new ArrayList<>() : new ArrayList<>(values);
     }
 
+    /**
+     * @return event identifier
+     */
     public String getEventId() {
         return eventId;
     }
 
+    /**
+     * @return event name
+     */
     public String getEventName() {
         return eventName;
     }
 
+    /**
+     * @return location label
+     */
     public String getLocation() {
         return location;
     }
 
+    /**
+     * @return organizer identifier
+     */
     public String getOrganizerId() {
         return organizerId;
     }
 
+    /**
+     * @return event description
+     */
     public String getDescription() {
         return description;
     }
 
+    /**
+     * @return poster path/url, or {@code null}
+     */
     public String getPosterPath() {
         return posterPath;
     }
 
+    /**
+     * @return max waitlist capacity
+     */
     public int getMaxWaitlist() {
         return maxWaitlist;
     }
 
+    /**
+     * @return registration start timestamp, or {@code null}
+     */
     public Timestamp getRegistrationStartDate() {
         return registrationStartDate;
     }
 
+    /**
+     * @return registration end timestamp, or {@code null}
+     */
     public Timestamp getRegistrationEndDate() {
         return registrationEndDate;
     }
 
+    /**
+     * @return true when geolocation is required for joining
+     */
     public boolean isGeolocationRequired() {
         return geolocationRequired;
     }
 
+    /**
+     * @return defensive copy of waitlist entrant ids
+     */
     public List<String> getWaitlistEntrantIds() {
         return new ArrayList<>(waitlistEntrantIds);
     }
 
+    /**
+     * @return current waitlist size
+     */
     public int getCurrentWaitlistCount() {
         return waitlistEntrantIds.size();
     }
 
+    /**
+     * @return true when waitlist is at capacity
+     */
     public boolean isWaitlistFull() {
         return maxWaitlist > 0 && waitlistEntrantIds.size() >= maxWaitlist;
     }
 
+    /**
+     * @return true when current entrant is in waitlist
+     */
     public boolean isEntrantOnWaitlist() {
         return waitlistEntrantIds.contains(entrantId);
     }
 
+    /**
+     * @return effective history status, or empty string
+     */
     public String getEffectiveStatus() {
         return historyStatus == null ? "" : historyStatus;
     }
 
+    /**
+     * Replaces waitlist entrants with a defensive copy.
+     *
+     * @param waitlistEntrantIds new waitlist ids
+     */
     public void setWaitlistEntrantIds(List<String> waitlistEntrantIds) {
         this.waitlistEntrantIds = waitlistEntrantIds == null ? new ArrayList<>() : new ArrayList<>(waitlistEntrantIds);
     }
 
+    /**
+     * Updates history status.
+     *
+     * @param historyStatus new history status
+     */
     public void setHistoryStatus(String historyStatus) {
         this.historyStatus = historyStatus == null ? "" : historyStatus;
     }

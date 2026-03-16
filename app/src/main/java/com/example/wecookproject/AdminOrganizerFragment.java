@@ -62,6 +62,12 @@ public class AdminOrganizerFragment extends Fragment {
         loadOrganizersFromFirestore();
 
         adapter.setOnMenuActionListener(new ListElementAdapter.OnMenuActionListener<User>() {
+            /**
+             * Deletes selected organizer account.
+             *
+             * @param user selected organizer
+             * @param position adapter position
+             */
             @Override
             public void onDelete(User user, int position) {
                 db.collection("users").document(user.getAndroidId())

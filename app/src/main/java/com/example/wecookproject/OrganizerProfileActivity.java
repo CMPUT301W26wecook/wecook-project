@@ -18,6 +18,11 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
  *   If extra time is available, these features can be implemented later.
  */
 public class OrganizerProfileActivity extends AppCompatActivity {
+    /**
+     * Initializes organizer profile screen and navigation actions.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

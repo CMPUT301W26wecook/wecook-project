@@ -16,6 +16,11 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
  *   implemented in part 4.
  */
 public class OrganizerNotificationActivity extends AppCompatActivity {
+    /**
+     * Initializes organizer notification UI and navigation.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

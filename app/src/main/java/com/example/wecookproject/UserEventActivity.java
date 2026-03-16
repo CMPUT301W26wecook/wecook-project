@@ -1,19 +1,26 @@
 package com.example.wecookproject;
 
 import android.Manifest;
-import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.content.pm.PackageManager;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,11 +28,13 @@ import androidx.annotation.NonNull;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.wecookproject.model.Event;
+import com.google.zxing.WriterException;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -43,6 +52,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Entrant event list screen with waitlist and invitation actions.
+ */
 public class UserEventActivity extends AppCompatActivity {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -58,6 +70,11 @@ public class UserEventActivity extends AppCompatActivity {
     private UserEventRecord pendingJoinEventRecord;
     private AlertDialog pendingJoinDialog;
 
+    /**
+     * Initializes list UI, permissions launcher, and data loading.
+     *
+     * @param savedInstanceState previously saved state, or {@code null}
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -90,12 +107,18 @@ public class UserEventActivity extends AppCompatActivity {
         loadEventsAndHistory();
     }
 
+    /**
+     * Reloads events when returning to foreground.
+     */
     @Override
     protected void onResume() {
         super.onResume();
         loadEventsAndHistory();
     }
 
+    /**
+     * Configures entrant bottom-navigation actions.
+     */
     private void setupBottomNav() {
         bottomNav.setSelectedItemId(R.id.nav_events);
 
@@ -128,6 +151,9 @@ public class UserEventActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Loads event history statuses, then event list.
+     */
     private void loadEventsAndHistory() {
         db.collection("users")
                 .document(entrantId)
@@ -150,6 +176,11 @@ public class UserEventActivity extends AppCompatActivity {
                 });
     }
 
+    /**
+     * Loads all events and merges history status for display.
+     *
+     * @param historyStatuses map of eventId to history status
+     */
     private void loadEvents(Map<String, String> historyStatuses) {
         db.collection("events")
                 .get()
@@ -179,6 +210,11 @@ public class UserEventActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load events", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Initializes waitlist fields on legacy event documents.
+     *
+     * @param eventReference event document reference
+     */
     private void initializeWaitingList(DocumentReference eventReference) {
         eventReference.update(
                 "waitlistEntrantIds", new ArrayList<String>(),
@@ -186,6 +222,9 @@ public class UserEventActivity extends AppCompatActivity {
         );
     }
 
+    /**
+     * Toggles empty-state visibility for the event list.
+     */
     private void updateEmptyState() {
         if (eventList.isEmpty()) {
             tvEmptyState.setVisibility(View.VISIBLE);
@@ -196,6 +235,11 @@ public class UserEventActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Shows the event-details dialog for one event record.
+     *
+     * @param eventRecord selected event
+     */
     private void showEventDetailsDialog(UserEventRecord eventRecord) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_user_event_details, null, false);
 
@@ -240,12 +284,20 @@ public class UserEventActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(true);
 
         btnShowQr.setOnClickListener(v ->
-                Toast.makeText(this, "QR code preview coming soon", Toast.LENGTH_SHORT).show());
+                showQrDialog(QrCodeUtils.buildPromotionalEventLink(eventRecord.getEventId())));
 
         configureDialogActions(dialog, eventRecord, btnJoinWaitlist, btnSecondary);
         dialog.show();
     }
 
+    /**
+     * Configures dialog action buttons based on current status.
+     *
+     * @param dialog details dialog
+     * @param eventRecord selected event record
+     * @param btnJoinWaitlist primary action button
+     * @param btnSecondary secondary action button
+     */
     private void configureDialogActions(AlertDialog dialog,
                                         UserEventRecord eventRecord,
                                         Button btnJoinWaitlist,
@@ -291,6 +343,12 @@ public class UserEventActivity extends AppCompatActivity {
         btnJoinWaitlist.setOnClickListener(v -> requestLocationAndJoinWaitlist(eventRecord, dialog));
     }
 
+    /**
+     * Requests location permission if required before joining waitlist.
+     *
+     * @param eventRecord target event record
+     * @param dialog details dialog
+     */
     private void requestLocationAndJoinWaitlist(UserEventRecord eventRecord, AlertDialog dialog) {
         if (!eventRecord.isGeolocationRequired()) {
             joinWaitingList(eventRecord, dialog, null);
@@ -309,40 +367,63 @@ public class UserEventActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Reads current location and continues waitlist join flow.
+     *
+     * @param eventRecord target event record
+     * @param dialog details dialog
+     */
     private void fetchLocationAndJoinWaitlist(UserEventRecord eventRecord, AlertDialog dialog) {
         if (!hasLocationPermission()) {
             Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
             return;
         }
+        try {
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> {
+                        if (location != null) {
+                            joinWaitingList(eventRecord, dialog, location);
+                            return;
+                        }
 
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    if (location != null) {
-                        joinWaitingList(eventRecord, dialog, location);
-                        return;
-                    }
-
-                    CancellationTokenSource tokenSource = new CancellationTokenSource();
-                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
-                            .addOnSuccessListener(currentLocation -> {
-                                if (currentLocation == null) {
-                                    Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                joinWaitingList(eventRecord, dialog, currentLocation);
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+                        CancellationTokenSource tokenSource = new CancellationTokenSource();
+                        try {
+                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
+                                    .addOnSuccessListener(currentLocation -> {
+                                        if (currentLocation == null) {
+                                            Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
+                                            return;
+                                        }
+                                        joinWaitingList(eventRecord, dialog, currentLocation);
+                                    })
+                                    .addOnFailureListener(e ->
+                                            Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+                        } catch (SecurityException securityException) {
+                            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+        } catch (SecurityException securityException) {
+            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+        }
     }
 
+    /**
+     * @return true when location permission is granted
+     */
     private boolean hasLocationPermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
+    /**
+     * Adds entrant to waitlist.
+     *
+     * @param eventRecord target event record
+     * @param dialog details dialog
+     * @param entrantLocation entrant location if available
+     */
     private void joinWaitingList(UserEventRecord eventRecord, AlertDialog dialog, Location entrantLocation) {
         updateWaitlistMembership(
                 eventRecord,
@@ -355,6 +436,12 @@ public class UserEventActivity extends AppCompatActivity {
         );
     }
 
+    /**
+     * Removes entrant from waitlist and history.
+     *
+     * @param eventRecord target event record
+     * @param dialog details dialog
+     */
     private void leaveWaitlist(UserEventRecord eventRecord, AlertDialog dialog) {
         updateWaitlistMembership(
                 eventRecord,
@@ -367,6 +454,12 @@ public class UserEventActivity extends AppCompatActivity {
         );
     }
 
+    /**
+     * Accepts invitation for an event.
+     *
+     * @param eventRecord target event record
+     * @param dialog details dialog
+     */
     private void acceptInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
         updateWaitlistMembership(
                 eventRecord,
@@ -379,6 +472,12 @@ public class UserEventActivity extends AppCompatActivity {
         );
     }
 
+    /**
+     * Declines invitation for an event.
+     *
+     * @param eventRecord target event record
+     * @param dialog details dialog
+     */
     private void declineInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
         updateWaitlistMembership(
                 eventRecord,
@@ -391,6 +490,17 @@ public class UserEventActivity extends AppCompatActivity {
         );
     }
 
+    /**
+     * Updates waitlist membership and history in Firestore transaction.
+     *
+     * @param eventRecord target event record
+     * @param addEntrant true to add entrant, false to remove
+     * @param newStatus new history status
+     * @param deleteHistory true to delete history record
+     * @param successMessage success toast message
+     * @param dialog details dialog
+     * @param entrantLocation entrant location if available
+     */
     private void updateWaitlistMembership(UserEventRecord eventRecord,
                                           boolean addEntrant,
                                           String newStatus,
@@ -470,13 +580,19 @@ public class UserEventActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Upserts a history document for the given event and status.
+     *
+     * @param eventRecord source event record
+     * @param status status to persist
+     */
     private void upsertHistoryDocument(UserEventRecord eventRecord, String status) {
         Map<String, Object> historyData = new HashMap<>();
         historyData.put("eventId", eventRecord.getEventId());
         historyData.put("eventName", eventRecord.getEventName());
         historyData.put("location", eventRecord.getLocation());
         historyData.put("organizerId", eventRecord.getOrganizerId());
-        historyData.put("posterPath", eventRecord.getPosterPath());
+        historyData.put("posterUrl", eventRecord.getPosterPath());
         historyData.put("registrationStartDate", eventRecord.getRegistrationStartDate());
         historyData.put("registrationEndDate", eventRecord.getRegistrationEndDate());
         historyData.put("description", eventRecord.getDescription());
@@ -490,6 +606,11 @@ public class UserEventActivity extends AppCompatActivity {
                 .set(historyData);
     }
 
+    /**
+     * Deletes one history document by event id.
+     *
+     * @param eventId event identifier
+     */
     private void deleteHistoryDocument(String eventId) {
         db.collection("users")
                 .document(entrantId)
@@ -498,15 +619,31 @@ public class UserEventActivity extends AppCompatActivity {
                 .delete();
     }
 
+    /**
+     * RecyclerView adapter for entrant event list rows.
+     */
     private static class UserEventAdapter extends RecyclerView.Adapter<UserEventAdapter.UserEventViewHolder> {
         private final List<UserEventRecord> eventItems;
         private final OnEventClickListener listener;
 
+        /**
+         * Creates an event adapter.
+         *
+         * @param eventItems backing event list
+         * @param listener click listener
+         */
         private UserEventAdapter(List<UserEventRecord> eventItems, OnEventClickListener listener) {
             this.eventItems = eventItems;
             this.listener = listener;
         }
 
+        /**
+         * Inflates one event row.
+         *
+         * @param parent parent RecyclerView
+         * @param viewType view type id
+         * @return created view holder
+         */
         @NonNull
         @Override
         public UserEventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -514,6 +651,12 @@ public class UserEventActivity extends AppCompatActivity {
             return new UserEventViewHolder(view);
         }
 
+        /**
+         * Binds one event row.
+         *
+         * @param holder row holder
+         * @param position adapter position
+         */
         @Override
         public void onBindViewHolder(@NonNull UserEventViewHolder holder, int position) {
             UserEventRecord eventItem = eventItems.get(position);
@@ -532,15 +675,26 @@ public class UserEventActivity extends AppCompatActivity {
             holder.itemView.setOnClickListener(v -> listener.onEventClick(eventItem));
         }
 
+        /**
+         * @return number of event rows
+         */
         @Override
         public int getItemCount() {
             return eventItems.size();
         }
 
+        /**
+         * ViewHolder for event row rendering.
+         */
         private static class UserEventViewHolder extends RecyclerView.ViewHolder {
             private final TextView tvEventName;
             private final TextView tvEventStatus;
 
+            /**
+             * Creates a row holder and binds row subviews.
+             *
+             * @param itemView row root view
+             */
             private UserEventViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvEventName = itemView.findViewById(R.id.tv_event_name);
@@ -549,7 +703,76 @@ public class UserEventActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Listener invoked when an event list row is tapped.
+     */
     private interface OnEventClickListener {
+        /**
+         * Handles event row click.
+         *
+         * @param eventRecord selected event record
+         */
         void onEventClick(UserEventRecord eventRecord);
+    }
+
+    private void showQrDialog(String payload) {
+        try {
+            int qrSize = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    280,
+                    getResources().getDisplayMetrics()
+            );
+            Bitmap qrBitmap = QrCodeUtils.generateQrBitmap(payload, qrSize);
+            ImageView qrImage = new ImageView(this);
+            qrImage.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            qrImage.setAdjustViewBounds(true);
+            qrImage.setImageBitmap(qrBitmap);
+
+            TextView linkView = new TextView(this);
+            linkView.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            linkView.setText(payload);
+            linkView.setTextColor(Color.BLUE);
+            linkView.setPaintFlags(linkView.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+            linkView.setOnClickListener(v -> {
+                Intent openIntent = new Intent(this, PublicEventLandingActivity.class);
+                openIntent.setData(Uri.parse(payload));
+                startActivity(openIntent);
+            });
+            linkView.setOnLongClickListener(v -> {
+                ClipboardManager clipboard =
+                        (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Event link", payload));
+                    Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            });
+            int topPadding = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 12, getResources().getDisplayMetrics());
+            linkView.setPadding(0, topPadding, 0, 0);
+
+            LinearLayout dialogContent = new LinearLayout(this);
+            dialogContent.setOrientation(LinearLayout.VERTICAL);
+            dialogContent.setGravity(Gravity.CENTER_HORIZONTAL);
+            int padding = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
+            dialogContent.setPadding(padding, padding, padding, padding);
+            dialogContent.addView(qrImage);
+            dialogContent.addView(linkView);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Event QR Code")
+                    .setView(dialogContent)
+                    .setPositiveButton("Close", null)
+                    .show();
+        } catch (WriterException e) {
+            Toast.makeText(this, "Failed to generate QR code", Toast.LENGTH_SHORT).show();
+        }
     }
 }

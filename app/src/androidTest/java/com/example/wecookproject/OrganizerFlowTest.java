@@ -362,6 +362,14 @@ public class OrganizerFlowTest {
         onView(withId(R.id.btn_view_waitlist)).check(matches(isDisplayed()));
         onView(withId(R.id.btn_registration_map)).check(matches(isDisplayed()));
         onView(withId(R.id.switch_geolocation)).check(matches(isDisplayed()));
+        onView(withId(R.id.btn_show_qr)).check(matches(isDisplayed()));
+
+        // Validate QR dialog for the event
+        onView(withId(R.id.btn_show_qr)).perform(click());
+        onView(withText("Promotional QR Code")).check(matches(isDisplayed()));
+        onView(withText(QrCodeUtils.buildPromotionalEventLink(mockEventId))).check(matches(isDisplayed()));
+        // Keep test stable: close QR dialog before continuing map navigation checks.
+        onView(withText("Close")).perform(click());
 
         onView(withId(R.id.btn_registration_map)).perform(click());
         safeSleep(WAIT_MEDIUM);
@@ -376,6 +384,54 @@ public class OrganizerFlowTest {
                 .delete()
                 .addOnCompleteListener(task -> deleteLatch.countDown());
         awaitLatch(deleteLatch, 10, "mock event deletion");
+    }
+
+    /**
+     * test8b: Organizer QR dialog link should navigate to the in-app public event landing page.
+     */
+    @Test
+    public void test8b_QrLinkNavigatesToPublicEventLanding() {
+        String mockEventId = "mock-qr-link-" + UUID.randomUUID();
+        @SuppressWarnings("deprecation")
+        Event mockEvent = new Event(
+                mockEventId,
+                "org123",
+                "Test QR Landing Event",
+                new Date(126, 0, 1),
+                new Date(126, 1, 2),
+                100,
+                10,
+                true,
+                "Edmonton",
+                "Test description"
+        );
+
+        CountDownLatch createLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .set(mockEvent)
+                .addOnCompleteListener(task -> createLatch.countDown());
+        awaitLatch(createLatch, 10, "mock qr-link event creation");
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", mockEventId);
+        ActivityScenario<OrganizerEventDetailsActivity> detailsScenario =
+                ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.btn_show_qr)).perform(click());
+        onView(withText("Promotional QR Code")).check(matches(isDisplayed()));
+        onView(withText(QrCodeUtils.buildPromotionalEventLink(mockEventId))).perform(click());
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.tv_public_event_name)).check(matches(withText("Test QR Landing Event")));
+
+        detailsScenario.close();
+
+        CountDownLatch deleteLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .delete()
+                .addOnCompleteListener(task -> deleteLatch.countDown());
+        awaitLatch(deleteLatch, 10, "mock qr-link event deletion");
     }
 
     /**

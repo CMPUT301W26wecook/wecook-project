@@ -12,13 +12,25 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+/**
+ * Utility helpers for user-event UI rendering.
+ */
 public final class UserEventUiUtils {
     public static final String STATUS_OPEN = "open";
     public static final String STATUS_FULL = "full";
 
+    /**
+     * Utility class constructor.
+     */
     private UserEventUiUtils() {
     }
 
+    /**
+     * Returns the avatar letter derived from event name.
+     *
+     * @param eventName source event name
+     * @return first uppercase letter, or {@code E} when name is blank
+     */
     public static String getAvatarLetter(String eventName) {
         if (eventName == null || eventName.trim().isEmpty()) {
             return "E";
@@ -26,6 +38,13 @@ public final class UserEventUiUtils {
         return String.valueOf(Character.toUpperCase(eventName.trim().charAt(0)));
     }
 
+    /**
+     * Formats registration date range for display.
+     *
+     * @param startDate registration start timestamp
+     * @param endDate registration end timestamp
+     * @return formatted date range label
+     */
     public static String formatDateRange(Timestamp startDate, Timestamp endDate) {
         if (startDate == null && endDate == null) {
             return "Registration dates unavailable";
@@ -42,11 +61,23 @@ public final class UserEventUiUtils {
         return formatTimestamp(startDate) + " - " + formatTimestamp(endDate);
     }
 
+    /**
+     * Formats one timestamp using app locale.
+     *
+     * @param timestamp timestamp to format
+     * @return formatted date string
+     */
     private static String formatTimestamp(Timestamp timestamp) {
         Date date = timestamp.toDate();
         return new SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(date);
     }
 
+    /**
+     * Builds waitlist summary text.
+     *
+     * @param eventRecord event snapshot model
+     * @return waitlist summary label
+     */
     public static String formatWaitlistSummary(UserEventRecord eventRecord) {
         if (eventRecord.getMaxWaitlist() > 0) {
             return "Waitlist: " + eventRecord.getCurrentWaitlistCount() + "/" + eventRecord.getMaxWaitlist();
@@ -54,10 +85,23 @@ public final class UserEventUiUtils {
         return "Waitlist: " + eventRecord.getCurrentWaitlistCount();
     }
 
+    /**
+     * Returns user-facing description text.
+     *
+     * @param eventRecord event snapshot model
+     * @return description string
+     */
     public static String buildDescription(UserEventRecord eventRecord) {
         return eventRecord.getDescription();
     }
 
+    /**
+     * Applies status-chip text and colors.
+     *
+     * @param textView target view
+     * @param status status key
+     * @param invitedAsPicked true to display invited status as "Picked"
+     */
     public static void applyStatusChip(TextView textView, String status, boolean invitedAsPicked) {
         if (status == null || status.trim().isEmpty()) {
             textView.setVisibility(View.GONE);
@@ -102,6 +146,13 @@ public final class UserEventUiUtils {
         textView.setTextColor(textColor);
     }
 
+    /**
+     * Maps status key to display text.
+     *
+     * @param status status key
+     * @param invitedAsPicked true to label invited state as "Picked"
+     * @return user-facing status label
+     */
     public static String getStatusLabel(String status, boolean invitedAsPicked) {
         switch (status) {
             case UserEventRecord.STATUS_WAITLISTED:
@@ -120,6 +171,13 @@ public final class UserEventUiUtils {
         }
     }
 
+    /**
+     * Converts density-independent pixels to physical pixels.
+     *
+     * @param context context used to access display metrics
+     * @param dp density-independent pixel value
+     * @return converted pixel value
+     */
     private static float dpToPx(Context context, int dp) {
         return dp * context.getResources().getDisplayMetrics().density;
     }
