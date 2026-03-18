@@ -372,7 +372,8 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 throw new IllegalStateException("Event not found");
             }
 
-            List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(snapshot, "waitlistEntrantIds");
+            @SuppressWarnings("unchecked")
+            List<String> waitlistEntrants = (List<String>) snapshot.get("waitlistEntrantIds");
             if (waitlistEntrants == null) {
                 waitlistEntrants = new ArrayList<>();
             } else {

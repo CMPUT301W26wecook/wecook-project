@@ -116,8 +116,9 @@ public class UserProfileActivity extends AppCompatActivity {
 
             if (id == R.id.nav_events) {
                 Intent intent = new Intent(UserProfileActivity.this, UserEventActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 startActivity(intent);
+                overridePendingTransition(0, 0);
                 finish();
                 return true;
             } else if (id == R.id.nav_scan) {
@@ -125,8 +126,9 @@ public class UserProfileActivity extends AppCompatActivity {
                 return true;
             } else if (id == R.id.nav_history) {
                 Intent intent = new Intent(UserProfileActivity.this, UserHistoryActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 startActivity(intent);
+                overridePendingTransition(0, 0);
                 finish();
                 return true;
             } else if (id == R.id.nav_profile) {

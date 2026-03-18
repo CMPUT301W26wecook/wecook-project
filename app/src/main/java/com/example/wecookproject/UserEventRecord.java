@@ -158,8 +158,10 @@ public class UserEventRecord {
      * @param field field name
      * @return string list (never {@code null})
      */
+    @SuppressWarnings("unchecked")
     private static List<String> getStringList(DocumentSnapshot snapshot, String field) {
-        return FirestoreFieldUtils.getStringList(snapshot, field);
+        List<String> values = (List<String>) snapshot.get(field);
+        return values == null ? new ArrayList<>() : new ArrayList<>(values);
     }
 
     /**
