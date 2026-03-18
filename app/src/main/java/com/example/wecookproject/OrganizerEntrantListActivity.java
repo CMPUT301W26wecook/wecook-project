@@ -160,7 +160,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         findViewById(R.id.btn_send_notification_to_all).setOnClickListener(v ->
             startActivity(new Intent(this, OrganizerNotificationActivity.class)));
         findViewById(R.id.btn_view_invited).setOnClickListener(v -> {
-            Toast.makeText(this, "Invited list is not available yet", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(this, OrganizerEntrantInvitedListActivity.class);
+            intent.putExtra("eventId", eventId);
+            startActivity(intent);
         });
         /**
          findViewById(R.id.btn_lottery_draw).setOnClickListener(v -> {
