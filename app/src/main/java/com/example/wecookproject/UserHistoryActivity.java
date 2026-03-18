@@ -94,9 +94,8 @@ public class UserHistoryActivity extends AppCompatActivity {
                 return true;
             } else if (itemId == R.id.nav_events) {
                 Intent intent = new Intent(UserHistoryActivity.this, UserEventActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
                 startActivity(intent);
-                overridePendingTransition(0, 0);
                 finish();
                 return true;
             } else if (itemId == R.id.nav_scan) {
@@ -104,9 +103,8 @@ public class UserHistoryActivity extends AppCompatActivity {
                 return true;
             } else if (itemId == R.id.nav_profile) {
                 Intent intent = new Intent(UserHistoryActivity.this, UserProfileActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
                 startActivity(intent);
-                overridePendingTransition(0, 0);
                 finish();
                 return true;
             }
@@ -159,8 +157,7 @@ public class UserHistoryActivity extends AppCompatActivity {
         db.runTransaction(transaction -> {
             DocumentSnapshot eventSnapshot = transaction.get(eventRef);
             if (eventSnapshot.exists()) {
-                @SuppressWarnings("unchecked")
-                List<String> waitlistEntrants = (List<String>) eventSnapshot.get("waitlistEntrantIds");
+                List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds");
                 if (waitlistEntrants != null && waitlistEntrants.contains(entrantId)) {
                     waitlistEntrants = new ArrayList<>(waitlistEntrants);
                     waitlistEntrants.remove(entrantId);
