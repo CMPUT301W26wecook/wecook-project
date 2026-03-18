@@ -8,6 +8,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.SearchView.SearchAutoComplete;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -17,6 +18,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
     private final List<OrganizerInvitedEntrantItem> allEntrants = new ArrayList<>();
@@ -27,6 +29,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
     private TextView emptyState;
     private String eventId;
     private String filterMode = "all";
+    private String currentQuery = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,6 +42,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         searchView = findViewById(R.id.sv_search_entrant);
         recyclerView = findViewById(R.id.rv_entrants);
         emptyState = findViewById(R.id.tv_empty_state);
+        configureSearchInput();
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new OrganizerInvitedEntrantAdapter(item ->
@@ -94,6 +98,26 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
             public boolean onQueryTextChange(String newText) {
                 applyFilter(newText);
                 return true;
+            }
+        });
+    }
+
+    private void configureSearchInput() {
+        searchView.setIconifiedByDefault(false);
+        searchView.setIconified(false);
+        searchView.clearFocus();
+
+        SearchAutoComplete searchText = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
+        if (searchText != null) {
+            searchText.setFocusable(true);
+            searchText.setFocusableInTouchMode(true);
+            searchText.setCursorVisible(true);
+        }
+
+        searchView.setOnClickListener(v -> {
+            searchView.setIconified(false);
+            if (searchText != null) {
+                searchText.requestFocus();
             }
         });
     }
@@ -184,25 +208,42 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
     }
 
     private void applyFilter(String query) {
-        String normalized = query == null ? "" : query.trim().toLowerCase();
+        currentQuery = query == null ? "" : query.trim();
+        String normalized = currentQuery.toLowerCase(Locale.ROOT);
         List<OrganizerInvitedEntrantItem> filtered = new ArrayList<>();
         for (OrganizerInvitedEntrantItem item : allEntrants) {
             boolean statusMatch = "all".equals(filterMode)
                     || ("accepted".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED.equals(item.getStatus()))
                     || ("cancelled".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_CANCELLED.equals(item.getStatus()));
             boolean textMatch = normalized.isEmpty()
-                    || item.getDisplayName().toLowerCase().contains(normalized)
-                    || item.getEntrantId().toLowerCase().contains(normalized);
+                    || item.getDisplayName().toLowerCase(Locale.ROOT).contains(normalized);
 
             if (statusMatch && textMatch) {
                 filtered.add(item);
             }
         }
         adapter.submitList(filtered);
-        showEmptyState(filtered.isEmpty());
+        showEmptyState(filtered.isEmpty(), currentQuery);
     }
 
     private void showEmptyState(boolean show) {
+        showEmptyState(show, "");
+    }
+
+    private void showEmptyState(boolean show, String query) {
+        if (show) {
+            if (allEntrants.isEmpty()) {
+                emptyState.setText("No invited entrants found.");
+            } else if (query != null && !query.trim().isEmpty()) {
+                emptyState.setText("No invited entrants match \"" + query.trim() + "\".");
+            } else if ("accepted".equals(filterMode)) {
+                emptyState.setText("No accepted entrants found.");
+            } else if ("cancelled".equals(filterMode)) {
+                emptyState.setText("No cancelled entrants found.");
+            } else {
+                emptyState.setText("No invited entrants found.");
+            }
+        }
         emptyState.setVisibility(show ? View.VISIBLE : View.GONE);
         recyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
     }

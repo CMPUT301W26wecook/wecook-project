@@ -155,7 +155,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         actionButtons.setVisibility(View.VISIBLE);
 
         findViewById(R.id.btn_send_invitation_to_selected).setOnClickListener(v -> {
-            Toast.makeText(this, "Invitations are not available yet", Toast.LENGTH_SHORT).show();
+            sendInvitationToSelected();
         });
         findViewById(R.id.btn_send_notification_to_all).setOnClickListener(v ->
             startActivity(new Intent(this, OrganizerNotificationActivity.class)));
@@ -185,6 +185,34 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         findViewById(R.id.btn_delete_all_selected).setOnClickListener(v -> {
             Toast.makeText(this, "Bulk delete is not available yet", Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * Persists currently visible entrants as invited so they appear in the invited list.
+     */
+    private void sendInvitationToSelected() {
+        List<String> visibleEntrants = adapter.getCurrentEntrantIds();
+        if (visibleEntrants.isEmpty()) {
+            Toast.makeText(this, "No entrants available to invite", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> updatedSelected = new ArrayList<>(selectedEntrantIds);
+        for (String entrantId : visibleEntrants) {
+            if (!updatedSelected.contains(entrantId)) {
+                updatedSelected.add(entrantId);
+            }
+        }
+
+        db.collection("events").document(eventId)
+                .update("selectedEntrantIds", updatedSelected)
+                .addOnSuccessListener(unused -> {
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(updatedSelected);
+                    Toast.makeText(this, "Invitation list updated", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to update invitation list", Toast.LENGTH_SHORT).show());
     }
 
     /**

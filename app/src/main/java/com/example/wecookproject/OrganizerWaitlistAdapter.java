@@ -72,6 +72,19 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     }
 
     /**
+     * Returns entrant ids currently visible in this adapter.
+     *
+     * @return list of visible entrant ids
+     */
+    public List<String> getCurrentEntrantIds() {
+        List<String> ids = new ArrayList<>();
+        for (OrganizerWaitlistItem item : items) {
+            ids.add(item.getEntrantId());
+        }
+        return ids;
+    }
+
+    /**
      * ViewHolder for organizer waitlist rows.
      */
     static class WaitlistViewHolder extends RecyclerView.ViewHolder {

@@ -73,6 +73,13 @@ public class OrganizerWaitlistItem {
     }
 
     /**
+     * @return entrant id
+     */
+    public String getEntrantId() {
+        return entrantId;
+    }
+
+    /**
      * @return subtitle text
      */
     public String getSubtitle() {
