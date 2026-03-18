@@ -68,6 +68,13 @@ public class OrganizerWaitlistItem {
     /**
      * @return display name
      */
+    public String getEntrantId() {
+        return entrantId;
+    }
+
+    /**
+     * @return display name
+     */
     public String getDisplayName() {
         return displayName;
     }
