@@ -31,6 +31,9 @@
             android:name=".UserProfileActivity"
             android:exported="false" />
         <activity
+            android:name=".UserNotificationActivity"
+            android:exported="false" />
+        <activity
             android:name=".UserEventActivity"
             android:exported="false" />
         <activity
@@ -71,6 +74,9 @@
             android:exported="false" />
         <activity
             android:name=".OrganizerEntrantListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".OrganizerEntrantInvitedListActivity"
             android:exported="false" />
         <activity
             android:name=".AdminLoginActivity"

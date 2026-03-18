@@ -1,71 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
-    tools:context=".OrganizerEntrantListActivity">
+    android:background="#F2ECF6"
+    tools:context=".OrganizerEntrantInvitedListActivity">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginBottom="72dp"
         android:orientation="vertical"
-        android:layout_marginBottom="56dp">
+        android:paddingHorizontal="14dp"
+        android:paddingTop="18dp">
 
-        <!-- Search bar -->
+        <ImageButton
+            android:id="@+id/btn_back"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Back"
+            android:padding="6dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_dark" />
+
         <androidx.appcompat.widget.SearchView
             android:id="@+id/sv_search_entrant"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_search_bar"
+            android:iconifiedByDefault="false"
             app:queryHint="Search by Entrant Name"
-            app:iconifiedByDefault="false" />
+            android:paddingHorizontal="4dp" />
 
-        <!-- Entrant list -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rv_entrants"
             android:layout_width="match_parent"
             android:layout_height="0dp"
+            android:layout_marginTop="12dp"
             android:layout_weight="1"
-            android:padding="8dp"
-            android:clipToPadding="false" />
+            android:clipToPadding="false"
+            android:paddingBottom="8dp" />
 
-        <!-- Action buttons (shown/hidden depending on list mode) -->
-        <LinearLayout
-            android:id="@+id/ll_action_buttons"
+        <TextView
+            android:id="@+id/tv_empty_state"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:gravity="center"
+            android:paddingVertical="16dp"
+            android:text="No invited entrants found."
+            android:textColor="@color/text_muted"
+            android:textSize="15sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal">
 
             <Button
                 android:id="@+id/view_accepted_button"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="View Entrants Accepted Invitation"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_pill_purple"
+                android:backgroundTint="@null"
+                app:backgroundTint="@null"
+                android:minWidth="110dp"
+                android:text="View Accepted"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/view_declined_button"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="view Entrants Declined Invitation"
-                android:layout_marginBottom="8dp" />
-            <Button
-                android:id="@+id/btn_send_invitation_to_selected"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Send Invitation to selected"
-                android:layout_marginBottom="8dp" />
-
-
+                android:background="@drawable/bg_pill_purple"
+                android:backgroundTint="@null"
+                app:backgroundTint="@null"
+                android:minWidth="110dp"
+                android:text="View Cancelled"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/btn_revoke_selected"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_revoke_button"
+            android:backgroundTint="@null"
+            app:backgroundTint="@null"
+            android:text="Revoke All Selected Entrants"
+            android:textAllCaps="false"
+            android:textColor="#A03636"
+            android:textSize="15sp" />
     </LinearLayout>
 
-    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"

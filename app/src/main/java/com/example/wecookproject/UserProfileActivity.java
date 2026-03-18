@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -29,8 +28,8 @@ public class UserProfileActivity extends AppCompatActivity {
 
     private MaterialButton btnUpdate;
     private MaterialButton btnDelete;
+    private MaterialButton btnViewInbox;
     private SwitchMaterial switchAutoLogin;
-    private ImageView ivNotifications;
     private BottomNavigationView bottomNav;
 
     private TextInputEditText etFirstName;
@@ -59,8 +58,8 @@ public class UserProfileActivity extends AppCompatActivity {
 
         btnUpdate = findViewById(R.id.btn_update);
         btnDelete = findViewById(R.id.btn_delete);
+        btnViewInbox = findViewById(R.id.btn_view_inbox);
         switchAutoLogin = findViewById(R.id.switch_auto_login);
-        ivNotifications = findViewById(R.id.iv_notifications);
         bottomNav = findViewById(R.id.bottom_nav);
 
         etFirstName = findViewById(R.id.et_first_name);
@@ -92,17 +91,12 @@ public class UserProfileActivity extends AppCompatActivity {
 
         btnDelete.setOnClickListener(v -> showDeleteAccountConfirm());
 
-        ivNotifications.setOnClickListener(v -> {
-            notificationsEnabled = !notificationsEnabled;
+        btnViewInbox.setOnClickListener(v -> openInbox());
+    }
 
-            if (notificationsEnabled) {
-                ivNotifications.setImageResource(R.drawable.ic_notifications);
-                Toast.makeText(this, "Notifications ON", Toast.LENGTH_SHORT).show();
-            } else {
-                ivNotifications.setImageResource(R.drawable.ic_notifications_off);
-                Toast.makeText(this, "Notifications OFF", Toast.LENGTH_SHORT).show();
-            }
-        });
+    private void openInbox() {
+        Intent intent = new Intent(UserProfileActivity.this, UserNotificationActivity.class);
+        startActivity(intent);
     }
 
     /**
