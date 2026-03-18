@@ -1,35 +1,39 @@
 package com.example.wecookproject;
 
+import android.graphics.Paint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * RecyclerView adapter for rendering organizer waitlist entrants in a scrollable list. Within the
- * app it acts as the presentation adapter for the entrant-management flow, binding
- * {@link OrganizerWaitlistItem} data objects to the waitlist row layout.
- *
- * Outstanding issues:
- * - The adapter is display-only and does not yet expose row interactions for selection, bulk
- *   actions, or entrant-specific organizer actions.
+ * RecyclerView adapter for rendering organizer waitlist entrants with selection and per-row actions.
  */
 public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWaitlistAdapter.WaitlistViewHolder> {
     private final List<OrganizerWaitlistItem> items = new ArrayList<>();
+    private final Set<String> selectedEntrantIds = new HashSet<>();
+    private String expandedActionEntrantId;
+    private final OnDeleteClickListener onDeleteClickListener;
 
-    /**
-     * Inflates one waitlist row.
-     *
-     * @param parent parent RecyclerView
-     * @param viewType view type id
-     * @return created view holder
-     */
+    public interface OnDeleteClickListener {
+        void onDelete(OrganizerWaitlistItem item);
+    }
+
+    public OrganizerWaitlistAdapter(OnDeleteClickListener onDeleteClickListener) {
+        this.onDeleteClickListener = onDeleteClickListener;
+    }
+
     @NonNull
     @Override
     public WaitlistViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -38,39 +42,69 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         return new WaitlistViewHolder(view);
     }
 
-    /**
-     * Binds one waitlist row.
-     *
-     * @param holder row holder
-     * @param position adapter position
-     */
     @Override
     public void onBindViewHolder(@NonNull WaitlistViewHolder holder, int position) {
         OrganizerWaitlistItem item = items.get(position);
-        holder.tvAvatar.setText(item.getAvatarLabel());
+        String entrantId = item.getEntrantId();
+        boolean isExpanded = entrantId.equals(expandedActionEntrantId);
+
         holder.tvName.setText(item.getDisplayName());
-        holder.tvSubtitle.setText(item.getSubtitle());
+        holder.tvName.setPaintFlags(holder.tvName.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);
+
+        holder.checkBox.setOnCheckedChangeListener(null);
+        holder.checkBox.setChecked(selectedEntrantIds.contains(entrantId));
+        holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                selectedEntrantIds.add(entrantId);
+            } else {
+                selectedEntrantIds.remove(entrantId);
+            }
+        });
+
+        holder.mainRow.setBackgroundResource(isExpanded
+                ? R.drawable.bg_selection_row_active
+                : R.drawable.bg_selection_row);
+        holder.deleteAction.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+
+        holder.menuButton.setOnClickListener(v -> {
+            if (entrantId.equals(expandedActionEntrantId)) {
+                expandedActionEntrantId = null;
+            } else {
+                expandedActionEntrantId = entrantId;
+            }
+            notifyDataSetChanged();
+        });
+
+        holder.deleteAction.setOnClickListener(v -> {
+            expandedActionEntrantId = null;
+            if (onDeleteClickListener != null) {
+                onDeleteClickListener.onDelete(item);
+            }
+        });
     }
 
-    /**
-     * @return number of rows
-     */
     @Override
     public int getItemCount() {
         return items.size();
     }
 
-    /**
-     * Replaces adapter data and refreshes list.
-     *
-     * @param newItems replacement items
-     */
     public void submitList(List<OrganizerWaitlistItem> newItems) {
+        Set<String> validIds = new HashSet<>();
+        for (OrganizerWaitlistItem item : newItems) {
+            validIds.add(item.getEntrantId());
+        }
+
+        selectedEntrantIds.retainAll(validIds);
+        if (expandedActionEntrantId != null && !validIds.contains(expandedActionEntrantId)) {
+            expandedActionEntrantId = null;
+        }
+
         items.clear();
         items.addAll(newItems);
         notifyDataSetChanged();
     }
 
+<<<<<<< HEAD
     /**
      * ViewHolder for organizer waitlist rows.
      */
@@ -78,17 +112,34 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         private final TextView tvAvatar;
         private final TextView tvName;
         private final TextView tvSubtitle;
+=======
+    public List<String> getCurrentEntrantIds() {
+        List<String> ids = new ArrayList<>();
+        for (OrganizerWaitlistItem item : items) {
+            ids.add(item.getEntrantId());
+        }
+        return ids;
+    }
 
-        /**
-         * Creates a view holder and binds subviews.
-         *
-         * @param itemView row root view
-         */
+    public List<String> getSelectedEntrantIds() {
+        return new ArrayList<>(selectedEntrantIds);
+    }
+
+    static class WaitlistViewHolder extends RecyclerView.ViewHolder {
+        private final CheckBox checkBox;
+        private final TextView tvName;
+        private final TextView deleteAction;
+        private final ImageButton menuButton;
+        private final LinearLayout mainRow;
+>>>>>>> d06f819 (Implement organizer entrant selection activity UI and row actions)
+
         WaitlistViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvAvatar = itemView.findViewById(R.id.tv_entrant_avatar);
+            checkBox = itemView.findViewById(R.id.cb_waitlist_selected);
             tvName = itemView.findViewById(R.id.tv_entrant_name);
-            tvSubtitle = itemView.findViewById(R.id.tv_entrant_subtitle);
+            deleteAction = itemView.findViewById(R.id.tv_delete_action);
+            menuButton = itemView.findViewById(R.id.btn_item_menu);
+            mainRow = itemView.findViewById(R.id.layout_row_main);
         }
     }
 }

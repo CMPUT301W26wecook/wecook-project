@@ -6,7 +6,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.util.Log;
+import android.widget.ImageButton;
 
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.app.AppCompatActivity;
@@ -74,10 +74,12 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         emptyStateView = findViewById(R.id.tv_empty_state);
         actionButtons = findViewById(R.id.ll_action_buttons);
         lotteryCountInput = findViewById(R.id.et_lottery_count);
+        ImageButton backButton = findViewById(R.id.btn_back);
 
         entrantsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new OrganizerWaitlistAdapter();
+        adapter = new OrganizerWaitlistAdapter(this::deleteEntrant);
         entrantsRecyclerView.setAdapter(adapter);
+        backButton.setOnClickListener(v -> finish());
 
         setupBottomNav();
         setupSearch();
@@ -186,6 +188,83 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     }
 
     /**
+<<<<<<< HEAD
+=======
+     * Persists currently visible entrants as invited so they appear in the invited list.
+     */
+    private void sendInvitationToSelected() {
+        List<String> selectedEntrants = adapter.getSelectedEntrantIds();
+        if (selectedEntrants.isEmpty()) {
+            Toast.makeText(this, "Select at least one entrant first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> updatedSelected = new ArrayList<>(selectedEntrantIds);
+        for (String entrantId : selectedEntrants) {
+            if (!updatedSelected.contains(entrantId)) {
+                updatedSelected.add(entrantId);
+            }
+        }
+
+        db.collection("events").document(eventId)
+                .update("selectedEntrantIds", updatedSelected)
+                .addOnSuccessListener(unused -> {
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(updatedSelected);
+                    Toast.makeText(this, "Invitation list updated", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to update invitation list", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Deletes one entrant from the event waitlist.
+     *
+     * @param item entrant row data
+     */
+    private void deleteEntrant(OrganizerWaitlistItem item) {
+        String entrantId = item.getEntrantId();
+        List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
+        if (!updatedWaitlist.remove(entrantId)) {
+            Toast.makeText(this, "Entrant is no longer in the waitlist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> updatedSelected = new ArrayList<>(selectedEntrantIds);
+        updatedSelected.remove(entrantId);
+        List<String> updatedReplacement = new ArrayList<>(replacementEntrantIds);
+        updatedReplacement.remove(entrantId);
+
+        db.collection("events").document(eventId)
+                .update(
+                        "waitlistEntrantIds", updatedWaitlist,
+                        "selectedEntrantIds", updatedSelected,
+                        "replacementEntrantIds", updatedReplacement
+                )
+                .addOnSuccessListener(unused -> {
+                    waitlistEntrantIds.clear();
+                    waitlistEntrantIds.addAll(updatedWaitlist);
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(updatedSelected);
+                    replacementEntrantIds.clear();
+                    replacementEntrantIds.addAll(updatedReplacement);
+
+                    for (int i = 0; i < allEntrants.size(); i++) {
+                        if (entrantId.equals(allEntrants.get(i).getEntrantId())) {
+                            allEntrants.remove(i);
+                            break;
+                        }
+                    }
+
+                    applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
+                    Toast.makeText(this, "Entrant deleted", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to delete entrant", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+>>>>>>> d06f819 (Implement organizer entrant selection activity UI and row actions)
      * Loads event waitlist metadata and entrant profiles.
      */
     private void loadWaitlist() {
