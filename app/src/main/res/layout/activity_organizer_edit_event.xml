@@ -218,6 +218,36 @@
                     android:inputType="number" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Event Visibility"
+                android:textColor="@color/text_muted"
+                android:textSize="14sp" />
+
+            <RadioGroup
+                android:id="@+id/rg_event_visibility"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rb_visibility_public"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="Public" />
+
+                <RadioButton
+                    android:id="@+id/rb_visibility_private"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="Private" />
+            </RadioGroup>
+
             <!-- Buttons row -->
             <LinearLayout
                 android:layout_width="match_parent"

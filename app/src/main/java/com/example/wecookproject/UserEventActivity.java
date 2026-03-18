@@ -185,6 +185,11 @@ public class UserEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(eventSnapshots -> {
                     eventList.clear();
                     for (QueryDocumentSnapshot document : eventSnapshots) {
+                        String visibilityTag = document.getString("visibilityTag");
+                        if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)) {
+                            continue;
+                        }
+
                         if (!document.contains("waitlistEntrantIds")) {
                             initializeWaitingList(document.getReference());
                         }

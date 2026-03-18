@@ -53,7 +53,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     @NonNull
     @Override
     public EventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_event, parent, false);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_organizer_event, parent, false);
         return new EventViewHolder(view);
     }
 
@@ -67,6 +67,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = eventList.get(position);
         holder.tvEventName.setText(event.getEventName());
+        holder.tvEventVisibility.setText(
+                Event.VISIBILITY_PRIVATE.equals(event.getVisibilityTag()) ? "Private" : "Public"
+        );
         // For now, hardcode status to "Upcoming", as indicated in layout.
         holder.tvEventStatus.setText("Upcoming");
 
@@ -90,6 +93,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
      */
     static class EventViewHolder extends RecyclerView.ViewHolder {
         TextView tvEventName;
+        TextView tvEventVisibility;
         TextView tvEventStatus;
 
         /**
@@ -100,6 +104,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
             tvEventName = itemView.findViewById(R.id.tv_event_name);
+            tvEventVisibility = itemView.findViewById(R.id.tv_event_visibility);
             tvEventStatus = itemView.findViewById(R.id.tv_event_status);
         }
     }

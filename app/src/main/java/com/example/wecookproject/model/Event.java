@@ -8,6 +8,9 @@ import java.util.List;
  * Event domain model stored in Firestore.
  */
 public class Event {
+    public static final String VISIBILITY_PUBLIC = "public";
+    public static final String VISIBILITY_PRIVATE = "private";
+
     private String eventId;
     private String organizerId;
     private String eventName;
@@ -18,6 +21,7 @@ public class Event {
     private boolean geolocationRequired;
     private String location; // As seen in details "Edmonton"
     private String description;
+    private String visibilityTag = VISIBILITY_PUBLIC;
 
     private String posterUrl;
     private String qrCodePath;
@@ -199,6 +203,31 @@ public class Event {
      */
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    /**
+     * @return visibility tag ("public" or "private")
+     */
+    public String getVisibilityTag() {
+        return visibilityTag == null || visibilityTag.trim().isEmpty()
+                ? VISIBILITY_PUBLIC
+                : visibilityTag;
+    }
+
+    /**
+     * @param visibilityTag visibility tag ("public" or "private")
+     */
+    public void setVisibilityTag(String visibilityTag) {
+        if (visibilityTag == null || visibilityTag.trim().isEmpty()) {
+            this.visibilityTag = VISIBILITY_PUBLIC;
+            return;
+        }
+        String normalized = visibilityTag.trim().toLowerCase();
+        if (VISIBILITY_PRIVATE.equals(normalized)) {
+            this.visibilityTag = VISIBILITY_PRIVATE;
+            return;
+        }
+        this.visibilityTag = VISIBILITY_PUBLIC;
     }
 
     /**

@@ -7,12 +7,14 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.webkit.MimeTypeMap;
 import android.widget.FrameLayout;
+import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
@@ -55,7 +57,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private TextInputEditText etRegistrationStartDate;
     private TextInputEditText etRegistrationEndDate;
     private TextInputEditText etMaxWaitlist;
+    private RadioGroup rgEventVisibility;
     private String originalPosterUrl;
+    private String originalVisibilityTag = Event.VISIBILITY_PUBLIC;
     private String pendingPosterUrl;
     private boolean posterCommitted;
     private ActivityResultLauncher<String> posterPickerLauncher;
@@ -86,6 +90,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         etMaxWaitlist = findViewById(R.id.et_max_waitlist);
+        rgEventVisibility = findViewById(R.id.rg_event_visibility);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
 
         posterPickerLauncher = registerForActivityResult(
@@ -229,6 +234,17 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             updates.put("posterPath", pendingPosterUrl);
         }
 
+        int checkedVisibilityId = rgEventVisibility.getCheckedRadioButtonId();
+        String selectedVisibilityTag = checkedVisibilityId == R.id.rb_visibility_private
+                ? Event.VISIBILITY_PRIVATE
+                : Event.VISIBILITY_PUBLIC;
+        if (!selectedVisibilityTag.equals(originalVisibilityTag)) {
+            updates.put("visibilityTag", selectedVisibilityTag);
+            if (Event.VISIBILITY_PRIVATE.equals(selectedVisibilityTag)) {
+                updates.put("qrCodePath", "");
+            }
+        }
+
         if (hasError) {
             return;
         }
@@ -249,6 +265,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                         posterCommitted = true;
                         deleteStorageFile(replacedPosterUrl);
                     }
+                    originalVisibilityTag = selectedVisibilityTag;
                     Toast.makeText(this, "Event updated", Toast.LENGTH_SHORT).show();
                     finish();
                 })
@@ -324,6 +341,19 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                     if (TextUtils.isEmpty(originalPosterUrl)) {
                         originalPosterUrl = documentSnapshot.getString("posterUrl");
                     }
+                    String visibilityTag = documentSnapshot.getString("visibilityTag");
+                    if (TextUtils.isEmpty(visibilityTag)) {
+                        originalVisibilityTag = Event.VISIBILITY_PUBLIC;
+                    } else if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag.trim())) {
+                        originalVisibilityTag = Event.VISIBILITY_PRIVATE;
+                    } else {
+                        originalVisibilityTag = Event.VISIBILITY_PUBLIC;
+                    }
+
+                    int visibilityId = Event.VISIBILITY_PRIVATE.equals(originalVisibilityTag)
+                            ? R.id.rb_visibility_private
+                            : R.id.rb_visibility_public;
+                    rgEventVisibility.check(visibilityId);
                 });
     }
 

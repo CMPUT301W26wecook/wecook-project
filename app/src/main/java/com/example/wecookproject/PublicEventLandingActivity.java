@@ -8,6 +8,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.wecookproject.model.Event;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 public class PublicEventLandingActivity extends AppCompatActivity {
@@ -36,6 +37,13 @@ public class PublicEventLandingActivity extends AppCompatActivity {
                         finish();
                         return;
                     }
+                    String visibilityTag = snapshot.getString("visibilityTag");
+                    if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)) {
+                        Toast.makeText(this, "This event is private", Toast.LENGTH_SHORT).show();
+                        finish();
+                        return;
+                    }
+
                     String eventName = snapshot.getString("eventName");
                     String description = snapshot.getString("description");
                     String posterUrl = snapshot.getString("posterUrl");

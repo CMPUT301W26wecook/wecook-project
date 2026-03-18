@@ -44,6 +44,7 @@ import java.util.Locale;
  */
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
     
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ListenerRegistration eventListener;
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
@@ -68,11 +69,11 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         TextView tvEventDates = findViewById(R.id.tv_event_dates);
         TextView tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
         TextView tvWaitlistLabel = findViewById(R.id.tv_waitlist_label);
+        TextView tvEventVisibility = findViewById(R.id.tv_event_visibility);
         TextView tvEventDescription = findViewById(R.id.tv_event_description);
         geolocationSwitch = findViewById(R.id.switch_geolocation);
 
         if (eventId != null) {
-            FirebaseFirestore db = FirebaseFirestore.getInstance();
             geolocationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (suppressSwitchCallback) {
                     return;
@@ -100,7 +101,6 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                             Event event = documentSnapshot.toObject(Event.class);
                             if (event != null) {
                                 currentEvent = event;
-                                ensureQrPathExists(db, eventId, event);
                                 tvEventNameBig.setText(event.getEventName());
                                 tvEventLocation.setText(event.getLocation());
                                 tvEventNameDetail.setText(event.getEventName());
@@ -118,6 +118,10 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 
                                 tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
                                 tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
+                                String visibilityLabel = Event.VISIBILITY_PRIVATE.equals(event.getVisibilityTag())
+                                        ? "Private"
+                                        : "Public";
+                                tvEventVisibility.setText("Visibility: " + visibilityLabel);
                                 suppressSwitchCallback = true;
                                 geolocationSwitch.setChecked(event.isGeolocationRequired());
                                 suppressSwitchCallback = false;
@@ -193,35 +197,61 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                 Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
                 return;
             }
+            if (currentEvent != null && Event.VISIBILITY_PRIVATE.equals(currentEvent.getVisibilityTag())) {
+                Toast.makeText(this, "Private events cannot generate promotional QR codes", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String resolvedEventId = eventId;
+            if ((resolvedEventId == null || resolvedEventId.trim().isEmpty()) && currentEvent != null) {
+                resolvedEventId = currentEvent.getEventId();
+            }
+            if (resolvedEventId == null || resolvedEventId.trim().isEmpty()) {
+                Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             String qrPayload;
             if (currentEvent != null
                     && currentEvent.getQrCodePath() != null
                     && !currentEvent.getQrCodePath().trim().isEmpty()) {
                 qrPayload = currentEvent.getQrCodePath().trim();
             } else {
-                qrPayload = QrCodeUtils.buildPromotionalEventLink(eventId);
+                qrPayload = ensureQrPathExists(db, resolvedEventId, currentEvent);
+                if (qrPayload == null || qrPayload.trim().isEmpty()) {
+                    Toast.makeText(this, "Unable to generate promotional QR code", Toast.LENGTH_SHORT).show();
+                    return;
+                }
             }
             showQrDialog(qrPayload);
         });
     }
 
-    private void ensureQrPathExists(FirebaseFirestore db, String eventDocId, Event event) {
+    private String ensureQrPathExists(FirebaseFirestore db, String eventDocId, Event event) {
+        if (event == null) {
+            return null;
+        }
+        if (event != null && Event.VISIBILITY_PRIVATE.equals(event.getVisibilityTag())) {
+            return null;
+        }
         String existing = event.getQrCodePath();
         if (existing != null && !existing.trim().isEmpty()) {
-            return;
+            return existing.trim();
         }
         String resolvedEventId = eventDocId;
         if (resolvedEventId == null || resolvedEventId.trim().isEmpty()) {
             resolvedEventId = event.getEventId();
         }
         if (resolvedEventId == null || resolvedEventId.trim().isEmpty()) {
-            return;
+            return null;
         }
         String generatedLink = QrCodeUtils.buildPromotionalEventLink(resolvedEventId);
-        currentEvent.setQrCodePath(generatedLink);
+        if (currentEvent != null) {
+            currentEvent.setQrCodePath(generatedLink);
+        }
         db.collection("events")
                 .document(resolvedEventId)
                 .update("qrCodePath", generatedLink);
+        return generatedLink;
     }
 
     private void showQrDialog(String payload) {

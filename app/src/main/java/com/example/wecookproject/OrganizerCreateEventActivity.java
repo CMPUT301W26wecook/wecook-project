@@ -7,6 +7,7 @@ import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.Toast;
+import android.widget.RadioGroup;
 
 import android.annotation.SuppressLint;
 import androidx.appcompat.app.AppCompatActivity;
@@ -55,6 +56,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         TextInputEditText etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         TextInputEditText etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
         TextInputEditText etMaxWaitlist = findViewById(R.id.et_max_waitlist);
+        RadioGroup rgEventVisibility = findViewById(R.id.rg_event_visibility);
 
         // Set up date picker for start date
         etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
@@ -195,7 +197,16 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     "Location TBD", // Default location
                     "" // Default description
             );
-            newEvent.setQrCodePath(QrCodeUtils.buildPromotionalEventLink(eventId));
+            int selectedVisibilityId = rgEventVisibility.getCheckedRadioButtonId();
+            String visibilityTag = selectedVisibilityId == R.id.rb_visibility_private
+                    ? Event.VISIBILITY_PRIVATE
+                    : Event.VISIBILITY_PUBLIC;
+            newEvent.setVisibilityTag(visibilityTag);
+            if (Event.VISIBILITY_PUBLIC.equals(visibilityTag)) {
+                newEvent.setQrCodePath(QrCodeUtils.buildPromotionalEventLink(eventId));
+            } else {
+                newEvent.setQrCodePath("");
+            }
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("events").document(eventId)
