@@ -104,15 +104,6 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         notifyDataSetChanged();
     }
 
-<<<<<<< HEAD
-    /**
-     * ViewHolder for organizer waitlist rows.
-     */
-    static class WaitlistViewHolder extends RecyclerView.ViewHolder {
-        private final TextView tvAvatar;
-        private final TextView tvName;
-        private final TextView tvSubtitle;
-=======
     public List<String> getCurrentEntrantIds() {
         List<String> ids = new ArrayList<>();
         for (OrganizerWaitlistItem item : items) {
@@ -131,7 +122,6 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         private final TextView deleteAction;
         private final ImageButton menuButton;
         private final LinearLayout mainRow;
->>>>>>> d06f819 (Implement organizer entrant selection activity UI and row actions)
 
         WaitlistViewHolder(@NonNull View itemView) {
             super(itemView);
