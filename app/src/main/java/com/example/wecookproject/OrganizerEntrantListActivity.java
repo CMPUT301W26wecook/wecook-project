@@ -6,6 +6,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.util.Log;
 
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.app.AppCompatActivity;
@@ -17,6 +18,7 @@ import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -48,7 +50,11 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private android.widget.EditText lotteryCountInput;
     private final List<String> waitlistEntrantIds = new ArrayList<>();
     private final List<String> selectedEntrantIds = new ArrayList<>();
+    private final List<String> replacementEntrantIds = new ArrayList<>();
+    private int lotteryCount = 0;
     private Date registrationEndDate;
+    private boolean waitlistLoaded = false;
+
 
     /**
      * Initializes organizer entrant management screen and loads waitlist data.
@@ -156,12 +162,24 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         findViewById(R.id.btn_view_invited).setOnClickListener(v -> {
             Toast.makeText(this, "Invited list is not available yet", Toast.LENGTH_SHORT).show();
         });
-        findViewById(R.id.btn_lottery_draw).setOnClickListener(v -> {
+        /**
+         findViewById(R.id.btn_lottery_draw).setOnClickListener(v -> {
             performLotteryDraw();
         });
         findViewById(R.id.btn_redraw_entrants).setOnClickListener(v -> {
-            Toast.makeText(this, "Redraw is not available yet", Toast.LENGTH_SHORT).show();
+            performReplacementDraw();
         });
+        **/
+
+        View lotteryButton = findViewById(R.id.btn_lottery_draw);
+        View redrawButton = findViewById(R.id.btn_redraw_entrants);
+
+        lotteryButton.setEnabled(false);
+        redrawButton.setEnabled(false);
+
+        lotteryButton.setOnClickListener(v -> performLotteryDraw());
+        redrawButton.setOnClickListener(v -> performReplacementDraw());
+
         findViewById(R.id.btn_delete_all_selected).setOnClickListener(v -> {
             Toast.makeText(this, "Bulk delete is not available yet", Toast.LENGTH_SHORT).show();
         });
@@ -204,6 +222,26 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                         }
                     }
 
+                    replacementEntrantIds.clear();
+                    Object rawReplacement = documentSnapshot.get("replacementEntrantIds");
+                    if (rawReplacement instanceof List<?>) {
+                        for (Object item : (List<?>) rawReplacement) {
+                            if (item instanceof String) {
+                                replacementEntrantIds.add((String) item);
+                            }
+                        }
+                    }
+
+                    Object rawLotteryCount = documentSnapshot.get("lotteryCount");
+                    if (rawLotteryCount instanceof Number) {
+                        lotteryCount = ((Number) rawLotteryCount).intValue();
+                    } else {
+                        lotteryCount = 0;
+                    }
+
+                    waitlistLoaded = true;
+                    findViewById(R.id.btn_lottery_draw).setEnabled(true);
+                    findViewById(R.id.btn_redraw_entrants).setEnabled(true);
                     loadEntrantProfiles(entrantIds);
                 })
                 .addOnFailureListener(e -> {
@@ -305,6 +343,11 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
      * Runs lottery draw and persists selected entrants.
      */
     private void performLotteryDraw() {
+        if (!waitlistLoaded) {
+            Toast.makeText(this, "Waitlist is still loading", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         // Check if lottery is available (only after registration ends)
         if (registrationEndDate == null) {
             Toast.makeText(this, "Registration end date not found", Toast.LENGTH_SHORT).show();
@@ -364,5 +407,68 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to save lottery result", Toast.LENGTH_SHORT).show());
+    }
+
+    private void performReplacementDraw() {
+        if (!waitlistLoaded) {
+            Toast.makeText(this, "Waitlist is still loading", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (registrationEndDate == null) {
+            Toast.makeText(this, "Registration end date not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Date currentDate = new Date();
+        if (!currentDate.after(registrationEndDate)) {
+            Toast.makeText(this, "Replacement draw is available only after registration ends", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (lotteryCount <= 0) {
+            Toast.makeText(this, "Run lottery draw before selecting replacements", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int vacancies = lotteryCount - selectedEntrantIds.size();
+        if (vacancies <= 0) {
+            Toast.makeText(this, "No replacement needed at this time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> pool = new ArrayList<>(waitlistEntrantIds);
+        pool.removeAll(selectedEntrantIds);
+        pool.removeAll(replacementEntrantIds);
+        if (pool.isEmpty()) {
+            Toast.makeText(this, "No remaining applicants for replacement", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        java.util.Collections.shuffle(pool);
+        int drawCount = Math.min(vacancies, pool.size());
+        List<String> drawn = new ArrayList<>(pool.subList(0, drawCount));
+        List<String> newReplacements = new ArrayList<>(replacementEntrantIds);
+        newReplacements.addAll(drawn);
+        List<String> newSelected = new ArrayList<>(selectedEntrantIds);
+        newSelected.addAll(drawn);
+        db.collection("events").document(eventId)
+                .update(
+                        "replacementEntrantIds", newReplacements,
+                        "selectedEntrantIds", newSelected
+                )
+                .addOnSuccessListener(unused -> {
+                    replacementEntrantIds.clear();
+                    replacementEntrantIds.addAll(newReplacements);
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(newSelected);
+                    Toast.makeText(this, "Replacement selected", Toast.LENGTH_SHORT).show();
+                    for (String entrant : drawn) {
+                        sendReplacementNotification(entrant);
+                    }
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to save replacement", Toast.LENGTH_SHORT).show());
+    }
+
+    private void sendReplacementNotification(String entrantId) {
+        // TODO: implement push notification logic or FCM integration
+        // placeholder to satisfy optional acceptance criterion
+        // Log.d("REPLACEMENT", "Would notify entrant " + entrantId);
     }
 }

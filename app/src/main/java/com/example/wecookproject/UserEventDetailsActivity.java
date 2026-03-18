@@ -289,27 +289,43 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             return;
         }
 
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    if (location != null) {
-                        joinWaitlist(location);
-                        return;
-                    }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-                    CancellationTokenSource tokenSource = new CancellationTokenSource();
-                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
-                            .addOnSuccessListener(currentLocation -> {
-                                if (currentLocation == null) {
-                                    Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                joinWaitlist(currentLocation);
-                            })
-                            .addOnFailureListener(e ->
-                                    Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+        try {
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> {
+                        if (location != null) {
+                            joinWaitlist(location);
+                            return;
+                        }
+
+                        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        CancellationTokenSource tokenSource = new CancellationTokenSource();
+                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.getToken())
+                                .addOnSuccessListener(currentLocation -> {
+                                    if (currentLocation == null) {
+                                        Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
+                                    joinWaitlist(currentLocation);
+                                })
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+                    })
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
+        } catch (SecurityException e) {
+            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**

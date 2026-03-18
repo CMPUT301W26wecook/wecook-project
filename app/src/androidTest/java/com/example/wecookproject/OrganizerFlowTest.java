@@ -15,10 +15,13 @@ import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+
 
 import android.content.Intent;
 import android.provider.Settings;
 import android.view.View;
+import android.widget.Button;
 
 import androidx.core.widget.NestedScrollView;
 import androidx.lifecycle.Lifecycle;
@@ -30,8 +33,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
 import com.example.wecookproject.model.Event;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.android.gms.tasks.Tasks;
 
 import org.junit.After;
 import org.junit.Before;
@@ -45,6 +50,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.hamcrest.Matcher;
 
 import java.util.Date;
@@ -97,7 +103,8 @@ public class OrganizerFlowTest {
     private static final int WAIT_MEDIUM = 4000;
     private static final int WAIT_LONG   = 6000;
 
-    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private FirebaseFirestore db;
+    private static boolean emulatorConfigured = false;
     private ActivityScenario<LoginActivity> activityScenario;
     /** Stable event ID used by test9 / test10 to exercise the edit flow. */
     private String editEventId;
@@ -108,25 +115,31 @@ public class OrganizerFlowTest {
      */
     @Before
     public void setUp() {
+        if (!emulatorConfigured) {
+            FirebaseFirestore.getInstance().useEmulator("10.0.2.2", 8080);
+            FirebaseAuth.getInstance().useEmulator("10.0.2.2", 9099);
+            emulatorConfigured = true;
+        }
+
+        db = FirebaseFirestore.getInstance();
+
         String androidId = Settings.Secure.getString(
                 ApplicationProvider.getApplicationContext().getContentResolver(),
                 Settings.Secure.ANDROID_ID);
 
-        // Ensure no existing user so LoginActivity always routes to signup
         CountDownLatch userDeleteLatch = new CountDownLatch(1);
         db.collection("users").document(androidId).delete()
                 .addOnCompleteListener(task -> userDeleteLatch.countDown());
         awaitLatch(userDeleteLatch, 10, "user document deletion");
 
-        // Pre-create event used by test9 / test10
         editEventId = "edit-test-" + UUID.randomUUID();
         @SuppressWarnings("deprecation")
         Event editTestEvent = new Event(
                 editEventId,
                 "organizer-test",
                 "Original Event",
-                new Date(126, 3, 1),   // 2026-04-01
-                new Date(126, 3, 30),  // 2026-04-30
+                new Date(126, 3, 1),
+                new Date(126, 3, 30),
                 25,
                 0,
                 false,
@@ -483,81 +496,128 @@ public class OrganizerFlowTest {
      * number of winners from the waitlist and persist them to Firestore.
      */
     @Test
-    public void test11_LotteryAvailableOnlyAfterRegistrationEnds() throws InterruptedException {
+    public void test11_LotteryAvailableOnlyAfterRegistrationEnds() throws Exception {
         String lotteryWithEntrantsEventId = "lottery-entrants-test-" + UUID.randomUUID();
-        
-        // Create an event with a past registration end date
-        @SuppressWarnings("deprecation")
-        Event lotteryTestEvent = new Event(
-                lotteryWithEntrantsEventId,
-                "organizer-test",
-                "Lottery With Entrants Test Event",
-                new Date(126, 2, 1),   // 2026-03-01 (registration start)
-                new Date(126, 2, 10),  // 2026-03-10 (registration end - in the past)
-                25,
-                0,
-                false,
-                "Edmonton",
-                "Test event for lottery with entrants"
-        );
-        
-        // Add some entrants to the waitlist
+
         List<String> entrants = Arrays.asList("entrant1", "entrant2", "entrant3", "entrant4", "entrant5");
-        lotteryTestEvent.setWaitlistEntrantIds(entrants);
-        lotteryTestEvent.setCurrentWaitlistCount(entrants.size());
-        
-        CountDownLatch eventCreateLatch = new CountDownLatch(1);
-        db.collection("events").document(lotteryWithEntrantsEventId)
-                .set(lotteryTestEvent)
-                .addOnCompleteListener(task -> eventCreateLatch.countDown());
-        awaitLatch(eventCreateLatch, 15, "lottery with entrants test event creation");
-        
-        // Launch OrganizerEntrantListActivity with the test event
+
+        java.util.Map<String, Object> eventData = new java.util.HashMap<>();
+        eventData.put("eventId", lotteryWithEntrantsEventId);
+        eventData.put("organizerId", "organizer-test");
+        eventData.put("eventName", "Lottery With Entrants Test Event");
+        eventData.put("registrationStartDate", new Date(126, 2, 1));
+        eventData.put("registrationEndDate", new Date(126, 2, 10));
+        eventData.put("maxWaitlist", 25);
+        eventData.put("currentWaitlistCount", entrants.size());
+        eventData.put("geolocationRequired", false);
+        eventData.put("location", "Edmonton");
+        eventData.put("description", "Test event for lottery with entrants");
+        eventData.put("waitlistEntrantIds", new ArrayList<>(entrants));
+        eventData.put("selectedEntrantIds", new ArrayList<String>());
+        eventData.put("replacementEntrantIds", new ArrayList<String>());
+        eventData.put("lotteryCount", 0);
+
+        db.collection("events").document(lotteryWithEntrantsEventId).set(eventData);
+
+        safeSleep(WAIT_LONG);
+
         Intent intent = new Intent(
                 ApplicationProvider.getApplicationContext(),
                 OrganizerEntrantListActivity.class);
         intent.putExtra("eventId", lotteryWithEntrantsEventId);
-        
+
         ActivityScenario<OrganizerEntrantListActivity> scenario =
                 ActivityScenario.launch(intent);
-        
-        safeSleep(WAIT_MEDIUM); // allow event data to load
-        
-        // Perform lottery draw for 3 winners
+
+        waitUntilLotteryButtonEnabled(scenario);
+
         onView(withId(R.id.et_lottery_count)).perform(replaceText("3"), closeSoftKeyboard());
         onView(withId(R.id.btn_lottery_draw)).perform(click());
-        
-        safeSleep(WAIT_LONG); // allow lottery operation and Firestore updates to complete
-        
-        // Verify that winners were selected by checking the event document
-        AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
-        CountDownLatch readLatch = new CountDownLatch(1);
-        db.collection("events").document(lotteryWithEntrantsEventId)
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    snapshotRef.set(snapshot);
-                    readLatch.countDown();
-                })
-                .addOnFailureListener(e -> readLatch.countDown());
-        
-        assertTrue("Timed out reading updated event after lottery", readLatch.await(15, TimeUnit.SECONDS));
-        DocumentSnapshot snapshot = snapshotRef.get();
-        assertTrue("Event document must exist after lottery", snapshot != null && snapshot.exists());
-        
-        // Check that selected entrants list exists and has 3 winners
+
+        DocumentSnapshot snapshot = waitForSelectedEntrants(lotteryWithEntrantsEventId, 3);
+
+        assertTrue("Event document must exist after lottery", snapshot.exists());
+
+        @SuppressWarnings("unchecked")
         List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
         assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
         assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
-        
+
         scenario.close();
-        
-        // Clean up: delete the test event
-        CountDownLatch eventDeleteLatch = new CountDownLatch(1);
-        db.collection("events").document(lotteryWithEntrantsEventId)
-                .delete()
-                .addOnCompleteListener(task -> eventDeleteLatch.countDown());
-        awaitLatch(eventDeleteLatch, 15, "lottery with entrants test event cleanup");
+
+        db.collection("events").document(lotteryWithEntrantsEventId).delete();
     }
+
+    /**
+     * test12: Replacement draw should pick a random applicant from the remaining
+     * pool and update the replacementEntrantIds field on the event document.
+     */
+    @Test
+    public void test12_ReplacementDrawPicksRandomApplicant() throws InterruptedException {
+        String replacementEventId = "replacement-test-" + UUID.randomUUID();
+        @SuppressWarnings("deprecation")
+        Event replacementEvent = new Event(
+                replacementEventId,
+                "organizer-test",
+                "Replacement Draw Event",
+                new Date(126, 2, 1),
+                new Date(126, 2, 10),
+                25,
+                0,
+                false,
+                "Edmonton",
+                "Event for replacement test"
+        );
+        List<String> entrants = Arrays.asList("a1", "a2", "a3", "a4", "a5");
+        replacementEvent.setWaitlistEntrantIds(entrants);
+        replacementEvent.setCurrentWaitlistCount(entrants.size());
+        replacementEvent.setSelectedEntrantIds(Arrays.asList("a1", "a2"));
+        replacementEvent.setLotteryCount(3);
+
+        CountDownLatch createLatch = new CountDownLatch(1);
+        db.collection("events").document(replacementEventId)
+                .set(replacementEvent)
+                .addOnCompleteListener(task -> createLatch.countDown());
+        awaitLatch(createLatch, 15, "replacement event creation");
+
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantListActivity.class);
+        intent.putExtra("eventId", replacementEventId);
+        ActivityScenario<OrganizerEntrantListActivity> scenario =
+                ActivityScenario.launch(intent);
+        safeSleep(WAIT_MEDIUM);
+
+        // trigger replacement draw
+        onView(withId(R.id.btn_redraw_entrants)).perform(click());
+        safeSleep(WAIT_LONG);
+
+        AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
+        CountDownLatch readLatch = new CountDownLatch(1);
+        db.collection("events").document(replacementEventId)
+                .get()
+                .addOnSuccessListener(snapshot -> { snapshotRef.set(snapshot); readLatch.countDown(); })
+                .addOnFailureListener(e -> readLatch.countDown());
+
+        assertTrue("Timed out reading replacement event", readLatch.await(15, TimeUnit.SECONDS));
+        DocumentSnapshot snapshot = snapshotRef.get();
+        assertTrue("Event document must exist", snapshot != null && snapshot.exists());
+        List<String> replacements = (List<String>) snapshot.get("replacementEntrantIds");
+        assertNotNull("Replacement list should not be null", replacements);
+        assertEquals("Should have exactly one replacement", 1, replacements.size());
+        String chosen = replacements.get(0);
+        assertFalse("Replacement should not be an originally selected applicant",
+                Arrays.asList("a1", "a2").contains(chosen));
+        assertTrue("Replacement should come from waitlist pool", entrants.contains(chosen));
+
+        scenario.close();
+        CountDownLatch delLatch = new CountDownLatch(1);
+        db.collection("events").document(replacementEventId)
+                .delete()
+                .addOnCompleteListener(task -> delLatch.countDown());
+        awaitLatch(delLatch, 15, "replacement event cleanup");
+    }
+
 
     /**
      * Drives the full organizer signup flow launched from LoginActivity, progressing through the
@@ -605,6 +665,68 @@ public class OrganizerFlowTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private void waitUntilLotteryButtonEnabled(ActivityScenario<OrganizerEntrantListActivity> scenario)
+            throws InterruptedException {
+        AtomicBoolean enabled = new AtomicBoolean(false);
+
+        for (int i = 0; i < 15; i++) {
+            scenario.onActivity(activity -> {
+                Button button = activity.findViewById(R.id.btn_lottery_draw);
+                enabled.set(button != null && button.isEnabled());
+            });
+
+            if (enabled.get()) {
+                return;
+            }
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Lottery button never became enabled");
+    }
+
+    @SuppressWarnings("unchecked")
+    private DocumentSnapshot waitForSelectedEntrants(String eventId, int expectedCount)
+            throws Exception {
+        for (int i = 0; i < 15; i++) {
+            DocumentSnapshot snapshot =
+                    Tasks.await(db.collection("events").document(eventId).get(), 15, TimeUnit.SECONDS);
+
+            if (snapshot != null && snapshot.exists()) {
+                List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+                if (selectedEntrants != null && selectedEntrants.size() == expectedCount) {
+                    return snapshot;
+                }
+            }
+
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Lottery result was not saved with " + expectedCount + " winners");
+    }
+
+    @SuppressWarnings("unchecked")
+    private DocumentSnapshot waitForEventDocument(String eventId, int expectedWaitlistSize) throws Exception {
+        for (int i = 0; i < 15; i++) {
+            DocumentSnapshot snapshot =
+                    com.google.android.gms.tasks.Tasks.await(
+                            db.collection("events").document(eventId).get(),
+                            10,
+                            TimeUnit.SECONDS
+                    );
+
+            if (snapshot != null && snapshot.exists()) {
+                List<String> waitlistEntrants = (List<String>) snapshot.get("waitlistEntrantIds");
+                if (waitlistEntrants != null && waitlistEntrants.size() == expectedWaitlistSize) {
+                    return snapshot;
+                }
+            }
+
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Timed out waiting for lottery test event to appear");
     }
 
     private ViewAction nestedScrollTo() {
