@@ -48,9 +48,11 @@ import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Entrant event list screen with waitlist and invitation actions.
@@ -159,18 +161,22 @@ public class UserEventActivity extends AppCompatActivity {
                 .get()
                 .addOnSuccessListener(historySnapshots -> {
                     Map<String, String> historyStatuses = new HashMap<>();
+                    Set<String> historyEventIds = new HashSet<>();
                     for (QueryDocumentSnapshot historyDocument : historySnapshots) {
                         String eventId = historyDocument.getString("eventId");
                         String status = historyDocument.getString("status");
-                        if (eventId != null && status != null) {
-                            historyStatuses.put(eventId, status);
+                        if (eventId != null) {
+                            historyEventIds.add(eventId);
+                            if (status != null) {
+                                historyStatuses.put(eventId, status);
+                            }
                         }
                     }
-                    loadEvents(historyStatuses);
+                    loadEvents(historyStatuses, historyEventIds);
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show();
-                    loadEvents(new HashMap<>());
+                    loadEvents(new HashMap<>(), new HashSet<>());
                 });
     }
 
@@ -178,15 +184,23 @@ public class UserEventActivity extends AppCompatActivity {
      * Loads all events and merges history status for display.
      *
      * @param historyStatuses map of eventId to history status
+     * @param historyEventIds set of eventIds present in entrant history
      */
-    private void loadEvents(Map<String, String> historyStatuses) {
+    private void loadEvents(Map<String, String> historyStatuses, Set<String> historyEventIds) {
         db.collection("events")
                 .get()
                 .addOnSuccessListener(eventSnapshots -> {
                     eventList.clear();
                     for (QueryDocumentSnapshot document : eventSnapshots) {
+                        String eventId = document.getId();
                         String visibilityTag = document.getString("visibilityTag");
-                        if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)) {
+                        List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(document, "waitlistEntrantIds");
+                        boolean entrantOnWaitlist = waitlistEntrants != null && waitlistEntrants.contains(entrantId);
+                        boolean entrantHasHistory = historyEventIds.contains(eventId);
+
+                        if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)
+                                && !entrantOnWaitlist
+                                && !entrantHasHistory) {
                             continue;
                         }
 
@@ -197,10 +211,10 @@ public class UserEventActivity extends AppCompatActivity {
                         UserEventRecord eventRecord = UserEventRecord.fromEventSnapshot(
                                 document,
                                 entrantId,
-                                historyStatuses.get(document.getId())
+                                historyStatuses.get(eventId)
                         );
 
-                        if (eventRecord.isEntrantOnWaitlist() && historyStatuses.get(document.getId()) == null) {
+                        if (eventRecord.isEntrantOnWaitlist() && historyStatuses.get(eventId) == null) {
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_WAITLISTED);
                         }
 
