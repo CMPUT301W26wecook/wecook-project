@@ -19,10 +19,14 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -254,23 +258,122 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             return;
         }
 
+        boolean changedToPrivate = Event.VISIBILITY_PRIVATE.equals(selectedVisibilityTag)
+                && !Event.VISIBILITY_PRIVATE.equals(originalVisibilityTag);
+        if (changedToPrivate) {
+            updateEventAndClearWaitlist(updates, selectedVisibilityTag);
+            return;
+        }
+
         db.collection("events")
                 .document(eventId)
                 .update(updates)
-                .addOnSuccessListener(unused -> {
-                    if (!TextUtils.isEmpty(pendingPosterUrl)) {
-                        String replacedPosterUrl = originalPosterUrl;
-                        originalPosterUrl = pendingPosterUrl;
-                        pendingPosterUrl = null;
-                        posterCommitted = true;
-                        deleteStorageFile(replacedPosterUrl);
-                    }
-                    originalVisibilityTag = selectedVisibilityTag;
-                    Toast.makeText(this, "Event updated", Toast.LENGTH_SHORT).show();
-                    finish();
-                })
+                .addOnSuccessListener(unused -> onEventUpdateSuccess(selectedVisibilityTag))
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to update event", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Updates event and clears waitlist when visibility changes to private.
+     *
+     * @param baseUpdates validated field updates
+     * @param selectedVisibilityTag final visibility value
+     */
+    private void updateEventAndClearWaitlist(Map<String, Object> baseUpdates, String selectedVisibilityTag) {
+        db.runTransaction(transaction -> {
+            com.google.firebase.firestore.DocumentReference eventRef = db.collection("events").document(eventId);
+            com.google.firebase.firestore.DocumentSnapshot eventSnapshot = transaction.get(eventRef);
+            if (!eventSnapshot.exists()) {
+                throw new IllegalStateException("Event not found");
+            }
+
+            List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds");
+            List<String> removedEntrantIds = new ArrayList<>(waitlistEntrants);
+
+            Map<String, Object> updates = new HashMap<>(baseUpdates);
+            updates.put("waitlistEntrantIds", new ArrayList<String>());
+            updates.put("currentWaitlistCount", 0);
+            updates.put("waitlistEntrantLocations", FieldValue.delete());
+            transaction.update(eventRef, updates);
+            return removedEntrantIds;
+        }).addOnSuccessListener(removedEntrantIds ->
+                clearWaitlistHistoryEntries(removedEntrantIds, selectedVisibilityTag))
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to update event", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Deletes history documents for removed waitlisted entrants.
+     *
+     * @param entrantIds entrants removed from waitlist
+     * @param selectedVisibilityTag final visibility value
+     */
+    private void clearWaitlistHistoryEntries(List<String> entrantIds, String selectedVisibilityTag) {
+        if (entrantIds == null || entrantIds.isEmpty()) {
+            onEventUpdateSuccess(selectedVisibilityTag);
+            return;
+        }
+
+        final int batchLimit = 450;
+        List<com.google.firebase.firestore.DocumentReference> historyRefs = new ArrayList<>();
+        for (String entrantId : entrantIds) {
+            if (!TextUtils.isEmpty(entrantId)) {
+                historyRefs.add(db.collection("users")
+                        .document(entrantId)
+                        .collection("eventHistory")
+                        .document(eventId));
+            }
+        }
+
+        if (historyRefs.isEmpty()) {
+            onEventUpdateSuccess(selectedVisibilityTag);
+            return;
+        }
+
+        commitHistoryDeleteBatches(historyRefs, 0, batchLimit, selectedVisibilityTag);
+    }
+
+    /**
+     * Commits batched history deletions recursively.
+     */
+    private void commitHistoryDeleteBatches(List<com.google.firebase.firestore.DocumentReference> historyRefs,
+                                            int startIndex,
+                                            int batchLimit,
+                                            String selectedVisibilityTag) {
+        int endIndex = Math.min(startIndex + batchLimit, historyRefs.size());
+        WriteBatch batch = db.batch();
+        for (int i = startIndex; i < endIndex; i++) {
+            batch.delete(historyRefs.get(i));
+        }
+
+        batch.commit()
+                .addOnSuccessListener(unused -> {
+                    if (endIndex < historyRefs.size()) {
+                        commitHistoryDeleteBatches(historyRefs, endIndex, batchLimit, selectedVisibilityTag);
+                    } else {
+                        onEventUpdateSuccess(selectedVisibilityTag);
+                    }
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Event updated, but failed to clear waitlist history", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Finalizes successful event update state and exits.
+     *
+     * @param selectedVisibilityTag current visibility tag
+     */
+    private void onEventUpdateSuccess(String selectedVisibilityTag) {
+        if (!TextUtils.isEmpty(pendingPosterUrl)) {
+            String replacedPosterUrl = originalPosterUrl;
+            originalPosterUrl = pendingPosterUrl;
+            pendingPosterUrl = null;
+            posterCommitted = true;
+            deleteStorageFile(replacedPosterUrl);
+        }
+        originalVisibilityTag = selectedVisibilityTag;
+        Toast.makeText(this, "Event updated", Toast.LENGTH_SHORT).show();
+        finish();
     }
 
     /**
