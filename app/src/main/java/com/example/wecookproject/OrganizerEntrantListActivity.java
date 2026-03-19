@@ -1,8 +1,10 @@
 package com.example.wecookproject;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -123,6 +125,18 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
      * Configures waitlist search behavior.
      */
     private void setupSearch() {
+        searchView.setIconifiedByDefault(false);
+        searchView.setIconified(false);
+        searchView.clearFocus();
+        searchView.setQueryHint("Search by Entrant Name");
+
+        EditText searchText = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
+        if (searchText != null) {
+            searchText.setHint("Search by Entrant Name");
+            searchText.setHintTextColor(Color.parseColor("#7A7A7A"));
+            searchText.setTextColor(Color.parseColor("#1F1F1F"));
+        }
+
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             /**
              * Handles submitted search query.
