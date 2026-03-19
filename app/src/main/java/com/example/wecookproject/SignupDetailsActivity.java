@@ -4,11 +4,13 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.textfield.TextInputLayout;
 
 /**
  * Captures user detail inputs during signup.
@@ -32,10 +34,25 @@ public class SignupDetailsActivity extends AppCompatActivity {
         EditText etFirstName = findViewById(R.id.et_first_name);
         EditText etLastName = findViewById(R.id.et_last_name);
         EditText etBirthday = findViewById(R.id.et_birthday);
+        EditText etPhoneNumber = findViewById(R.id.et_phone_number);
 
         backButton.setOnClickListener(v -> finish());
         setupBirthdayFormatting(etBirthday);
-        continueButton.setOnClickListener(v -> handleContinue(etFirstName, etLastName, etBirthday));
+        TextInputLayout tilPhoneNumber = findViewById(R.id.til_phone_number);
+        configureEntrantOnlyFields(tilPhoneNumber);
+        continueButton.setOnClickListener(v -> handleContinue(etFirstName, etLastName, etBirthday, etPhoneNumber));
+    }
+
+    /**
+     * Shows entrant-only fields and hides them for organizer signup.
+     *
+     * @param phoneNumberLayout phone number container
+     */
+    private void configureEntrantOnlyFields(TextInputLayout phoneNumberLayout) {
+        String clickedRole = getIntent().getStringExtra("clickedRole");
+        if ("ORGANIZER".equals(clickedRole)) {
+            phoneNumberLayout.setVisibility(View.GONE);
+        }
     }
 
     /**
@@ -109,11 +126,16 @@ public class SignupDetailsActivity extends AppCompatActivity {
      * @param firstNameInput first-name field
      * @param lastNameInput last-name field
      * @param birthdayInput birthday field
+     * @param phoneNumberInput phone-number field
      */
-    private void handleContinue(EditText firstNameInput, EditText lastNameInput, EditText birthdayInput) {
+    private void handleContinue(EditText firstNameInput,
+                                EditText lastNameInput,
+                                EditText birthdayInput,
+                                EditText phoneNumberInput) {
         String firstName = firstNameInput.getText().toString().trim();
         String lastName = lastNameInput.getText().toString().trim();
         String birthday = birthdayInput.getText().toString().trim();
+        String phoneNumber = phoneNumberInput.getText().toString().trim();
 
         String clickedRole = getIntent().getStringExtra("clickedRole");
         if ("ORGANIZER".equals(clickedRole)) {
@@ -122,8 +144,8 @@ public class SignupDetailsActivity extends AppCompatActivity {
                 return;
             }
         } else {
-            if (firstName.isEmpty() || birthday.isEmpty()) {
-                Toast.makeText(this, "First name and Birthday cannot be empty", Toast.LENGTH_SHORT).show();
+            if (firstName.isEmpty() || birthday.isEmpty() || phoneNumber.isEmpty()) {
+                Toast.makeText(this, "First name, Birthday, and Phone number cannot be empty", Toast.LENGTH_SHORT).show();
                 return;
             }
         }
@@ -132,6 +154,7 @@ public class SignupDetailsActivity extends AppCompatActivity {
         intent.putExtra("firstName", firstName);
         intent.putExtra("lastName", lastName);
         intent.putExtra("birthday", birthday);
+        intent.putExtra("phoneNumber", phoneNumber);
         if (getIntent().hasExtra("clickedRole")) {
             intent.putExtra("clickedRole", clickedRole);
         }

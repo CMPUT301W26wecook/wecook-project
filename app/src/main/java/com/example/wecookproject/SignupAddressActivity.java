@@ -73,6 +73,7 @@ public class SignupAddressActivity extends AppCompatActivity {
         String firstName = intentFromDetails.getStringExtra("firstName");
         String lastName = intentFromDetails.getStringExtra("lastName");
         String birthday = intentFromDetails.getStringExtra("birthday");
+        String phoneNumber = intentFromDetails.getStringExtra("phoneNumber");
         String clickedRole = intentFromDetails.getStringExtra("clickedRole");
         String role = "ORGANIZER".equals(clickedRole) ? "organizer" : "entrant";
 
@@ -82,6 +83,7 @@ public class SignupAddressActivity extends AppCompatActivity {
         userData.put("firstName", firstName != null ? firstName : "");
         userData.put("lastName", lastName != null ? lastName : "");
         userData.put("birthday", birthday != null ? birthday : "");
+        userData.put("phoneNumber", phoneNumber != null ? phoneNumber : "");
         userData.put("addressLine1", addressLine1);
         userData.put("addressLine2", addressLine2);
         userData.put("city", city);

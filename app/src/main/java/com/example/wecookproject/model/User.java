@@ -16,6 +16,7 @@ public class User {
     private String firstName;
     private String lastName;
     private String postalCode;
+    private String phoneNumber;
     private boolean profileCompleted;
     private String role;
 
@@ -72,6 +73,8 @@ public class User {
     public void setLastName(String lastName) { this.lastName = lastName; }
     public String getPostalCode() { return postalCode; }
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public boolean isProfileCompleted() { return profileCompleted; }
     public void setProfileCompleted(boolean profileCompleted) { this.profileCompleted = profileCompleted; }
     public String getRole() { return role; }
@@ -99,6 +102,7 @@ public class User {
         this.city = "";
         this.postalCode = "";
         this.country = "";
+        this.phoneNumber = "";
         this.profileCompleted = false;
     }
 
@@ -117,6 +121,7 @@ public class User {
         userMap.put("firstName", firstName);
         userMap.put("lastName", lastName);
         userMap.put("postalCode", postalCode);
+        userMap.put("phoneNumber", phoneNumber);
         userMap.put("profileCompleted", profileCompleted);
         userMap.put("role", role);
         return userMap;

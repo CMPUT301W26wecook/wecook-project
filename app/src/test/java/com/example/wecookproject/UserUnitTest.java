@@ -64,6 +64,7 @@ public class UserUnitTest {
         assertEquals("", user.getCity());
         assertEquals("", user.getPostalCode());
         assertEquals("", user.getCountry());
+        assertEquals("", user.getPhoneNumber());
         assertFalse(user.isProfileCompleted());
 
         assertEquals("entrant", user.getRole());
@@ -89,9 +90,10 @@ public class UserUnitTest {
         assertEquals("John", map.get("firstName"));
         assertEquals("Doe", map.get("lastName"));
         assertEquals("T6G 2R3", map.get("postalCode"));
+        assertNull(map.get("phoneNumber"));
         assertEquals(true, map.get("profileCompleted"));
         assertEquals("organizer", map.get("role"));
-        assertEquals(11, map.size());
+        assertEquals(12, map.size());
     }
 
     @Test
