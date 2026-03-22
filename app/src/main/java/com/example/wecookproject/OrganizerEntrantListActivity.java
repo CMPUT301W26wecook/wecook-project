@@ -33,7 +33,7 @@ import java.util.List;
  * single screen.
  *
  * Outstanding issues:
- * - Several organizer actions are still placeholders, including invitations, invited-list viewing,
+ * - Several organizer actions are still placeholders, including invited-list viewing,
  *   redraw, and bulk deletion and will be implemented in part 4.
  * - Firestore reads and lottery-write logic are handled directly in the Activity, which puts
  *   UI and data logic together instead of separating them through a repository or ViewModel-style
@@ -170,15 +170,13 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private void setupActionButtons() {
         actionButtons.setVisibility(View.VISIBLE);
 
-        findViewById(R.id.btn_send_invitation_to_selected).setOnClickListener(v -> {
-            sendInvitationToSelected();
-        });
+
         findViewById(R.id.btn_send_notification_to_all).setOnClickListener(v -> {
             Intent intent = new Intent(this, OrganizerNotificationActivity.class);
             intent.putExtra("eventId", eventId);
             startActivity(intent);
         });
-        findViewById(R.id.btn_view_invited).setOnClickListener(v -> {
+        findViewById(R.id.btn_view_lottery_winners).setOnClickListener(v -> {
             Intent intent = new Intent(this, OrganizerEntrantInvitedListActivity.class);
             intent.putExtra("eventId", eventId);
             startActivity(intent);
@@ -206,33 +204,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Persists selected entrants as invited so they appear in the invited list.
-     */
-    private void sendInvitationToSelected() {
-        List<String> selectedEntrants = adapter.getSelectedEntrantIds();
-        if (selectedEntrants.isEmpty()) {
-            Toast.makeText(this, "Select at least one entrant first", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
-        List<String> updatedSelected = new ArrayList<>(selectedEntrantIds);
-        for (String entrantId : selectedEntrants) {
-            if (!updatedSelected.contains(entrantId)) {
-                updatedSelected.add(entrantId);
-            }
-        }
-
-        db.collection("events").document(eventId)
-                .update("selectedEntrantIds", updatedSelected)
-                .addOnSuccessListener(unused -> {
-                    selectedEntrantIds.clear();
-                    selectedEntrantIds.addAll(updatedSelected);
-                    Toast.makeText(this, "Invitation list updated", Toast.LENGTH_SHORT).show();
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Failed to update invitation list", Toast.LENGTH_SHORT).show());
-    }
 
     /**
      * Deletes one entrant from the event waitlist.
@@ -499,6 +471,28 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     selectedEntrantIds.clear();
                     selectedEntrantIds.addAll(selected);
                     Toast.makeText(this, "Lottery draw completed", Toast.LENGTH_SHORT).show();
+
+                    db.collection("events").document(eventId).get().addOnSuccessListener(eventSnapshot -> {
+                        if (eventSnapshot.exists()) {
+                            for (String winnerId : selected) {
+                                java.util.Map<String, Object> historyData = new java.util.HashMap<>();
+                                historyData.put("eventId", eventId);
+                                historyData.put("eventName", eventSnapshot.getString("eventName"));
+                                historyData.put("location", eventSnapshot.getString("location"));
+                                historyData.put("organizerId", eventSnapshot.getString("organizerId"));
+                                historyData.put("posterUrl", eventSnapshot.getString("posterPath"));
+                                historyData.put("registrationStartDate", eventSnapshot.getTimestamp("registrationStartDate"));
+                                historyData.put("registrationEndDate", eventSnapshot.getTimestamp("registrationEndDate"));
+                                historyData.put("description", eventSnapshot.getString("description"));
+                                historyData.put("status", "invited");
+                                historyData.put("updatedAt", com.google.firebase.firestore.FieldValue.serverTimestamp());
+
+                                db.collection("users").document(winnerId)
+                                        .collection("eventHistory").document(eventId)
+                                        .set(historyData, com.google.firebase.firestore.SetOptions.merge());
+                            }
+                        }
+                    });
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to save lottery result", Toast.LENGTH_SHORT).show());

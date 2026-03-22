@@ -198,6 +198,16 @@ public class UserEventDetailsActivity extends AppCompatActivity {
 
         currentEvent = UserEventRecord.fromEventSnapshot(eventSnapshot, entrantId, historyStatus);
 
+        // If the organizer has selected this entrant in the lottery and their status is still
+        // "waitlisted", promote it to "invited" so the UI reflects the correct state.
+        List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
+        boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
+        boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentEvent.getEffectiveStatus());
+        if (isSelected && isStillWaitlisted) {
+            currentEvent.setHistoryStatus(UserEventRecord.STATUS_INVITED);
+            upsertHistoryDocument(UserEventRecord.STATUS_INVITED);
+        }
+
         tvAvatar.setText(UserEventUiUtils.getAvatarLetter(currentEvent.getEventName()));
         tvHeaderName.setText(currentEvent.getEventName());
         tvHeaderLocation.setText(currentEvent.getLocation());

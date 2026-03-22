@@ -54,6 +54,10 @@ public class OrganizerInvitedEntrantAdapter extends RecyclerView.Adapter<Organiz
             holder.status.setVisibility(View.VISIBLE);
             holder.status.setText("Cancelled");
             holder.status.setBackgroundResource(R.drawable.bg_status_cancelled);
+        } else if (STATUS_PENDING.equals(item.getStatus())) {
+            holder.status.setVisibility(View.VISIBLE);
+            holder.status.setText("Invited");
+            holder.status.setBackgroundResource(R.drawable.bg_pill_purple);
         } else {
             holder.status.setVisibility(View.GONE);
         }

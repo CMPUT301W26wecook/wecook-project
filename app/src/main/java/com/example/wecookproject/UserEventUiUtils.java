@@ -158,7 +158,7 @@ public final class UserEventUiUtils {
             case UserEventRecord.STATUS_WAITLISTED:
                 return "Waitlisted";
             case UserEventRecord.STATUS_INVITED:
-                return invitedAsPicked ? "Picked" : "Invited";
+                return "Invited";
             case UserEventRecord.STATUS_ACCEPTED:
                 return "Accepted";
             case UserEventRecord.STATUS_REJECTED:

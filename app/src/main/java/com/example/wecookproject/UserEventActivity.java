@@ -218,6 +218,18 @@ public class UserEventActivity extends AppCompatActivity {
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_WAITLISTED);
                         }
 
+                        // If the organizer has picked this entrant as a lottery winner and their
+                        // current status is still "waitlisted", promote it to "invited".
+                        List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(document, "selectedEntrantIds");
+                        String currentStatus = historyStatuses.get(eventId);
+                        boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
+                        boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentStatus)
+                                || UserEventRecord.STATUS_WAITLISTED.equals(eventRecord.getEffectiveStatus());
+                        if (isSelected && isStillWaitlisted) {
+                            eventRecord.setHistoryStatus(UserEventRecord.STATUS_INVITED);
+                            upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_INVITED);
+                        }
+
                         eventList.add(eventRecord);
                     }
 
