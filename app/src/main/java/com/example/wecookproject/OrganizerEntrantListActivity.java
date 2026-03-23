@@ -19,12 +19,15 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Activity for organizers to review an event's waitlist, search entrants, and run a lottery draw
@@ -461,13 +464,18 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         java.util.Collections.shuffle(shuffledEntrants);
 
         List<String> selected = new ArrayList<>(shuffledEntrants.subList(0, lotteryCount));
+        List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
+        updatedWaitlist.removeAll(selected);
+        Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, selected);
+        updates.put("lotteryCount", lotteryCount);
+        updates.put("selectedEntrantIds", selected);
 
         db.collection("events").document(eventId)
-                .update(
-                        "lotteryCount", lotteryCount,
-                        "selectedEntrantIds", selected
-                )
+                .update(updates)
                 .addOnSuccessListener(unused -> {
+                    waitlistEntrantIds.clear();
+                    waitlistEntrantIds.addAll(updatedWaitlist);
+                    removeEntrantsFromVisibleWaitlist(selected);
                     selectedEntrantIds.clear();
                     selectedEntrantIds.addAll(selected);
                     Toast.makeText(this, "Lottery draw completed", Toast.LENGTH_SHORT).show();
@@ -536,12 +544,17 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         newReplacements.addAll(drawn);
         List<String> newSelected = new ArrayList<>(selectedEntrantIds);
         newSelected.addAll(drawn);
+        List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
+        updatedWaitlist.removeAll(drawn);
+        Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, drawn);
+        updates.put("replacementEntrantIds", newReplacements);
+        updates.put("selectedEntrantIds", newSelected);
         db.collection("events").document(eventId)
-                .update(
-                        "replacementEntrantIds", newReplacements,
-                        "selectedEntrantIds", newSelected
-                )
+                .update(updates)
                 .addOnSuccessListener(unused -> {
+                    waitlistEntrantIds.clear();
+                    waitlistEntrantIds.addAll(updatedWaitlist);
+                    removeEntrantsFromVisibleWaitlist(drawn);
                     replacementEntrantIds.clear();
                     replacementEntrantIds.addAll(newReplacements);
                     selectedEntrantIds.clear();
@@ -553,6 +566,24 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to save replacement", Toast.LENGTH_SHORT).show());
+    }
+
+    private Map<String, Object> buildWaitlistRemovalUpdate(List<String> updatedWaitlist, List<String> removedEntrantIds) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("waitlistEntrantIds", updatedWaitlist);
+        updates.put("currentWaitlistCount", updatedWaitlist.size());
+        for (String entrantId : removedEntrantIds) {
+            updates.put("waitlistEntrantLocations." + entrantId, FieldValue.delete());
+        }
+        return updates;
+    }
+
+    private void removeEntrantsFromVisibleWaitlist(List<String> removedEntrantIds) {
+        if (removedEntrantIds == null || removedEntrantIds.isEmpty()) {
+            return;
+        }
+        allEntrants.removeIf(item -> removedEntrantIds.contains(item.getEntrantId()));
+        applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
     }
 
     private void sendReplacementNotification(String entrantId) {
