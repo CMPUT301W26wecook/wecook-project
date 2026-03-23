@@ -220,12 +220,14 @@ public class UserEventActivity extends AppCompatActivity {
 
                         // If the organizer has picked this entrant as a lottery winner and their
                         // current status is still "waitlisted", promote it to "invited".
+                        // Do NOT re-promote users who already declined (cancelled).
                         List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(document, "selectedEntrantIds");
                         String currentStatus = historyStatuses.get(eventId);
                         boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
                         boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentStatus)
                                 || UserEventRecord.STATUS_WAITLISTED.equals(eventRecord.getEffectiveStatus());
-                        if (isSelected && isStillWaitlisted) {
+                        boolean isCancelled = UserEventRecord.STATUS_REJECTED.equals(currentStatus);
+                        if (isSelected && isStillWaitlisted && !isCancelled) {
                             eventRecord.setHistoryStatus(UserEventRecord.STATUS_INVITED);
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_INVITED);
                         }
@@ -508,15 +510,24 @@ public class UserEventActivity extends AppCompatActivity {
      * @param dialog details dialog
      */
     private void declineInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
-        updateWaitlistMembership(
-                eventRecord,
-                false,
-                UserEventRecord.STATUS_REJECTED,
-                false,
-                "Invitation declined",
-                dialog,
-                null
-        );
+        // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
+        // The entrant stays off the waitlist and is not reconsidered in the rerun.
+        db.collection("events").document(eventRecord.getEventId())
+                .update("selectedEntrantIds", FieldValue.arrayRemove(entrantId))
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(
+                                eventRecord,
+                                false,
+                                UserEventRecord.STATUS_REJECTED,
+                                false,
+                                "Invitation declined",
+                                dialog,
+                                null
+                        )
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**

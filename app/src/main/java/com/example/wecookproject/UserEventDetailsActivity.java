@@ -203,7 +203,8 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
         boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
         boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentEvent.getEffectiveStatus());
-        if (isSelected && isStillWaitlisted) {
+        boolean isRejected = UserEventRecord.STATUS_REJECTED.equals(currentEvent.getEffectiveStatus());
+        if (isSelected && isStillWaitlisted && !isRejected) {
             currentEvent.setHistoryStatus(UserEventRecord.STATUS_INVITED);
             upsertHistoryDocument(UserEventRecord.STATUS_INVITED);
         }
@@ -373,7 +374,16 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * Declines an invitation.
      */
     private void declineInvitation() {
-        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null);
+        // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
+        // The entrant stays off the waitlist and is not reconsidered in the rerun.
+        db.collection("events").document(eventId)
+                .update("selectedEntrantIds", FieldValue.arrayRemove(entrantId))
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null)
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
