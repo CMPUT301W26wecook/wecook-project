@@ -108,9 +108,9 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         searchView.clearFocus();
 
         SearchAutoComplete searchText = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
-        searchView.setQueryHint("Search by entrant name or phone");
+        searchView.setQueryHint("Search by entrant name, phone, or email");
         if (searchText != null) {
-            searchText.setHint("Search by entrant name or phone");
+            searchText.setHint("Search by entrant name, phone, or email");
             searchText.setFocusable(true);
             searchText.setFocusableInTouchMode(true);
             searchText.setCursorVisible(true);
@@ -189,6 +189,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         String firstName = safe(userDoc.getString("firstName"));
         String lastName = safe(userDoc.getString("lastName"));
         String phoneNumber = safe(userDoc.getString("phoneNumber"));
+        String email = safe(userDoc.getString("email"));
         String displayName = (firstName + " " + lastName).trim();
         if (displayName.isEmpty()) {
             displayName = entrantId;
@@ -201,7 +202,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
             status = OrganizerInvitedEntrantAdapter.STATUS_CANCELLED;
         }
 
-        return new OrganizerInvitedEntrantItem(entrantId, displayName, phoneNumber, status);
+        return new OrganizerInvitedEntrantItem(entrantId, displayName, phoneNumber, email, status);
     }
 
     private void onInvitedLoaded(List<OrganizerInvitedEntrantItem> loaded) {
@@ -220,7 +221,8 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     || ("cancelled".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_CANCELLED.equals(item.getStatus()));
             boolean textMatch = normalized.isEmpty()
                     || item.getDisplayName().toLowerCase(Locale.ROOT).contains(normalized)
-                    || item.getPhoneNumber().toLowerCase(Locale.ROOT).contains(normalized);
+                    || item.getPhoneNumber().toLowerCase(Locale.ROOT).contains(normalized)
+                    || item.getEmail().toLowerCase(Locale.ROOT).contains(normalized);
 
             if (statusMatch && textMatch) {
                 filtered.add(item);
