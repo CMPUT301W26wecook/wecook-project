@@ -3,24 +3,26 @@ package com.example.wecookproject;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ImageButton;
+import android.widget.Button;
 
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.gms.tasks.Task;
-import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 
 
 import java.util.ArrayList;
@@ -43,7 +45,8 @@ import java.util.Map;
  *   layer.
  */
 public class OrganizerEntrantListActivity extends AppCompatActivity {
-    private final List<OrganizerWaitlistItem> allEntrants = new ArrayList<>();
+    private final List<OrganizerWaitlistItem> waitlistEntrants = new ArrayList<>();
+    private final List<OrganizerWaitlistItem> searchableEntrants = new ArrayList<>();
 
     private FirebaseFirestore db;
     private OrganizerWaitlistAdapter adapter;
@@ -59,6 +62,8 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private int lotteryCount = 0;
     private Date registrationEndDate;
     private boolean waitlistLoaded = false;
+    private boolean isPrivateEvent = false;
+    private Button inviteSelectedButton;
 
 
     /**
@@ -79,10 +84,12 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         emptyStateView = findViewById(R.id.tv_empty_state);
         actionButtons = findViewById(R.id.ll_action_buttons);
         lotteryCountInput = findViewById(R.id.et_lottery_count);
+        inviteSelectedButton = findViewById(R.id.btn_invite_selected_waitlist);
         ImageButton backButton = findViewById(R.id.btn_back);
 
         entrantsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new OrganizerWaitlistAdapter(this::deleteEntrant);
+        adapter.setOnSelectionChangedListener(selectedCount -> updateInviteButtonVisibility());
         entrantsRecyclerView.setAdapter(adapter);
         backButton.setOnClickListener(v -> finish());
 
@@ -131,11 +138,11 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         searchView.setIconifiedByDefault(false);
         searchView.setIconified(false);
         searchView.clearFocus();
-        searchView.setQueryHint("Search by entrant name or phone");
+        searchView.setQueryHint("Search all users by name or phone");
 
         EditText searchText = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
         if (searchText != null) {
-            searchText.setHint("Search by entrant name or phone");
+            searchText.setHint("Search all users by name or phone");
             searchText.setHintTextColor(Color.parseColor("#7A7A7A"));
             searchText.setTextColor(Color.parseColor("#1F1F1F"));
         }
@@ -184,6 +191,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             intent.putExtra("eventId", eventId);
             startActivity(intent);
         });
+        inviteSelectedButton.setOnClickListener(v -> sendInvitationToSelectedWaitlistEntrants());
         /**
          findViewById(R.id.btn_lottery_draw).setOnClickListener(v -> {
             performLotteryDraw();
@@ -241,9 +249,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     replacementEntrantIds.clear();
                     replacementEntrantIds.addAll(updatedReplacement);
 
-                    for (int i = 0; i < allEntrants.size(); i++) {
-                        if (entrantId.equals(allEntrants.get(i).getEntrantId())) {
-                            allEntrants.remove(i);
+                    for (int i = 0; i < waitlistEntrants.size(); i++) {
+                        if (entrantId.equals(waitlistEntrants.get(i).getEntrantId())) {
+                            waitlistEntrants.remove(i);
                             break;
                         }
                     }
@@ -276,6 +284,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
 
                     // Extract and store the registration end date
                     registrationEndDate = documentSnapshot.getDate("registrationEndDate");
+                    isPrivateEvent = "private".equalsIgnoreCase(documentSnapshot.getString("visibilityTag"));
 
                     List<String> entrantIds = readEntrantIds(documentSnapshot);
 
@@ -312,6 +321,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     waitlistLoaded = true;
                     findViewById(R.id.btn_lottery_draw).setEnabled(true);
                     findViewById(R.id.btn_redraw_entrants).setEnabled(true);
+                    updateInviteButtonVisibility();
                     loadEntrantProfiles(entrantIds);
                 })
                 .addOnFailureListener(e -> {
@@ -345,33 +355,24 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
      * @param entrantIds entrant identifiers
      */
     private void loadEntrantProfiles(List<String> entrantIds) {
-        if (entrantIds.isEmpty()) {
-            allEntrants.clear();
-            adapter.submitList(new ArrayList<>());
-            showEmptyState(true);
-            return;
-        }
-
-        List<Task<DocumentSnapshot>> tasks = new ArrayList<>();
-        for (String entrantId : entrantIds) {
-            tasks.add(db.collection("users").document(entrantId).get());
-        }
-
-        Tasks.whenAllComplete(tasks)
-                .addOnSuccessListener(unused -> {
-                    List<OrganizerWaitlistItem> loadedEntrants = new ArrayList<>();
-                    for (int index = 0; index < tasks.size(); index++) {
-                        String entrantId = entrantIds.get(index);
-                        Task<DocumentSnapshot> task = tasks.get(index);
-                        if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                            loadedEntrants.add(OrganizerWaitlistItem.fromSnapshot(entrantId, task.getResult()));
-                        } else {
-                            loadedEntrants.add(OrganizerWaitlistItem.fallback(entrantId));
-                        }
+        db.collection("users")
+                .get()
+                .addOnSuccessListener(userSnapshots -> {
+                    searchableEntrants.clear();
+                    Map<String, OrganizerWaitlistItem> byEntrantId = new HashMap<>();
+                    for (DocumentSnapshot userSnapshot : userSnapshots.getDocuments()) {
+                        String userId = userSnapshot.getId();
+                        OrganizerWaitlistItem item = OrganizerWaitlistItem.fromSnapshot(userId, userSnapshot);
+                        searchableEntrants.add(item);
+                        byEntrantId.put(userId, item);
                     }
 
-                    allEntrants.clear();
-                    allEntrants.addAll(loadedEntrants);
+                    waitlistEntrants.clear();
+                    for (String entrantId : entrantIds) {
+                        OrganizerWaitlistItem item = byEntrantId.get(entrantId);
+                        waitlistEntrants.add(item != null ? item : OrganizerWaitlistItem.fallback(entrantId));
+                    }
+
                     applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
                 })
                 .addOnFailureListener(e -> {
@@ -388,15 +389,112 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private void applyFilter(String query) {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
         List<OrganizerWaitlistItem> filteredEntrants = new ArrayList<>();
+        List<OrganizerWaitlistItem> source = normalizedQuery.isEmpty()
+                ? waitlistEntrants
+                : searchableEntrants;
 
-        for (OrganizerWaitlistItem entrant : allEntrants) {
+        for (OrganizerWaitlistItem entrant : source) {
             if (normalizedQuery.isEmpty() || entrant.matches(normalizedQuery)) {
                 filteredEntrants.add(entrant);
             }
         }
 
         adapter.submitList(filteredEntrants);
+        updateInviteButtonVisibility();
         showEmptyState(filteredEntrants.isEmpty());
+    }
+
+    private void updateInviteButtonVisibility() {
+        if (inviteSelectedButton == null) {
+            return;
+        }
+        boolean hasSelection = !adapter.getSelectedEntrantIds().isEmpty();
+        inviteSelectedButton.setVisibility(isPrivateEvent && hasSelection ? View.VISIBLE : View.GONE);
+    }
+
+    private void sendInvitationToSelectedWaitlistEntrants() {
+        if (!isPrivateEvent) {
+            Toast.makeText(this, "Invitations are available only for private events", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> selected = adapter.getSelectedEntrantIds();
+        if (selected.isEmpty()) {
+            Toast.makeText(this, "Select at least one entrant", Toast.LENGTH_SHORT).show();
+            updateInviteButtonVisibility();
+            return;
+        }
+
+        List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
+        updatedWaitlist.removeAll(selected);
+
+        List<String> updatedSelected = new ArrayList<>(selectedEntrantIds);
+        for (String entrantId : selected) {
+            if (!updatedSelected.contains(entrantId)) {
+                updatedSelected.add(entrantId);
+            }
+        }
+
+        Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, selected);
+        updates.put("selectedEntrantIds", updatedSelected);
+
+        db.collection("events").document(eventId)
+                .update(updates)
+                .addOnSuccessListener(unused -> {
+                    waitlistEntrantIds.clear();
+                    waitlistEntrantIds.addAll(updatedWaitlist);
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(updatedSelected);
+                    removeEntrantsFromVisibleWaitlist(selected);
+                    persistInvitedHistory(selected);
+                    Toast.makeText(this, "Invitation sent to selected entrants", Toast.LENGTH_SHORT).show();
+                    updateInviteButtonVisibility();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to send invitations", Toast.LENGTH_SHORT).show());
+    }
+
+    private void persistInvitedHistory(List<String> invitedEntrants) {
+        db.collection("events").document(eventId).get().addOnSuccessListener(eventSnapshot -> {
+            if (!eventSnapshot.exists()) {
+                return;
+            }
+            String eventName = eventSnapshot.getString("eventName");
+            String eventLocation = eventSnapshot.getString("location");
+            String organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+            for (String entrantId : invitedEntrants) {
+                Map<String, Object> historyData = new HashMap<>();
+                historyData.put("eventId", eventId);
+                historyData.put("eventName", eventName);
+                historyData.put("location", eventLocation);
+                historyData.put("organizerId", eventSnapshot.getString("organizerId"));
+                historyData.put("posterUrl", eventSnapshot.getString("posterPath"));
+                historyData.put("registrationStartDate", eventSnapshot.getTimestamp("registrationStartDate"));
+                historyData.put("registrationEndDate", eventSnapshot.getTimestamp("registrationEndDate"));
+                historyData.put("description", eventSnapshot.getString("description"));
+                historyData.put("status", "invited");
+                historyData.put("updatedAt", FieldValue.serverTimestamp());
+
+                db.collection("users").document(entrantId)
+                        .collection("eventHistory").document(eventId)
+                        .set(historyData, SetOptions.merge());
+
+                Map<String, Object> notification = new HashMap<>();
+                notification.put("eventId", eventId);
+                notification.put("eventName", eventName == null || eventName.trim().isEmpty() ? "Event Invitation" : eventName);
+                notification.put("location", eventLocation == null ? "" : eventLocation);
+                notification.put("message", "You have been invited to this private event. Open Events to accept or decline.");
+                notification.put("recipientId", entrantId);
+                notification.put("senderId", organizerId);
+                notification.put("status", "unread");
+                notification.put("createdAt", Timestamp.now());
+
+                db.collection("users")
+                        .document(entrantId)
+                        .collection("notifications")
+                        .document()
+                        .set(notification, SetOptions.merge());
+            }
+        });
     }
 
     /**
@@ -582,7 +680,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         if (removedEntrantIds == null || removedEntrantIds.isEmpty()) {
             return;
         }
-        allEntrants.removeIf(item -> removedEntrantIds.contains(item.getEntrantId()));
+        waitlistEntrants.removeIf(item -> removedEntrantIds.contains(item.getEntrantId()));
         applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
     }
 
