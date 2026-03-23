@@ -35,6 +35,7 @@ public class UserProfileActivity extends AppCompatActivity {
     private TextInputEditText etFirstName;
     private TextInputEditText etLastName;
     private TextInputEditText etBirthday;
+    private TextInputEditText etEmail;
     private TextInputEditText etAddressLine1;
     private TextInputEditText etCity;
     private TextInputEditText etPostalCode;
@@ -65,6 +66,7 @@ public class UserProfileActivity extends AppCompatActivity {
         etFirstName = findViewById(R.id.et_first_name);
         etLastName = findViewById(R.id.et_last_name);
         etBirthday = findViewById(R.id.et_birthday);
+        etEmail = findViewById(R.id.et_email);
         etAddressLine1 = findViewById(R.id.et_address_line_1);
         etCity = findViewById(R.id.et_city);
         etPostalCode = findViewById(R.id.et_postal_code);
@@ -140,6 +142,7 @@ public class UserProfileActivity extends AppCompatActivity {
         etFirstName.setEnabled(enabled);
         etLastName.setEnabled(enabled);
         etBirthday.setEnabled(enabled);
+        etEmail.setEnabled(enabled);
         etAddressLine1.setEnabled(enabled);
         etCity.setEnabled(enabled);
         etPostalCode.setEnabled(enabled);
@@ -215,6 +218,7 @@ public class UserProfileActivity extends AppCompatActivity {
                         etFirstName.setText(safe(documentSnapshot.getString("firstName")));
                         etLastName.setText(safe(documentSnapshot.getString("lastName")));
                         etBirthday.setText(safe(documentSnapshot.getString("birthday")));
+                        etEmail.setText(safe(documentSnapshot.getString("email")));
                         etAddressLine1.setText(safe(documentSnapshot.getString("addressLine1")));
                         etCity.setText(safe(documentSnapshot.getString("city")));
                         etPostalCode.setText(safe(documentSnapshot.getString("postalCode")));
@@ -242,6 +246,7 @@ public class UserProfileActivity extends AppCompatActivity {
         String firstName = textOf(etFirstName);
         String lastName = textOf(etLastName);
         String birthday = textOf(etBirthday);
+        String email = textOf(etEmail);
         String addressLine1 = textOf(etAddressLine1);
         String city = textOf(etCity);
         String postalCode = textOf(etPostalCode);
@@ -258,6 +263,7 @@ public class UserProfileActivity extends AppCompatActivity {
         userData.put("firstName", firstName);
         userData.put("lastName", lastName);
         userData.put("birthday", birthday);
+        userData.put("email", email);
         userData.put("addressLine1", addressLine1);
         userData.put("city", city);
         userData.put("postalCode", postalCode);

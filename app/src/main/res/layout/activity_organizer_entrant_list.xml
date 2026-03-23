@@ -80,6 +80,14 @@
                 android:layout_marginBottom="8dp"
                 android:text="View Lottery Winners" />
 
+            <Button
+                android:id="@+id/btn_invite_selected_waitlist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Send invitation to selected for waitlist"
+                android:visibility="gone" />
+
             <EditText
                 android:id="@+id/et_lottery_count"
                 android:layout_width="match_parent"

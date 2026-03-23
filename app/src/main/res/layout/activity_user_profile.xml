@@ -80,7 +80,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:hint="First name">
+                android:hint="First name"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_first_name"
@@ -94,7 +95,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Last name">
+                android:hint="Last name"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_last_name"
@@ -108,7 +110,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Birthday">
+                android:hint="Birthday"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_birthday"
@@ -118,11 +121,28 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_email"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Email"
+                android:textColorHint="@color/text_muted"
+                app:expandedHintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_email"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textEmailAddress" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_address"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Address">
+                android:hint="Address"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_address_line_1"
@@ -136,7 +156,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="City">
+                android:hint="City"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_city"
@@ -150,7 +171,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Postal code">
+                android:hint="Postal code"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_postal_code"
@@ -164,7 +186,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Country">
+                android:hint="Country"
+                app:expandedHintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_country"
