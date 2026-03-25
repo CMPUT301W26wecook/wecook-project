@@ -27,6 +27,7 @@ import com.google.firebase.firestore.ListenerRegistration;
 import com.google.zxing.WriterException;
 
 import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -69,6 +70,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         TextView tvEventDates = findViewById(R.id.tv_event_dates);
         TextView tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
         TextView tvWaitlistLabel = findViewById(R.id.tv_waitlist_label);
+        TextView tvCapacityLabel = findViewById(R.id.tv_capacity_label);
         TextView tvEventVisibility = findViewById(R.id.tv_event_visibility);
         TextView tvEventDescription = findViewById(R.id.tv_event_description);
         geolocationSwitch = findViewById(R.id.switch_geolocation);
@@ -118,6 +120,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 
                                 tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
                                 tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
+                                List<String> acceptedEntrantIds = FirestoreFieldUtils.getStringList(documentSnapshot, "acceptedEntrantIds");
+                                int acceptedCount = acceptedEntrantIds.size();
+                                tvCapacityLabel.setText("Capacity: " + acceptedCount + "/" + event.getCapacity());
                                 String visibilityLabel = Event.VISIBILITY_PRIVATE.equals(event.getVisibilityTag())
                                         ? "Private"
                                         : "Public";
@@ -191,6 +196,8 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                  Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
              }
         });
+
+        findViewById(R.id.iv_back).setOnClickListener(v -> finish());
 
         findViewById(R.id.btn_show_qr).setOnClickListener(v -> {
             if (eventId == null || eventId.trim().isEmpty()) {

@@ -77,6 +77,7 @@ public class UserHistoryActivity extends AppCompatActivity {
         rvHistory.setAdapter(adapter);
 
         setupBottomNav();
+        findViewById(R.id.iv_back).setOnClickListener(v -> finish());
 
         loadHistory();
     }

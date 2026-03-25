@@ -56,10 +56,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private TextInputLayout tilEventName;
     private TextInputLayout tilRegistrationStartDate;
     private TextInputLayout tilRegistrationEndDate;
+    private TextInputLayout tilCapacity;
     private TextInputLayout tilMaxWaitlist;
     private TextInputEditText etEventName;
     private TextInputEditText etRegistrationStartDate;
     private TextInputEditText etRegistrationEndDate;
+    private TextInputEditText etCapacity;
     private TextInputEditText etMaxWaitlist;
     private RadioGroup rgEventVisibility;
     private String originalPosterUrl;
@@ -89,10 +91,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         tilEventName = findViewById(R.id.til_event_name);
         tilRegistrationStartDate = findViewById(R.id.til_registration_start_date);
         tilRegistrationEndDate = findViewById(R.id.til_registration_end_date);
+        tilCapacity = findViewById(R.id.til_capacity);
         tilMaxWaitlist = findViewById(R.id.til_max_waitlist);
         etEventName = findViewById(R.id.et_event_name);
         etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
+        etCapacity = findViewById(R.id.et_capacity);
         etMaxWaitlist = findViewById(R.id.et_max_waitlist);
         rgEventVisibility = findViewById(R.id.rg_event_visibility);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
@@ -199,9 +203,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         tilEventName.setError(null);
         tilRegistrationStartDate.setError(null);
         tilRegistrationEndDate.setError(null);
+        tilCapacity.setError(null);
         tilMaxWaitlist.setError(null);
 
         String eventName = getTrimmedText(etEventName);
+        String capacityText = getTrimmedText(etCapacity);
         String maxWaitlistText = getTrimmedText(etMaxWaitlist);
 
         boolean hasError = false;
@@ -230,6 +236,21 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 }
             } catch (NumberFormatException e) {
                 tilMaxWaitlist.setError("Enter a valid number");
+                hasError = true;
+            }
+        }
+
+        if (!TextUtils.isEmpty(capacityText)) {
+            try {
+                int capacity = Integer.parseInt(capacityText);
+                if (capacity <= 0) {
+                    tilCapacity.setError("Capacity must be greater than 0");
+                    hasError = true;
+                } else {
+                    updates.put("capacity", capacity);
+                }
+            } catch (NumberFormatException e) {
+                tilCapacity.setError("Enter a valid number");
                 hasError = true;
             }
         }
@@ -440,6 +461,33 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 .document(eventId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
+                    String eventName = documentSnapshot.getString("eventName");
+                    if (!TextUtils.isEmpty(eventName)) {
+                        etEventName.setText(eventName);
+                    }
+
+                    Date loadedStartDate = documentSnapshot.getDate("registrationStartDate");
+                    if (loadedStartDate != null) {
+                        registrationStartDate = loadedStartDate;
+                        etRegistrationStartDate.setText(dateFormat.format(loadedStartDate));
+                    }
+
+                    Date loadedEndDate = documentSnapshot.getDate("registrationEndDate");
+                    if (loadedEndDate != null) {
+                        registrationEndDate = loadedEndDate;
+                        etRegistrationEndDate.setText(dateFormat.format(loadedEndDate));
+                    }
+
+                    Long capacity = documentSnapshot.getLong("capacity");
+                    if (capacity != null) {
+                        etCapacity.setText(String.valueOf(capacity));
+                    }
+
+                    Long maxWaitlist = documentSnapshot.getLong("maxWaitlist");
+                    if (maxWaitlist != null) {
+                        etMaxWaitlist.setText(String.valueOf(maxWaitlist));
+                    }
+
                     originalPosterUrl = documentSnapshot.getString("posterPath");
                     if (TextUtils.isEmpty(originalPosterUrl)) {
                         originalPosterUrl = documentSnapshot.getString("posterUrl");

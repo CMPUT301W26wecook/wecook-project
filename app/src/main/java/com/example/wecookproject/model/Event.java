@@ -14,6 +14,7 @@ public class Event {
     private String eventId;
     private String organizerId;
     private String eventName;
+    private int capacity;
     private Date registrationStartDate;
     private Date registrationEndDate;
     private int maxWaitlist;
@@ -105,6 +106,20 @@ public class Event {
      */
     public void setEventName(String eventName) {
         this.eventName = eventName;
+    }
+
+    /**
+     * @return event capacity
+     */
+    public int getCapacity() {
+        return capacity;
+    }
+
+    /**
+     * @param capacity event capacity
+     */
+    public void setCapacity(int capacity) {
+        this.capacity = capacity;
     }
 
     /**
