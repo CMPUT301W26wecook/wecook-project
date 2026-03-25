@@ -492,15 +492,25 @@ public class UserEventActivity extends AppCompatActivity {
      * @param dialog details dialog
      */
     private void acceptInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
-        updateWaitlistMembership(
-                eventRecord,
-                false,
-                UserEventRecord.STATUS_ACCEPTED,
-                false,
-                "Invitation accepted",
-                dialog,
-                null
-        );
+        db.collection("events").document(eventRecord.getEventId())
+                .update(
+                        "acceptedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(
+                                eventRecord,
+                                false,
+                                UserEventRecord.STATUS_ACCEPTED,
+                                false,
+                                "Invitation accepted",
+                                dialog,
+                                null
+                        )
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to accept invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
@@ -513,7 +523,11 @@ public class UserEventActivity extends AppCompatActivity {
         // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
         // The entrant stays off the waitlist and is not reconsidered in the rerun.
         db.collection("events").document(eventRecord.getEventId())
-                .update("selectedEntrantIds", FieldValue.arrayRemove(entrantId))
+                .update(
+                        "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
                 .addOnSuccessListener(unused ->
                         updateWaitlistMembership(
                                 eventRecord,

@@ -367,7 +367,17 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * Accepts an invitation.
      */
     private void acceptInvitation() {
-        updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted", null);
+        db.collection("events").document(eventId)
+                .update(
+                        "acceptedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted", null)
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to accept invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
@@ -377,7 +387,11 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
         // The entrant stays off the waitlist and is not reconsidered in the rerun.
         db.collection("events").document(eventId)
-                .update("selectedEntrantIds", FieldValue.arrayRemove(entrantId))
+                .update(
+                        "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
                 .addOnSuccessListener(unused ->
                         updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null)
                 )
