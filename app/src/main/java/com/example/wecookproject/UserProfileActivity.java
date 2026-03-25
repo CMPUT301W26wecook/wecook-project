@@ -28,6 +28,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
     private MaterialButton btnUpdate;
     private MaterialButton btnDelete;
+    private MaterialButton btnLogout;
     private MaterialButton btnViewInbox;
     private SwitchMaterial switchAutoLogin;
     private BottomNavigationView bottomNav;
@@ -59,6 +60,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
         btnUpdate = findViewById(R.id.btn_update);
         btnDelete = findViewById(R.id.btn_delete);
+        btnLogout = findViewById(R.id.btn_logout);
         btnViewInbox = findViewById(R.id.btn_view_inbox);
         switchAutoLogin = findViewById(R.id.switch_auto_login);
         bottomNav = findViewById(R.id.bottom_nav);
@@ -77,6 +79,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
         setupBirthdayWatcher();
         setupBottomNav();
+        findViewById(R.id.iv_back).setOnClickListener(v -> finish());
 
         setEditable(false);
         loadUserProfile();
@@ -92,6 +95,7 @@ public class UserProfileActivity extends AppCompatActivity {
         });
 
         btnDelete.setOnClickListener(v -> showDeleteAccountConfirm());
+        btnLogout.setOnClickListener(v -> showLogoutConfirm());
 
         btnViewInbox.setOnClickListener(v -> openInbox());
     }
@@ -305,6 +309,33 @@ public class UserProfileActivity extends AppCompatActivity {
                 )
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /**
+     * Displays a confirmation dialog before logging out.
+     */
+    private void showLogoutConfirm() {
+        new AlertDialog.Builder(this)
+                .setTitle("Log Out")
+                .setMessage("Are you sure you want to log out?")
+                .setPositiveButton("Log Out", (dialog, which) -> logout())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * Logs out current user and returns to login screen.
+     */
+    private void logout() {
+        db.collection("users")
+                .document(androidId)
+                .update("autoLogin", false)
+                .addOnCompleteListener(task -> {
+                    Intent intent = new Intent(UserProfileActivity.this, LoginActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(intent);
+                    finish();
+                });
     }
 
     /**

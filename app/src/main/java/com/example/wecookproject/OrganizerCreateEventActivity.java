@@ -55,6 +55,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         TextInputEditText etEventName = findViewById(R.id.et_event_name);
         TextInputEditText etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
         TextInputEditText etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
+        TextInputEditText etCapacity = findViewById(R.id.et_capacity);
         TextInputEditText etMaxWaitlist = findViewById(R.id.et_max_waitlist);
         RadioGroup rgEventVisibility = findViewById(R.id.rg_event_visibility);
 
@@ -156,9 +157,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             String eventName = etEventName.getText() != null ? etEventName.getText().toString().trim() : "";
             String startDateStr = etRegistrationStartDate.getText() != null ? etRegistrationStartDate.getText().toString().trim() : "";
             String endDateStr = etRegistrationEndDate.getText() != null ? etRegistrationEndDate.getText().toString().trim() : "";
+            String capacityStr = etCapacity.getText() != null ? etCapacity.getText().toString().trim() : "";
             String maxWaitlistStr = etMaxWaitlist.getText() != null ? etMaxWaitlist.getText().toString().trim() : "";
 
-            if (eventName.isEmpty() || startDateStr.isEmpty() || endDateStr.isEmpty() || maxWaitlistStr.isEmpty()) {
+            if (eventName.isEmpty() || startDateStr.isEmpty() || endDateStr.isEmpty() || capacityStr.isEmpty() || maxWaitlistStr.isEmpty()) {
                 Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -173,11 +175,29 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return;
             }
 
+            int capacity;
+            try {
+                capacity = Integer.parseInt(capacityStr);
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "Invalid capacity number", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             int maxWaitlist;
             try {
                 maxWaitlist = Integer.parseInt(maxWaitlistStr);
             } catch (NumberFormatException e) {
                 Toast.makeText(this, "Invalid maximum waitlist number", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (capacity <= 0) {
+                Toast.makeText(this, "Capacity must be greater than 0", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (maxWaitlist < 0) {
+                Toast.makeText(this, "Maximum waitlist must be 0 or more", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -197,6 +217,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     "Location TBD", // Default location
                     "" // Default description
             );
+            newEvent.setCapacity(capacity);
             int selectedVisibilityId = rgEventVisibility.getCheckedRadioButtonId();
             String visibilityTag = selectedVisibilityId == R.id.rb_visibility_private
                     ? Event.VISIBILITY_PRIVATE
