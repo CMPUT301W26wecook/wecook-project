@@ -165,6 +165,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         String registrationStartText = getTrimmedText(etRegistrationStartDate);
         String registrationEndText = getTrimmedText(etRegistrationEndDate);
         String maxWaitlistText = getTrimmedText(etMaxWaitlist);
+        String capacityText = getTrimmedText(etCapacity);
 
         boolean hasError = false;
         Map<String, Object> updates = new HashMap<>();
