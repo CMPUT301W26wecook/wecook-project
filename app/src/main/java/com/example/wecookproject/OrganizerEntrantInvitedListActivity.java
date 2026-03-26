@@ -159,11 +159,18 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     List<String> invitedIds = readStringList(eventDoc, "selectedEntrantIds");
                     List<String> acceptedIds = readStringList(eventDoc, "acceptedEntrantIds");
                     List<String> cancelledIds = readStringList(eventDoc, "declinedEntrantIds");
+                    List<String> waitlistIds = readStringList(eventDoc, "waitlistEntrantIds");
 
                     Set<String> allInvitedIds = new LinkedHashSet<>();
                     allInvitedIds.addAll(invitedIds);
                     allInvitedIds.addAll(acceptedIds);
-                    allInvitedIds.addAll(cancelledIds);
+                    for (String cancelledId : cancelledIds) {
+                        // If a cancelled entrant is back on the waitlist, they are not a current
+                        // lottery winner and should not appear in the winners list.
+                        if (!waitlistIds.contains(cancelledId)) {
+                            allInvitedIds.add(cancelledId);
+                        }
+                    }
 
                     if (allInvitedIds.isEmpty()) {
                         allEntrants.clear();
@@ -184,14 +191,14 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                                                 .document(eventId)
                                                 .get()
                                                 .addOnSuccessListener(historyDoc -> {
-                                                    loaded.add(toInvitedItem(entrantId, userDoc, historyDoc, acceptedIds, cancelledIds));
+                                                    loaded.add(toInvitedItem(entrantId, userDoc, historyDoc, invitedIds, acceptedIds, cancelledIds));
                                                     pending[0]--;
                                                     if (pending[0] == 0) {
                                                         onInvitedLoaded(loaded);
                                                     }
                                                 })
                                                 .addOnFailureListener(e -> {
-                                                    loaded.add(toInvitedItem(entrantId, userDoc, null, acceptedIds, cancelledIds));
+                                                    loaded.add(toInvitedItem(entrantId, userDoc, null, invitedIds, acceptedIds, cancelledIds));
                                                     pending[0]--;
                                                     if (pending[0] == 0) {
                                                         onInvitedLoaded(loaded);
@@ -215,7 +222,9 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
 
     private OrganizerInvitedEntrantItem toInvitedItem(String entrantId, DocumentSnapshot userDoc,
                                                       DocumentSnapshot historyDoc,
-                                                      List<String> acceptedIds, List<String> cancelledIds) {
+                                                      List<String> invitedIds,
+                                                      List<String> acceptedIds,
+                                                      List<String> cancelledIds) {
         String firstName = safe(userDoc.getString("firstName"));
         String lastName = safe(userDoc.getString("lastName"));
         String phoneNumber = safe(userDoc.getString("phoneNumber"));
@@ -229,6 +238,8 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         String status = OrganizerInvitedEntrantAdapter.STATUS_PENDING;
         if ("accepted".equals(historyStatus) || acceptedIds.contains(entrantId)) {
             status = OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED;
+        } else if ("invited".equals(historyStatus) || invitedIds.contains(entrantId)) {
+            status = OrganizerInvitedEntrantAdapter.STATUS_PENDING;
         } else if ("rejected".equals(historyStatus) || cancelledIds.contains(entrantId)) {
             status = OrganizerInvitedEntrantAdapter.STATUS_CANCELLED;
         }
