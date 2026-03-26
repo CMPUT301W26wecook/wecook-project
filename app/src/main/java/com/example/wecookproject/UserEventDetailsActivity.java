@@ -449,17 +449,25 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 waitlistEntrants.remove(entrantId);
             }
 
-            if (addEntrant && entrantLocation != null) {
+            boolean shouldStoreLocation = addEntrant && entrantLocation != null;
+            boolean shouldDeleteStoredLocation = !addEntrant
+                    && (deleteHistory || UserEventRecord.STATUS_REJECTED.equals(newStatus));
+
+            if (shouldStoreLocation) {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId,
                         new GeoPoint(entrantLocation.getLatitude(), entrantLocation.getLongitude()));
-            } else {
+            } else if (shouldDeleteStoredLocation) {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId, FieldValue.delete());
+            } else {
+                transaction.update(eventReference,
+                        "waitlistEntrantIds", waitlistEntrants,
+                        "currentWaitlistCount", waitlistEntrants.size());
             }
             return waitlistEntrants;
         }).addOnSuccessListener(updatedWaitlist -> {

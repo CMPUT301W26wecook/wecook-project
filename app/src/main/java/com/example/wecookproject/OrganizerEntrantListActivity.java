@@ -670,9 +670,8 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         Map<String, Object> updates = new HashMap<>();
         updates.put("waitlistEntrantIds", updatedWaitlist);
         updates.put("currentWaitlistCount", updatedWaitlist.size());
-        for (String entrantId : removedEntrantIds) {
-            updates.put("waitlistEntrantLocations." + entrantId, FieldValue.delete());
-        }
+        // Keep stored entrant coordinates so organizer registration map can show where
+        // registrations came from even after entrants are moved out of waitlist.
         return updates;
     }
 

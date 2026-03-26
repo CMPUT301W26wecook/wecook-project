@@ -9,10 +9,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:unchecked"))
 }
 
-val mapsApiKey = (project.findProperty("MAPS_API_KEY") as String?)
-    ?: System.getenv("MAPS_API_KEY")
-    ?: ""
-
 android {
     namespace = "com.example.wecookproject"
     compileSdk = 36
@@ -23,7 +19,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -51,9 +46,9 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // Google Play Services and Maps
+    // Google Play Services location
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    implementation("com.google.android.gms:play-services-maps:19.2.0")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Firebase (BoM manages versions)
     implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
