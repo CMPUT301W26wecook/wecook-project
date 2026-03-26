@@ -436,6 +436,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
 
         Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, selected);
         updates.put("selectedEntrantIds", updatedSelected);
+        updates.put("declinedEntrantIds", FieldValue.arrayRemove(selected.toArray()));
 
         db.collection("events").document(eventId)
                 .update(updates)
@@ -567,6 +568,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, selected);
         updates.put("lotteryCount", lotteryCount);
         updates.put("selectedEntrantIds", selected);
+        updates.put("declinedEntrantIds", FieldValue.arrayRemove(selected.toArray()));
 
         db.collection("events").document(eventId)
                 .update(updates)
@@ -647,6 +649,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, drawn);
         updates.put("replacementEntrantIds", newReplacements);
         updates.put("selectedEntrantIds", newSelected);
+        updates.put("declinedEntrantIds", FieldValue.arrayRemove(drawn.toArray()));
         db.collection("events").document(eventId)
                 .update(updates)
                 .addOnSuccessListener(unused -> {
