@@ -30,8 +30,7 @@ public class UserEventUiUtilsTest {
 
         String formatted = UserEventUiUtils.formatDateRange(start, end);
 
-        assertTrue(formatted.contains("2024"));
-        assertTrue(formatted.contains("-"));
+        assertEquals("2024-04-01 00:00 - 2024-05-01 00:00", formatted);
     }
 
     @Test

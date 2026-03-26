@@ -44,13 +44,14 @@ import java.util.Locale;
  *   layer.
  */
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
     
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ListenerRegistration eventListener;
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
     private Event currentEvent;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
 
     /**
      * Initializes event detail rendering and related navigation actions.

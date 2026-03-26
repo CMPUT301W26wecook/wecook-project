@@ -27,6 +27,7 @@ import java.util.Map;
  * A Fragment that displays the details of a specific event for administrative purposes.
  */
 public class AdminEventDetailFragment extends Fragment {
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
 
     private AdminViewModel viewModel;
     private FirebaseFirestore db = FirebaseFirestore.getInstance();;
@@ -68,7 +69,7 @@ public class AdminEventDetailFragment extends Fragment {
         Button btnDeletePoster = view.findViewById(R.id.btn_delete_poster);
         Button btnDeleteEvent = view.findViewById(R.id.btn_delete_event);
 
-        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+        SimpleDateFormat sdf = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
 
         viewModel.getSelectedEvent().observe(getViewLifecycleOwner(), event -> {
             if (event != null) {

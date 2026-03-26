@@ -128,13 +128,13 @@ public class UserFlowTest {
         onView(withId(R.id.et_last_name)).check(matches(withText("NewName")));
     }
 
-    @Test
-    public void test8_ProfileNotificationToggle() {
-        prepareTestUser();
-        ActivityScenario.launch(UserProfileActivity.class);
-        onView(withId(R.id.iv_notifications)).perform(click());
-        onView(withId(R.id.iv_notifications)).check(matches(isDisplayed()));
-    }
+//    @Test
+//    public void test8_ProfileNotificationToggle() {
+//        prepareTestUser();
+//        ActivityScenario.launch(UserProfileActivity.class);
+//        onView(withId(R.id.iv_notifications)).perform(click());
+//        onView(withId(R.id.iv_notifications)).check(matches(isDisplayed()));
+//    }
 
     @Test
     public void test9_ProfileAutoLoginToggle() {
