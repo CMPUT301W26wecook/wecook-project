@@ -15,6 +15,8 @@ public class OrganizerWaitlistItem {
     private final String entrantId;
     private final String displayName;
     private final String subtitle;
+    private final String phoneNumber;
+    private final String email;
 
     /**
      * Creates one organizer waitlist item.
@@ -24,9 +26,36 @@ public class OrganizerWaitlistItem {
      * @param subtitle subtitle text
      */
     public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle) {
+        this(entrantId, displayName, subtitle, "", "");
+    }
+
+    /**
+     * Creates one organizer waitlist item.
+     *
+     * @param entrantId entrant identifier
+     * @param displayName display name text
+     * @param subtitle subtitle text
+     * @param phoneNumber entrant phone number
+     */
+    public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle, String phoneNumber) {
+        this(entrantId, displayName, subtitle, phoneNumber, "");
+    }
+
+    /**
+     * Creates one organizer waitlist item.
+     *
+     * @param entrantId entrant identifier
+     * @param displayName display name text
+     * @param subtitle subtitle text
+     * @param phoneNumber entrant phone number
+     * @param email entrant email
+     */
+    public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle, String phoneNumber, String email) {
         this.entrantId = entrantId;
         this.displayName = displayName;
         this.subtitle = subtitle;
+        this.phoneNumber = safe(phoneNumber);
+        this.email = safe(email);
     }
 
     /**
@@ -41,6 +70,7 @@ public class OrganizerWaitlistItem {
         String lastName = safe(snapshot.getString("lastName"));
         String city = safe(snapshot.getString("city"));
         String email = safe(snapshot.getString("email"));
+        String phoneNumber = safe(snapshot.getString("phoneNumber"));
 
         String displayName = (firstName + " " + lastName).trim();
         if (displayName.isEmpty()) {
@@ -52,7 +82,7 @@ public class OrganizerWaitlistItem {
             subtitle = "Entrant ID: " + entrantId;
         }
 
-        return new OrganizerWaitlistItem(entrantId, displayName, subtitle);
+        return new OrganizerWaitlistItem(entrantId, displayName, subtitle, phoneNumber, email);
     }
 
     /**
@@ -62,7 +92,7 @@ public class OrganizerWaitlistItem {
      * @return fallback item
      */
     public static OrganizerWaitlistItem fallback(String entrantId) {
-        return new OrganizerWaitlistItem(entrantId, entrantId, "Entrant profile unavailable");
+        return new OrganizerWaitlistItem(entrantId, entrantId, "Entrant profile unavailable", "", "");
     }
 
     /**
@@ -106,6 +136,8 @@ public class OrganizerWaitlistItem {
         String normalized = query == null ? "" : query.toLowerCase();
         return displayName.toLowerCase().contains(normalized)
                 || subtitle.toLowerCase().contains(normalized)
+                || phoneNumber.toLowerCase().contains(normalized)
+                || email.toLowerCase().contains(normalized)
                 || entrantId.toLowerCase().contains(normalized);
     }
 

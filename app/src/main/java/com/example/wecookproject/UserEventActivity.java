@@ -48,9 +48,11 @@ import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Entrant event list screen with waitlist and invitation actions.
@@ -161,18 +163,22 @@ public class UserEventActivity extends AppCompatActivity {
                 .get()
                 .addOnSuccessListener(historySnapshots -> {
                     Map<String, String> historyStatuses = new HashMap<>();
+                    Set<String> historyEventIds = new HashSet<>();
                     for (QueryDocumentSnapshot historyDocument : historySnapshots) {
                         String eventId = historyDocument.getString("eventId");
                         String status = historyDocument.getString("status");
-                        if (eventId != null && status != null) {
-                            historyStatuses.put(eventId, status);
+                        if (eventId != null) {
+                            historyEventIds.add(eventId);
+                            if (status != null) {
+                                historyStatuses.put(eventId, status);
+                            }
                         }
                     }
-                    loadEvents(historyStatuses);
+                    loadEvents(historyStatuses, historyEventIds);
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show();
-                    loadEvents(new HashMap<>());
+                    loadEvents(new HashMap<>(), new HashSet<>());
                 });
     }
 
@@ -180,15 +186,23 @@ public class UserEventActivity extends AppCompatActivity {
      * Loads all events and merges history status for display.
      *
      * @param historyStatuses map of eventId to history status
+     * @param historyEventIds set of eventIds present in entrant history
      */
-    private void loadEvents(Map<String, String> historyStatuses) {
+    private void loadEvents(Map<String, String> historyStatuses, Set<String> historyEventIds) {
         db.collection("events")
                 .get()
                 .addOnSuccessListener(eventSnapshots -> {
                     eventList.clear();
                     for (QueryDocumentSnapshot document : eventSnapshots) {
+                        String eventId = document.getId();
                         String visibilityTag = document.getString("visibilityTag");
-                        if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)) {
+                        List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(document, "waitlistEntrantIds");
+                        boolean entrantOnWaitlist = waitlistEntrants != null && waitlistEntrants.contains(entrantId);
+                        boolean entrantHasHistory = historyEventIds.contains(eventId);
+
+                        if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)
+                                && !entrantOnWaitlist
+                                && !entrantHasHistory) {
                             continue;
                         }
 
@@ -199,11 +213,25 @@ public class UserEventActivity extends AppCompatActivity {
                         UserEventRecord eventRecord = UserEventRecord.fromEventSnapshot(
                                 document,
                                 entrantId,
-                                historyStatuses.get(document.getId())
+                                historyStatuses.get(eventId)
                         );
 
-                        if (eventRecord.isEntrantOnWaitlist() && historyStatuses.get(document.getId()) == null) {
+                        if (eventRecord.isEntrantOnWaitlist() && historyStatuses.get(eventId) == null) {
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_WAITLISTED);
+                        }
+
+                        // If the organizer has picked this entrant as a lottery winner and their
+                        // current status is still "waitlisted", promote it to "invited".
+                        // Do NOT re-promote users who already declined (cancelled).
+                        List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(document, "selectedEntrantIds");
+                        String currentStatus = historyStatuses.get(eventId);
+                        boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
+                        boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentStatus)
+                                || UserEventRecord.STATUS_WAITLISTED.equals(eventRecord.getEffectiveStatus());
+                        boolean isCancelled = UserEventRecord.STATUS_REJECTED.equals(currentStatus);
+                        if (isSelected && isStillWaitlisted && !isCancelled) {
+                            eventRecord.setHistoryStatus(UserEventRecord.STATUS_INVITED);
+                            upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_INVITED);
                         }
 
                         eventList.add(eventRecord);
@@ -466,15 +494,25 @@ public class UserEventActivity extends AppCompatActivity {
      * @param dialog details dialog
      */
     private void acceptInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
-        updateWaitlistMembership(
-                eventRecord,
-                false,
-                UserEventRecord.STATUS_ACCEPTED,
-                false,
-                "Invitation accepted",
-                dialog,
-                null
-        );
+        db.collection("events").document(eventRecord.getEventId())
+                .update(
+                        "acceptedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(
+                                eventRecord,
+                                false,
+                                UserEventRecord.STATUS_ACCEPTED,
+                                false,
+                                "Invitation accepted",
+                                dialog,
+                                null
+                        )
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to accept invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
@@ -484,15 +522,28 @@ public class UserEventActivity extends AppCompatActivity {
      * @param dialog details dialog
      */
     private void declineInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
-        updateWaitlistMembership(
-                eventRecord,
-                false,
-                UserEventRecord.STATUS_REJECTED,
-                false,
-                "Invitation declined",
-                dialog,
-                null
-        );
+        // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
+        // The entrant stays off the waitlist and is not reconsidered in the rerun.
+        db.collection("events").document(eventRecord.getEventId())
+                .update(
+                        "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(
+                                eventRecord,
+                                false,
+                                UserEventRecord.STATUS_REJECTED,
+                                false,
+                                "Invitation declined",
+                                dialog,
+                                null
+                        )
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
@@ -548,17 +599,25 @@ public class UserEventActivity extends AppCompatActivity {
                 waitlistEntrants.remove(entrantId);
             }
 
-            if (addEntrant && entrantLocation != null) {
+            boolean shouldStoreLocation = addEntrant && entrantLocation != null;
+            boolean shouldDeleteStoredLocation = !addEntrant
+                    && (deleteHistory || UserEventRecord.STATUS_REJECTED.equals(newStatus));
+
+            if (shouldStoreLocation) {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId,
                         new GeoPoint(entrantLocation.getLatitude(), entrantLocation.getLongitude()));
-            } else {
+            } else if (shouldDeleteStoredLocation) {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId, FieldValue.delete());
+            } else {
+                transaction.update(eventReference,
+                        "waitlistEntrantIds", waitlistEntrants,
+                        "currentWaitlistCount", waitlistEntrants.size());
             }
             return waitlistEntrants;
         }).addOnSuccessListener(updatedWaitlist -> {

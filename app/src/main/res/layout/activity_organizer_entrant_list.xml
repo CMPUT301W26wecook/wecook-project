@@ -64,12 +64,7 @@
             android:orientation="vertical"
             android:paddingTop="6dp">
 
-            <Button
-                android:id="@+id/btn_send_invitation_to_selected"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="Send Invitation to selected" />
+
 
             <Button
                 android:id="@+id/btn_send_notification_to_all"
@@ -79,11 +74,19 @@
                 android:text="Send Notification to all" />
 
             <Button
-                android:id="@+id/btn_view_invited"
+                android:id="@+id/btn_view_lottery_winners"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="View Invited" />
+                android:text="View Lottery Winners" />
+
+            <Button
+                android:id="@+id/btn_invite_selected_waitlist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Send invitation to selected for waitlist"
+                android:visibility="gone" />
 
             <EditText
                 android:id="@+id/et_lottery_count"

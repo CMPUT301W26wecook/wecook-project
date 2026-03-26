@@ -198,6 +198,17 @@ public class UserEventDetailsActivity extends AppCompatActivity {
 
         currentEvent = UserEventRecord.fromEventSnapshot(eventSnapshot, entrantId, historyStatus);
 
+        // If the organizer has selected this entrant in the lottery and their status is still
+        // "waitlisted", promote it to "invited" so the UI reflects the correct state.
+        List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
+        boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
+        boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentEvent.getEffectiveStatus());
+        boolean isRejected = UserEventRecord.STATUS_REJECTED.equals(currentEvent.getEffectiveStatus());
+        if (isSelected && isStillWaitlisted && !isRejected) {
+            currentEvent.setHistoryStatus(UserEventRecord.STATUS_INVITED);
+            upsertHistoryDocument(UserEventRecord.STATUS_INVITED);
+        }
+
         tvAvatar.setText(UserEventUiUtils.getAvatarLetter(currentEvent.getEventName()));
         tvHeaderName.setText(currentEvent.getEventName());
         tvHeaderLocation.setText(currentEvent.getLocation());
@@ -356,14 +367,37 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * Accepts an invitation.
      */
     private void acceptInvitation() {
-        updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted", null);
+        db.collection("events").document(eventId)
+                .update(
+                        "acceptedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(false, UserEventRecord.STATUS_ACCEPTED, false, "Invitation accepted", null)
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to accept invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
      * Declines an invitation.
      */
     private void declineInvitation() {
-        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null);
+        // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
+        // The entrant stays off the waitlist and is not reconsidered in the rerun.
+        db.collection("events").document(eventId)
+                .update(
+                        "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
+                        "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
+                        "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
+                )
+                .addOnSuccessListener(unused ->
+                        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null)
+                )
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
+                );
     }
 
     /**
@@ -415,17 +449,25 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 waitlistEntrants.remove(entrantId);
             }
 
-            if (addEntrant && entrantLocation != null) {
+            boolean shouldStoreLocation = addEntrant && entrantLocation != null;
+            boolean shouldDeleteStoredLocation = !addEntrant
+                    && (deleteHistory || UserEventRecord.STATUS_REJECTED.equals(newStatus));
+
+            if (shouldStoreLocation) {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId,
                         new GeoPoint(entrantLocation.getLatitude(), entrantLocation.getLongitude()));
-            } else {
+            } else if (shouldDeleteStoredLocation) {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId, FieldValue.delete());
+            } else {
+                transaction.update(eventReference,
+                        "waitlistEntrantIds", waitlistEntrants,
+                        "currentWaitlistCount", waitlistEntrants.size());
             }
             return waitlistEntrants;
         }).addOnSuccessListener(updatedWaitlist -> {

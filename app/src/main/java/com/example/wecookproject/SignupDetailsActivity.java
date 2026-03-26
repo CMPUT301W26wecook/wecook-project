@@ -34,23 +34,33 @@ public class SignupDetailsActivity extends AppCompatActivity {
         EditText etFirstName = findViewById(R.id.et_first_name);
         EditText etLastName = findViewById(R.id.et_last_name);
         EditText etBirthday = findViewById(R.id.et_birthday);
+        EditText etEmail = findViewById(R.id.et_email);
         EditText etPhoneNumber = findViewById(R.id.et_phone_number);
 
         backButton.setOnClickListener(v -> finish());
         setupBirthdayFormatting(etBirthday);
+        TextInputLayout tilEmail = findViewById(R.id.til_email);
         TextInputLayout tilPhoneNumber = findViewById(R.id.til_phone_number);
-        configureEntrantOnlyFields(tilPhoneNumber);
-        continueButton.setOnClickListener(v -> handleContinue(etFirstName, etLastName, etBirthday, etPhoneNumber));
+        configureEntrantOnlyFields(tilEmail, tilPhoneNumber);
+        continueButton.setOnClickListener(v -> handleContinue(
+                etFirstName,
+                etLastName,
+                etBirthday,
+                etEmail,
+                etPhoneNumber
+        ));
     }
 
     /**
      * Shows entrant-only fields and hides them for organizer signup.
      *
+     * @param emailLayout email container
      * @param phoneNumberLayout phone number container
      */
-    private void configureEntrantOnlyFields(TextInputLayout phoneNumberLayout) {
+    private void configureEntrantOnlyFields(TextInputLayout emailLayout, TextInputLayout phoneNumberLayout) {
         String clickedRole = getIntent().getStringExtra("clickedRole");
         if ("ORGANIZER".equals(clickedRole)) {
+            emailLayout.setVisibility(View.GONE);
             phoneNumberLayout.setVisibility(View.GONE);
         }
     }
@@ -126,15 +136,18 @@ public class SignupDetailsActivity extends AppCompatActivity {
      * @param firstNameInput first-name field
      * @param lastNameInput last-name field
      * @param birthdayInput birthday field
+     * @param emailInput email field
      * @param phoneNumberInput phone-number field
      */
     private void handleContinue(EditText firstNameInput,
                                 EditText lastNameInput,
                                 EditText birthdayInput,
+                                EditText emailInput,
                                 EditText phoneNumberInput) {
         String firstName = firstNameInput.getText().toString().trim();
         String lastName = lastNameInput.getText().toString().trim();
         String birthday = birthdayInput.getText().toString().trim();
+        String email = emailInput.getText().toString().trim();
         String phoneNumber = phoneNumberInput.getText().toString().trim();
 
         String clickedRole = getIntent().getStringExtra("clickedRole");
@@ -154,6 +167,7 @@ public class SignupDetailsActivity extends AppCompatActivity {
         intent.putExtra("firstName", firstName);
         intent.putExtra("lastName", lastName);
         intent.putExtra("birthday", birthday);
+        intent.putExtra("email", email);
         intent.putExtra("phoneNumber", phoneNumber);
         if (getIntent().hasExtra("clickedRole")) {
             intent.putExtra("clickedRole", clickedRole);

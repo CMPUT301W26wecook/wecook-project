@@ -25,9 +25,14 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
     private final Set<String> selectedEntrantIds = new HashSet<>();
     private String expandedActionEntrantId;
     private final OnDeleteClickListener onDeleteClickListener;
+    private OnSelectionChangedListener onSelectionChangedListener;
 
     public interface OnDeleteClickListener {
         void onDelete(OrganizerWaitlistItem item);
+    }
+
+    public interface OnSelectionChangedListener {
+        void onSelectionChanged(int selectedCount);
     }
 
     public OrganizerWaitlistAdapter(OnDeleteClickListener onDeleteClickListener) {
@@ -59,6 +64,7 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
             } else {
                 selectedEntrantIds.remove(entrantId);
             }
+            notifySelectionChanged();
         });
 
         holder.mainRow.setBackgroundResource(isExpanded
@@ -102,6 +108,7 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
         items.clear();
         items.addAll(newItems);
         notifyDataSetChanged();
+        notifySelectionChanged();
     }
 
     public List<String> getCurrentEntrantIds() {
@@ -114,6 +121,16 @@ public class OrganizerWaitlistAdapter extends RecyclerView.Adapter<OrganizerWait
 
     public List<String> getSelectedEntrantIds() {
         return new ArrayList<>(selectedEntrantIds);
+    }
+
+    public void setOnSelectionChangedListener(OnSelectionChangedListener listener) {
+        this.onSelectionChangedListener = listener;
+    }
+
+    private void notifySelectionChanged() {
+        if (onSelectionChangedListener != null) {
+            onSelectionChangedListener.onSelectionChanged(selectedEntrantIds.size());
+        }
     }
 
     static class WaitlistViewHolder extends RecyclerView.ViewHolder {

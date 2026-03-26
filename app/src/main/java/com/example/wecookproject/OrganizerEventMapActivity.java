@@ -1,24 +1,31 @@
 package com.example.wecookproject;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
-import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.GeoPoint;
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import org.osmdroid.config.Configuration;
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase;
+import org.osmdroid.tileprovider.tilesource.XYTileSource;
+import org.osmdroid.util.BoundingBox;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.FolderOverlay;
+import org.osmdroid.views.overlay.Marker;
 
+import java.io.File;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,9 +41,24 @@ import java.util.Objects;
  *   workflow.
  */
 
-public class OrganizerEventMapActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class OrganizerEventMapActivity extends AppCompatActivity {
+    private static final String TAG = "OrganizerEventMap";
+    private static final OnlineTileSourceBase OSM_XYZ_TILE_SOURCE = new XYTileSource(
+            "OSM-XYZ",
+            0,
+            19,
+            256,
+            ".png",
+            new String[]{
+                    "https://a.tile.openstreetmap.org/",
+                    "https://b.tile.openstreetmap.org/",
+                    "https://c.tile.openstreetmap.org/"
+            }
+    );
+
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
-    private GoogleMap googleMap;
+    private MapView mapView;
+    private FolderOverlay entrantMarkersOverlay;
     private String eventId;
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
@@ -49,6 +71,21 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        SharedPreferences osmdroidPrefs = getSharedPreferences("osmdroid", MODE_PRIVATE);
+        File osmdroidBase = new File(getCacheDir(), "osmdroid");
+        File osmdroidTiles = new File(osmdroidBase, "tiles");
+        if (!osmdroidBase.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            osmdroidBase.mkdirs();
+        }
+        if (!osmdroidTiles.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            osmdroidTiles.mkdirs();
+        }
+        Configuration.getInstance().setOsmdroidBasePath(osmdroidBase);
+        Configuration.getInstance().setOsmdroidTileCache(osmdroidTiles);
+        Configuration.getInstance().load(getApplicationContext(), osmdroidPrefs);
+        Configuration.getInstance().setUserAgentValue(getPackageName() + "/1.0 (wecook-project)");
         setContentView(R.layout.activity_organizer_event_map);
 
         eventId = getIntent().getStringExtra("eventId");
@@ -73,11 +110,20 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
                     });
         });
 
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map_fragment);
-        if (mapFragment != null) {
-            mapFragment.getMapAsync(this);
-        } else {
+        mapView = findViewById(R.id.map_view);
+        if (mapView == null) {
             Toast.makeText(this, "Map initialization failed", Toast.LENGTH_SHORT).show();
+        } else {
+            mapView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            mapView.setTileSource(OSM_XYZ_TILE_SOURCE);
+            Log.i(TAG, "Tile source set to: " + mapView.getTileProvider().getTileSource().name());
+            mapView.setUseDataConnection(true);
+            mapView.setTilesScaledToDpi(true);
+            mapView.setMultiTouchControls(true);
+            mapView.getController().setZoom(3.0);
+            entrantMarkersOverlay = new FolderOverlay();
+            mapView.getOverlays().add(entrantMarkersOverlay);
+            logTileProbe();
         }
 
         loadEventHeader();
@@ -101,23 +147,28 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
         });
 
         findViewById(R.id.btn_back_to_event).setOnClickListener(v -> finish());
+        findViewById(R.id.iv_back).setOnClickListener(v -> finish());
 
         findViewById(R.id.btn_show_qr).setOnClickListener(v -> {
             // TODO: show QR code dialog
         });
     }
 
-    /**
-     * Receives map readiness callback and loads location markers.
-     *
-     * @param map initialized GoogleMap instance
-     */
     @Override
-    public void onMapReady(GoogleMap map) {
-        googleMap = map;
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        googleMap.getUiSettings().setMapToolbarEnabled(true);
+    protected void onResume() {
+        super.onResume();
+        if (mapView != null) {
+            mapView.onResume();
+        }
         loadEntrantLocations();
+    }
+
+    @Override
+    protected void onPause() {
+        if (mapView != null) {
+            mapView.onPause();
+        }
+        super.onPause();
     }
 
     /**
@@ -150,41 +201,85 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
      * Loads and renders entrant location markers on the map.
      */
     private void loadEntrantLocations() {
-        if (googleMap == null) {
+        if (mapView == null) {
             return;
         }
 
         db.collection("events").document(eventId).get()
-                .addOnSuccessListener(snapshot -> {
-                    if (!snapshot.exists()) {
-                        Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
-                        finish();
-                        return;
-                    }
-
-                    googleMap.clear();
-                    List<MarkerData> markers = extractMarkers(snapshot.get("waitlistEntrantLocations"));
-                    if (markers.isEmpty()) {
-                        Toast.makeText(this, "No waitlist locations yet", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    LatLngBounds.Builder boundsBuilder = new LatLngBounds.Builder();
-                    for (MarkerData marker : markers) {
-                        LatLng latLng = new LatLng(marker.latitude, marker.longitude);
-                        googleMap.addMarker(new MarkerOptions().position(latLng).title(marker.title));
-                        boundsBuilder.include(latLng);
-                    }
-
-                    if (markers.size() == 1) {
-                        MarkerData single = markers.get(0);
-                        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                                new LatLng(single.latitude, single.longitude), 13f));
-                    } else {
-                        googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 120));
-                    }
-                })
+                .addOnSuccessListener(this::renderEntrantLocations)
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load waitlist locations", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Renders entrant map markers when geolocation requirement is enabled.
+     *
+     * @param snapshot event snapshot
+     */
+    private void renderEntrantLocations(DocumentSnapshot snapshot) {
+        if (!snapshot.exists()) {
+            Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        if (entrantMarkersOverlay != null) {
+            entrantMarkersOverlay.getItems().clear();
+        }
+        Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
+        boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
+        if (!geolocationRequired) {
+            Toast.makeText(this, "Enable geolocation requirement to view entrant pins", Toast.LENGTH_SHORT).show();
+            mapView.invalidate();
+            return;
+        }
+
+        List<MarkerData> markers = extractMarkers(snapshot.get("waitlistEntrantLocations"));
+        if (markers.isEmpty()) {
+            int waitlistCount = getListSize(snapshot.get("waitlistEntrantIds"));
+            int selectedCount = getListSize(snapshot.get("selectedEntrantIds"));
+            int acceptedCount = getListSize(snapshot.get("acceptedEntrantIds"));
+            int totalRegistrations = waitlistCount + selectedCount + acceptedCount;
+            if (totalRegistrations > 0) {
+                Toast.makeText(this,
+                        "Found " + totalRegistrations + " registrations but 0 stored map coordinates",
+                        Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "No waitlist locations yet", Toast.LENGTH_SHORT).show();
+            }
+            mapView.invalidate();
+            return;
+        }
+
+        List<org.osmdroid.util.GeoPoint> points = new ArrayList<>();
+        for (MarkerData marker : markers) {
+            org.osmdroid.util.GeoPoint geoPoint = new org.osmdroid.util.GeoPoint(marker.latitude, marker.longitude);
+            Marker markerOverlay = new Marker(mapView);
+            markerOverlay.setPosition(geoPoint);
+            markerOverlay.setTitle(marker.title);
+            if (entrantMarkersOverlay != null) {
+                entrantMarkersOverlay.add(markerOverlay);
+            }
+            points.add(geoPoint);
+        }
+
+        if (markers.size() == 1) {
+            MarkerData single = markers.get(0);
+            mapView.getController().animateTo(new org.osmdroid.util.GeoPoint(single.latitude, single.longitude));
+            mapView.getController().setZoom(13.0);
+        } else {
+            BoundingBox boundingBox = BoundingBox.fromGeoPoints(points);
+            double latSpan = Math.abs(boundingBox.getLatNorth() - boundingBox.getLatSouth());
+            double lonSpan = Math.abs(boundingBox.getLonEast() - boundingBox.getLonWest());
+            if (latSpan < 0.0005 && lonSpan < 0.0005) {
+                org.osmdroid.util.GeoPoint center = points.get(0);
+                mapView.getController().animateTo(center);
+                mapView.getController().setZoom(14.0);
+            } else {
+                mapView.zoomToBoundingBox(boundingBox, true, 120);
+            }
+        }
+        mapView.invalidate();
+        Toast.makeText(this, "Loaded " + markers.size() + " entrant location pin(s)", Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -211,6 +306,10 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
                 Map<?, ?> nestedMap = (Map<?, ?>) value;
                 Object latObj = nestedMap.get("lat");
                 Object lngObj = nestedMap.get("lng");
+                if (!(latObj instanceof Number) || !(lngObj instanceof Number)) {
+                    latObj = nestedMap.get("latitude");
+                    lngObj = nestedMap.get("longitude");
+                }
                 if (latObj instanceof Number && lngObj instanceof Number) {
                     geoPoint = new GeoPoint(((Number) latObj).doubleValue(), ((Number) lngObj).doubleValue());
                 }
@@ -222,6 +321,35 @@ public class OrganizerEventMapActivity extends AppCompatActivity implements OnMa
             }
         }
         return markers;
+    }
+
+    private int getListSize(Object value) {
+        if (!(value instanceof List<?>)) {
+            return 0;
+        }
+        return ((List<?>) value).size();
+    }
+
+    private void logTileProbe() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("https://tile.openstreetmap.org/0/0/0.png");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(6000);
+                connection.setReadTimeout(6000);
+                connection.setRequestProperty("User-Agent", getPackageName() + "/1.0 (wecook-project)");
+                int code = connection.getResponseCode();
+                Log.i(TAG, "Tile probe HTTP status: " + code);
+            } catch (Exception e) {
+                Log.e(TAG, "Tile probe failed", e);
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }).start();
     }
 
     /**

@@ -17,8 +17,10 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
     private final List<OrganizerInvitedEntrantItem> allEntrants = new ArrayList<>();
@@ -62,6 +64,14 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         }
 
         loadInvitedEntrants();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (eventId != null && !eventId.trim().isEmpty()) {
+            loadInvitedEntrants();
+        }
     }
 
     private void setupBottomNav() {
@@ -108,7 +118,9 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         searchView.clearFocus();
 
         SearchAutoComplete searchText = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
+        searchView.setQueryHint("Search by entrant name, phone, or email");
         if (searchText != null) {
+            searchText.setHint("Search by entrant name, phone, or email");
             searchText.setFocusable(true);
             searchText.setFocusableInTouchMode(true);
             searchText.setCursorVisible(true);
@@ -148,7 +160,12 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     List<String> acceptedIds = readStringList(eventDoc, "acceptedEntrantIds");
                     List<String> cancelledIds = readStringList(eventDoc, "declinedEntrantIds");
 
-                    if (invitedIds.isEmpty()) {
+                    Set<String> allInvitedIds = new LinkedHashSet<>();
+                    allInvitedIds.addAll(invitedIds);
+                    allInvitedIds.addAll(acceptedIds);
+                    allInvitedIds.addAll(cancelledIds);
+
+                    if (allInvitedIds.isEmpty()) {
                         allEntrants.clear();
                         adapter.submitList(new ArrayList<>());
                         showEmptyState(true);
@@ -156,17 +173,31 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     }
 
                     List<OrganizerInvitedEntrantItem> loaded = new ArrayList<>();
-                    final int[] pending = {invitedIds.size()};
+                    final int[] pending = {allInvitedIds.size()};
 
-                    for (String entrantId : invitedIds) {
+                    for (String entrantId : allInvitedIds) {
                         db.collection("users").document(entrantId).get()
-                                .addOnSuccessListener(userDoc -> {
-                                    loaded.add(toInvitedItem(entrantId, userDoc, acceptedIds, cancelledIds));
-                                    pending[0]--;
-                                    if (pending[0] == 0) {
-                                        onInvitedLoaded(loaded);
-                                    }
-                                })
+                                .addOnSuccessListener(userDoc ->
+                                        db.collection("users")
+                                                .document(entrantId)
+                                                .collection("eventHistory")
+                                                .document(eventId)
+                                                .get()
+                                                .addOnSuccessListener(historyDoc -> {
+                                                    loaded.add(toInvitedItem(entrantId, userDoc, historyDoc, acceptedIds, cancelledIds));
+                                                    pending[0]--;
+                                                    if (pending[0] == 0) {
+                                                        onInvitedLoaded(loaded);
+                                                    }
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    loaded.add(toInvitedItem(entrantId, userDoc, null, acceptedIds, cancelledIds));
+                                                    pending[0]--;
+                                                    if (pending[0] == 0) {
+                                                        onInvitedLoaded(loaded);
+                                                    }
+                                                })
+                                )
                                 .addOnFailureListener(e -> {
                                     loaded.add(new OrganizerInvitedEntrantItem(entrantId, entrantId, OrganizerInvitedEntrantAdapter.STATUS_PENDING));
                                     pending[0]--;
@@ -183,22 +214,26 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
     }
 
     private OrganizerInvitedEntrantItem toInvitedItem(String entrantId, DocumentSnapshot userDoc,
+                                                      DocumentSnapshot historyDoc,
                                                       List<String> acceptedIds, List<String> cancelledIds) {
         String firstName = safe(userDoc.getString("firstName"));
         String lastName = safe(userDoc.getString("lastName"));
+        String phoneNumber = safe(userDoc.getString("phoneNumber"));
+        String email = safe(userDoc.getString("email"));
         String displayName = (firstName + " " + lastName).trim();
         if (displayName.isEmpty()) {
             displayName = entrantId;
         }
 
+        String historyStatus = historyDoc == null ? "" : safe(historyDoc.getString("status")).toLowerCase(Locale.ROOT);
         String status = OrganizerInvitedEntrantAdapter.STATUS_PENDING;
-        if (acceptedIds.contains(entrantId)) {
+        if ("accepted".equals(historyStatus) || acceptedIds.contains(entrantId)) {
             status = OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED;
-        } else if (cancelledIds.contains(entrantId)) {
+        } else if ("rejected".equals(historyStatus) || cancelledIds.contains(entrantId)) {
             status = OrganizerInvitedEntrantAdapter.STATUS_CANCELLED;
         }
 
-        return new OrganizerInvitedEntrantItem(entrantId, displayName, status);
+        return new OrganizerInvitedEntrantItem(entrantId, displayName, phoneNumber, email, status);
     }
 
     private void onInvitedLoaded(List<OrganizerInvitedEntrantItem> loaded) {
@@ -216,7 +251,9 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     || ("accepted".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED.equals(item.getStatus()))
                     || ("cancelled".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_CANCELLED.equals(item.getStatus()));
             boolean textMatch = normalized.isEmpty()
-                    || item.getDisplayName().toLowerCase(Locale.ROOT).contains(normalized);
+                    || item.getDisplayName().toLowerCase(Locale.ROOT).contains(normalized)
+                    || item.getPhoneNumber().toLowerCase(Locale.ROOT).contains(normalized)
+                    || item.getEmail().toLowerCase(Locale.ROOT).contains(normalized);
 
             if (statusMatch && textMatch) {
                 filtered.add(item);

@@ -16,10 +16,11 @@ public class OrganizerWaitlistItemTest {
 
     @Test
     public void matches_withDisplayNameOrSubtitleOrId_returnsTrue() {
-        OrganizerWaitlistItem item = new OrganizerWaitlistItem("abc123", "Alice Smith", "Edmonton");
+        OrganizerWaitlistItem item = new OrganizerWaitlistItem("abc123", "Alice Smith", "Edmonton", "7801234567");
 
         assertTrue(item.matches("alice"));
         assertTrue(item.matches("edmonton"));
+        assertTrue(item.matches("7801"));
         assertTrue(item.matches("abc"));
         assertFalse(item.matches("calgary"));
     }
