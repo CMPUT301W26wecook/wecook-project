@@ -98,6 +98,8 @@ public class UserEventActivity extends AppCompatActivity {
         rvEvents = findViewById(R.id.rv_events);
         tvEmptyState = findViewById(R.id.tv_empty_state);
         bottomNav = findViewById(R.id.bottom_nav);
+        findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
+                startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
         rvEvents.setLayoutManager(new LinearLayoutManager(this));
         eventAdapter = new UserEventAdapter(eventList, this::showEventDetailsDialog);

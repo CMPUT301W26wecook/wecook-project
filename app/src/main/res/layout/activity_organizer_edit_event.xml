@@ -178,12 +178,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Registration Start Date (YYYY-MM-DD)">
+                android:hint="Registration Start Time (YYYY-MM-DD HH:mm)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_registration_start_date"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
+                    android:inputType="none"
                     android:focusable="false"
                     android:clickable="true" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -194,12 +194,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Registration End Date (YYYY-MM-DD)">
+                android:hint="Registration End Time (YYYY-MM-DD HH:mm)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_registration_end_date"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
+                    android:inputType="none"
                     android:focusable="false"
                     android:clickable="true" />
             </com.google.android.material.textfield.TextInputLayout>

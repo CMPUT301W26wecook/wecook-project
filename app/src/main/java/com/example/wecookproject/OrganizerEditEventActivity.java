@@ -5,13 +5,16 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.text.InputType;
 import android.webkit.MimeTypeMap;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.wecookproject.model.Event;
@@ -43,9 +46,11 @@ import java.util.Locale;
  *   as connecting to Firebase storage require addition setup that might incur extra costs.
  */
 public class OrganizerEditEventActivity extends AppCompatActivity {
-    private Date registrationStartDate;
-    private Date registrationEndDate;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
+
+    private Date existingRegistrationStartDate;
+    private Date existingRegistrationEndDate;
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
     private String eventId;
     private FirebaseFirestore db;
     private FirebaseStorage storage;
@@ -73,6 +78,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_organizer_edit_event);
+        dateFormat.setLenient(false);
         db = FirebaseFirestore.getInstance();
         storage = FirebaseStorage.getInstance();
         eventId = getIntent().getStringExtra("eventId");
@@ -98,9 +104,10 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 this::handlePosterSelection
         );
 
-        // Set up date pickers for registration dates
-        etRegistrationStartDate.setOnClickListener(v -> showStartDatePicker(etRegistrationStartDate));
-        etRegistrationEndDate.setOnClickListener(v -> showEndDatePicker(etRegistrationEndDate));
+        etRegistrationStartDate.setOnClickListener(v ->
+                showDatePicker(etRegistrationStartDate, "Registration Start Time"));
+        etRegistrationEndDate.setOnClickListener(v ->
+                showDatePicker(etRegistrationEndDate, "Registration End Time"));
 
         loadCurrentPosterUrl();
         flPosterUpload.setOnClickListener(v -> posterPickerLauncher.launch("image/*"));
@@ -137,58 +144,6 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Opens date picker for registration start date.
-     *
-     * @param editText target input field
-     */
-    private void showStartDatePicker(TextInputEditText editText) {
-        Calendar calendar = Calendar.getInstance();
-        DatePickerDialog datePickerDialog = new DatePickerDialog(
-            this,
-            (view, year, month, dayOfMonth) -> {
-                calendar.set(year, month, dayOfMonth);
-                registrationStartDate = calendar.getTime();
-                editText.setText(dateFormat.format(registrationStartDate));
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        );
-        datePickerDialog.show();
-    }
-
-    /**
-     * Opens date picker for registration end date.
-     *
-     * @param editText target input field
-     */
-    private void showEndDatePicker(TextInputEditText editText) {
-        Calendar calendar = Calendar.getInstance();
-        if (registrationStartDate != null) {
-            calendar.setTime(registrationStartDate);
-        }
-        
-        DatePickerDialog datePickerDialog = new DatePickerDialog(
-            this,
-            (view, year, month, dayOfMonth) -> {
-                calendar.set(year, month, dayOfMonth);
-                registrationEndDate = calendar.getTime();
-                editText.setText(dateFormat.format(registrationEndDate));
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        );
-        
-        // Set minimum date to start date if selected
-        if (registrationStartDate != null) {
-            datePickerDialog.getDatePicker().setMinDate(registrationStartDate.getTime());
-        }
-        
-        datePickerDialog.show();
-    }
-
-    /**
      * Validates changed fields and submits event updates.
      */
     private void updateEvent() {
@@ -198,6 +153,8 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         tilMaxWaitlist.setError(null);
 
         String eventName = getTrimmedText(etEventName);
+        String registrationStartText = getTrimmedText(etRegistrationStartDate);
+        String registrationEndText = getTrimmedText(etRegistrationEndDate);
         String maxWaitlistText = getTrimmedText(etMaxWaitlist);
 
         boolean hasError = false;
@@ -207,12 +164,33 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             updates.put("eventName", eventName);
         }
 
-        if (registrationStartDate != null) {
+        Date registrationStartDate = parseDateTime(registrationStartText);
+        Date registrationEndDate = parseDateTime(registrationEndText);
+
+        if (!TextUtils.isEmpty(registrationStartText) && registrationStartDate != null) {
             updates.put("registrationStartDate", registrationStartDate);
         }
 
-        if (registrationEndDate != null) {
+        if (!TextUtils.isEmpty(registrationEndText) && registrationEndDate != null) {
             updates.put("registrationEndDate", registrationEndDate);
+        }
+
+        Date effectiveStartDate = registrationStartDate != null ? registrationStartDate : existingRegistrationStartDate;
+        Date effectiveEndDate = registrationEndDate != null ? registrationEndDate : existingRegistrationEndDate;
+        Date now = new Date();
+        boolean invalidStartTime = effectiveStartDate == null || effectiveStartDate.before(now);
+        boolean invalidEndTime = effectiveEndDate == null
+                || effectiveEndDate.before(now)
+                || (effectiveStartDate != null && effectiveEndDate.before(effectiveStartDate));
+        if (invalidStartTime && invalidEndTime) {
+            Toast.makeText(this, "invalid start and end time", Toast.LENGTH_SHORT).show();
+            hasError = true;
+        } else if (invalidStartTime) {
+            Toast.makeText(this, "invalid start time", Toast.LENGTH_SHORT).show();
+            hasError = true;
+        } else if (invalidEndTime) {
+            Toast.makeText(this, "invalid end time", Toast.LENGTH_SHORT).show();
+            hasError = true;
         }
 
         if (!TextUtils.isEmpty(maxWaitlistText)) {
@@ -337,6 +315,14 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                 .document(eventId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
+                    existingRegistrationStartDate = documentSnapshot.getDate("registrationStartDate");
+                    existingRegistrationEndDate = documentSnapshot.getDate("registrationEndDate");
+                    if (existingRegistrationStartDate != null) {
+                        etRegistrationStartDate.setText(dateFormat.format(existingRegistrationStartDate));
+                    }
+                    if (existingRegistrationEndDate != null) {
+                        etRegistrationEndDate.setText(dateFormat.format(existingRegistrationEndDate));
+                    }
                     originalPosterUrl = documentSnapshot.getString("posterPath");
                     if (TextUtils.isEmpty(originalPosterUrl)) {
                         originalPosterUrl = documentSnapshot.getString("posterUrl");
@@ -396,4 +382,83 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
     }
 
+    private Date parseDateTime(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return null;
+        }
+        try {
+            return dateFormat.parse(value);
+        } catch (java.text.ParseException e) {
+            return null;
+        }
+    }
+
+    private void showDatePicker(TextInputEditText targetView, String dialogTitle) {
+        Calendar calendar = Calendar.getInstance();
+        Date existingValue = parseDateTime(getTrimmedText(targetView));
+        if (existingValue != null) {
+            calendar.setTime(existingValue);
+        }
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    calendar.set(year, month, dayOfMonth);
+                    showTimeInputDialog(targetView, dialogTitle, calendar);
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+        );
+        datePickerDialog.show();
+    }
+
+    private void showTimeInputDialog(TextInputEditText targetView, String dialogTitle, Calendar calendar) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, padding, padding, 0);
+
+        TextInputEditText hourInput = new TextInputEditText(this);
+        hourInput.setHint("Hour (0-23)");
+        hourInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+
+        TextInputEditText minuteInput = new TextInputEditText(this);
+        minuteInput.setHint("Minute (0-59)");
+        minuteInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+
+        container.addView(hourInput);
+        container.addView(minuteInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(dialogTitle)
+                .setView(container)
+                .setPositiveButton("OK", (dialog, which) -> {
+                    Integer hour = parseTimePart(hourInput.getText() == null ? "" : hourInput.getText().toString().trim(), 23);
+                    Integer minute = parseTimePart(minuteInput.getText() == null ? "" : minuteInput.getText().toString().trim(), 59);
+                    if (hour == null || minute == null) {
+                        Toast.makeText(this, "Please enter a valid hour and minute", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    calendar.set(Calendar.HOUR_OF_DAY, hour);
+                    calendar.set(Calendar.MINUTE, minute);
+                    calendar.set(Calendar.SECOND, 0);
+                    calendar.set(Calendar.MILLISECOND, 0);
+                    targetView.setText(dateFormat.format(calendar.getTime()));
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private Integer parseTimePart(String value, int max) {
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < 0 || parsed > max) {
+                return null;
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 }

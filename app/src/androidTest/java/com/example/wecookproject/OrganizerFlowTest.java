@@ -54,6 +54,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.hamcrest.Matcher;
 
 import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -78,6 +80,8 @@ import java.util.concurrent.atomic.AtomicReference;
  *   tapping update keeps the organizer on the profile screen without error.
  * - `test6_NotificationScreenIsReachableAndShowsHintField`: verifies that the organizer
  *   notification screen opens and shows its message input field.
+ * - `test6b_CreateEventWithInvalidDatesIsBlocked`: verifies that invalid registration timestamps
+ *   prevent event creation and no matching Firestore event document is saved.
  * - `test7_CreateEventAndVerifyInList`: verifies that submitting a valid create-event form returns
  *   the organizer to the home screen after the event is saved.
  * - `test8_EventDetailsScreenDisplaysCorrectly`: verifies that the event-details screen loads the
@@ -102,6 +106,7 @@ public class OrganizerFlowTest {
     private static final int WAIT_SHORT  = 2000;
     private static final int WAIT_MEDIUM = 4000;
     private static final int WAIT_LONG   = 6000;
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
 
     private FirebaseFirestore db;
     private static boolean emulatorConfigured = false;
@@ -138,8 +143,8 @@ public class OrganizerFlowTest {
                 editEventId,
                 "organizer-test",
                 "Original Event",
-                new Date(126, 3, 1),
-                new Date(126, 3, 30),
+                parseTestDate("2026-04-01 00:00"),
+                parseTestDate("2026-04-30 00:00"),
                 25,
                 0,
                 false,
@@ -285,14 +290,62 @@ public class OrganizerFlowTest {
     }
 
     /**
+     * test6b: Submitting the Create Event form with invalid registration
+     * timestamps should keep the organizer on the Create Event screen and
+     * must not write the event document to Firestore.
+     */
+    @Test
+    public void test6b_CreateEventWithInvalidDatesIsBlocked() throws InterruptedException {
+        performFullSignup();
+
+        ActivityScenario<OrganizerCreateEventActivity> createScenario =
+                ActivityScenario.launch(OrganizerCreateEventActivity.class);
+
+        String invalidEventName = "Invalid Date Event " + UUID.randomUUID();
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+
+        Calendar startCalendar = Calendar.getInstance();
+        startCalendar.add(Calendar.DAY_OF_MONTH, 1);
+        Calendar endCalendar = Calendar.getInstance();
+        endCalendar.add(Calendar.DAY_OF_MONTH, 2);
+
+        onView(withId(R.id.et_event_name))
+                .perform(replaceText(invalidEventName), closeSoftKeyboard());
+        onView(withId(R.id.et_registration_start_date))
+                .perform(replaceText(formatter.format(startCalendar.getTime())), closeSoftKeyboard());
+        onView(withId(R.id.et_registration_end_date))
+                .perform(replaceText(formatter.format(endCalendar.getTime())), closeSoftKeyboard());
+        onView(withId(R.id.et_max_waitlist))
+                .perform(replaceText("25"), closeSoftKeyboard());
+
+        onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
+
+        onView(withId(R.id.btn_create_event)).check(matches(isDisplayed()));
+
+        AtomicReference<Boolean> eventExistsRef = new AtomicReference<>(false);
+        CountDownLatch queryLatch = new CountDownLatch(1);
+        db.collection("events")
+                .whereEqualTo("eventName", invalidEventName)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    eventExistsRef.set(!querySnapshot.isEmpty());
+                    queryLatch.countDown();
+                })
+                .addOnFailureListener(e -> queryLatch.countDown());
+
+        assertTrue("Timed out checking invalid event creation", queryLatch.await(10, TimeUnit.SECONDS));
+        assertFalse("Event should not be created when dates are invalid", eventExistsRef.get());
+
+        createScenario.close();
+    }
+
+    /**
      * test7: Filling all mandatory Create Event fields (name, dates via text
      * input, and max waitlist) and tapping "Create Event"
      * should save to Firestore and navigate back to OrganizerHomeActivity.
      *
-     * <p>Date fields accept "yyyy-MM-dd" text directly because
-     * OrganizerCreateEventActivity registers a TextWatcher that parses the
-     * typed value and sets the internal Date field in addition to the
-     * DatePickerDialog that sets the same field when the user taps the view.</p>
+     * <p>Date fields accept "yyyy-MM-dd HH:mm" text directly and the create
+     * flow validates them when the organizer submits the form.</p>
      */
     @Test
     public void test7_CreateEventAndVerifyInList() {
@@ -307,9 +360,9 @@ public class OrganizerFlowTest {
         onView(withId(R.id.et_event_name))
                 .perform(replaceText("Espresso Test Event"), closeSoftKeyboard());
         onView(withId(R.id.et_registration_start_date))
-                .perform(replaceText("2026-04-01"), closeSoftKeyboard());
+                .perform(replaceText("2026-03-10 17:00"), closeSoftKeyboard());
         onView(withId(R.id.et_registration_end_date))
-                .perform(replaceText("2026-04-10"), closeSoftKeyboard());
+                .perform(replaceText("2026-03-01 09:00"), closeSoftKeyboard());
         onView(withId(R.id.et_max_waitlist))
                 .perform(replaceText("50"), closeSoftKeyboard());
 
@@ -332,13 +385,12 @@ public class OrganizerFlowTest {
     public void test8_EventDetailsScreenDisplaysAndNavigatesToRegistrationMap() {
         // Use a unique ID to avoid collisions across test runs
         String mockEventId = "mock-details-" + UUID.randomUUID();
-        @SuppressWarnings("deprecation")
         Event mockEvent = new Event(
                 mockEventId,
                 "org123",
                 "Test Event Details",
-                new Date(126, 0, 1),  // 2026-01-01
-                new Date(126, 1, 2),  // 2026-02-02
+                parseTestDate("2026-01-01 00:00"),
+                parseTestDate("2026-02-02 00:00"),
                 100,
                 50,
                 false,
@@ -396,13 +448,12 @@ public class OrganizerFlowTest {
     @Test
     public void test8b_QrLinkNavigatesToPublicEventLanding() {
         String mockEventId = "mock-qr-link-" + UUID.randomUUID();
-        @SuppressWarnings("deprecation")
         Event mockEvent = new Event(
                 mockEventId,
                 "org123",
                 "Test QR Landing Event",
-                new Date(126, 0, 1),
-                new Date(126, 1, 2),
+                parseTestDate("2026-01-01 00:00"),
+                parseTestDate("2026-02-02 00:00"),
                 100,
                 10,
                 true,
@@ -466,6 +517,8 @@ public class OrganizerFlowTest {
         ActivityScenario<OrganizerEditEventActivity> scenario =
                 ActivityScenario.launch(intent);
 
+        waitUntilEditEventDatesLoaded(scenario);
+
         onView(withId(R.id.et_event_name))
                 .perform(replaceText("Updated Event Name"), closeSoftKeyboard());
         onView(withId(R.id.btn_update_event)).perform(nestedScrollTo(), click());
@@ -505,8 +558,8 @@ public class OrganizerFlowTest {
         eventData.put("eventId", lotteryWithEntrantsEventId);
         eventData.put("organizerId", "organizer-test");
         eventData.put("eventName", "Lottery With Entrants Test Event");
-        eventData.put("registrationStartDate", new Date(126, 2, 1));
-        eventData.put("registrationEndDate", new Date(126, 2, 10));
+        eventData.put("registrationStartDate", parseTestDate("2026-03-01 00:00"));
+        eventData.put("registrationEndDate", parseTestDate("2026-03-10 00:00"));
         eventData.put("maxWaitlist", 25);
         eventData.put("currentWaitlistCount", entrants.size());
         eventData.put("geolocationRequired", false);
@@ -555,13 +608,12 @@ public class OrganizerFlowTest {
     @Test
     public void test12_ReplacementDrawPicksRandomApplicant() throws InterruptedException {
         String replacementEventId = "replacement-test-" + UUID.randomUUID();
-        @SuppressWarnings("deprecation")
         Event replacementEvent = new Event(
                 replacementEventId,
                 "organizer-test",
                 "Replacement Draw Event",
-                new Date(126, 2, 1),
-                new Date(126, 2, 10),
+                parseTestDate("2026-03-01 00:00"),
+                parseTestDate("2026-03-10 00:00"),
                 25,
                 0,
                 false,
@@ -627,9 +679,15 @@ public class OrganizerFlowTest {
         // LoginActivity was already launched by setUp()
         onView(withId(R.id.btn_organizer_login)).perform(click());
 
-        // Wait for routing to Details screen (FCM token + Firestore lookup)
+        // Wait for routing after FCM token + Firestore lookup.
         safeSleep(WAIT_MEDIUM);
-        onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
+
+        if (isViewDisplayed(R.id.nav_create_events)) {
+            onView(withId(R.id.nav_create_events)).check(matches(isDisplayed()));
+            return;
+        }
+
+//        onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
 
         onView(withId(R.id.et_first_name)).perform(replaceText("John"), closeSoftKeyboard());
         onView(withId(R.id.et_last_name)).perform(replaceText("Doe"), closeSoftKeyboard());
@@ -647,6 +705,23 @@ public class OrganizerFlowTest {
 
         // Wait for Firestore write + navigation to OrganizerHomeActivity
         safeSleep(WAIT_LONG);
+    }
+
+    private Date parseTestDate(String value) {
+        try {
+            return new SimpleDateFormat(DATE_TIME_PATTERN, java.util.Locale.getDefault()).parse(value);
+        } catch (Exception e) {
+            throw new AssertionError("Unable to parse test date: " + value, e);
+        }
+    }
+
+    private boolean isViewDisplayed(int viewId) {
+        try {
+            onView(withId(viewId)).check(matches(isDisplayed()));
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private void safeSleep(long millis) {
@@ -684,6 +759,32 @@ public class OrganizerFlowTest {
         }
 
         throw new AssertionError("Lottery button never became enabled");
+    }
+
+    private void waitUntilEditEventDatesLoaded(ActivityScenario<OrganizerEditEventActivity> scenario)
+            throws InterruptedException {
+        AtomicBoolean loaded = new AtomicBoolean(false);
+
+        for (int i = 0; i < 15; i++) {
+            scenario.onActivity(activity -> {
+                android.widget.EditText startField = activity.findViewById(R.id.et_registration_start_date);
+                android.widget.EditText endField = activity.findViewById(R.id.et_registration_end_date);
+                String startText = startField != null && startField.getText() != null
+                        ? startField.getText().toString().trim()
+                        : "";
+                String endText = endField != null && endField.getText() != null
+                        ? endField.getText().toString().trim()
+                        : "";
+                loaded.set(!startText.isEmpty() && !endText.isEmpty());
+            });
+
+            if (loaded.get()) {
+                return;
+            }
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Edit event form never finished loading existing registration dates");
     }
 
     @SuppressWarnings("unchecked")

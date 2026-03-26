@@ -16,6 +16,7 @@ import java.util.Locale;
  * Utility helpers for user-event UI rendering.
  */
 public final class UserEventUiUtils {
+    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
     public static final String STATUS_OPEN = "open";
     public static final String STATUS_FULL = "full";
 
@@ -69,7 +70,7 @@ public final class UserEventUiUtils {
      */
     private static String formatTimestamp(Timestamp timestamp) {
         Date date = timestamp.toDate();
-        return new SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(date);
+        return new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault()).format(date);
     }
 
     /**
