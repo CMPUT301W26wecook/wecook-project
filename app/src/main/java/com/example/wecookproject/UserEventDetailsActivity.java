@@ -198,13 +198,13 @@ public class UserEventDetailsActivity extends AppCompatActivity {
 
         currentEvent = UserEventRecord.fromEventSnapshot(eventSnapshot, entrantId, historyStatus);
 
-        // If the organizer has selected this entrant in the lottery and their status is still
-        // "waitlisted", promote it to "invited" so the UI reflects the correct state.
+        // If the organizer has selected this entrant in the lottery, promote status to "invited"
+        // unless they have already accepted.
         List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
         boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
-        boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentEvent.getEffectiveStatus());
-        boolean isRejected = UserEventRecord.STATUS_REJECTED.equals(currentEvent.getEffectiveStatus());
-        if (isSelected && isStillWaitlisted && !isRejected) {
+        String effectiveStatus = currentEvent.getEffectiveStatus();
+        boolean isAccepted = UserEventRecord.STATUS_ACCEPTED.equals(effectiveStatus);
+        if (isSelected && !isAccepted) {
             currentEvent.setHistoryStatus(UserEventRecord.STATUS_INVITED);
             upsertHistoryDocument(UserEventRecord.STATUS_INVITED);
         }
@@ -385,15 +385,16 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      */
     private void declineInvitation() {
         // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
-        // The entrant stays off the waitlist and is not reconsidered in the rerun.
+        // The entrant is returned to the waitlist and can be considered again in reruns.
         db.collection("events").document(eventId)
                 .update(
                         "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
+                        "replacementEntrantIds", FieldValue.arrayRemove(entrantId),
                         "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
                         "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
                 )
                 .addOnSuccessListener(unused ->
-                        updateWaitlistMembership(false, UserEventRecord.STATUS_REJECTED, false, "Invitation declined", null)
+                        updateWaitlistMembership(true, UserEventRecord.STATUS_WAITLISTED, false, "Invitation declined", null)
                 )
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
@@ -433,9 +434,10 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             int maxWaitlist = maxWaitlistValue == null ? 0 : maxWaitlistValue.intValue();
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
+            GeoPoint existingEntrantLocation = snapshot.getGeoPoint("waitlistEntrantLocations." + entrantId);
 
             if (addEntrant) {
-                if (geolocationRequired && entrantLocation == null) {
+                if (geolocationRequired && entrantLocation == null && existingEntrantLocation == null) {
                     throw new IllegalStateException("Location is required to join this waitlist");
                 }
                 if (waitlistEntrants.contains(entrantId)) {

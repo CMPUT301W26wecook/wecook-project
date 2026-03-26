@@ -220,16 +220,14 @@ public class UserEventActivity extends AppCompatActivity {
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_WAITLISTED);
                         }
 
-                        // If the organizer has picked this entrant as a lottery winner and their
-                        // current status is still "waitlisted", promote it to "invited".
-                        // Do NOT re-promote users who already declined (cancelled).
+                        // If the organizer has picked this entrant as a lottery winner, promote
+                        // it to "invited" unless the entrant has already accepted.
                         List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(document, "selectedEntrantIds");
                         String currentStatus = historyStatuses.get(eventId);
                         boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
-                        boolean isStillWaitlisted = UserEventRecord.STATUS_WAITLISTED.equals(currentStatus)
-                                || UserEventRecord.STATUS_WAITLISTED.equals(eventRecord.getEffectiveStatus());
-                        boolean isCancelled = UserEventRecord.STATUS_REJECTED.equals(currentStatus);
-                        if (isSelected && isStillWaitlisted && !isCancelled) {
+                        boolean isAccepted = UserEventRecord.STATUS_ACCEPTED.equals(currentStatus)
+                                || UserEventRecord.STATUS_ACCEPTED.equals(eventRecord.getEffectiveStatus());
+                        if (isSelected && !isAccepted) {
                             eventRecord.setHistoryStatus(UserEventRecord.STATUS_INVITED);
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_INVITED);
                         }
@@ -523,18 +521,19 @@ public class UserEventActivity extends AppCompatActivity {
      */
     private void declineInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
         // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
-        // The entrant stays off the waitlist and is not reconsidered in the rerun.
+        // The entrant is returned to the waitlist and can be considered again in reruns.
         db.collection("events").document(eventRecord.getEventId())
                 .update(
                         "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
+                        "replacementEntrantIds", FieldValue.arrayRemove(entrantId),
                         "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
                         "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
                 )
                 .addOnSuccessListener(unused ->
                         updateWaitlistMembership(
                                 eventRecord,
-                                false,
-                                UserEventRecord.STATUS_REJECTED,
+                                true,
+                                UserEventRecord.STATUS_WAITLISTED,
                                 false,
                                 "Invitation declined",
                                 dialog,
@@ -583,9 +582,10 @@ public class UserEventActivity extends AppCompatActivity {
             int maxWaitlist = maxWaitlistValue == null ? 0 : maxWaitlistValue.intValue();
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
+            GeoPoint existingEntrantLocation = snapshot.getGeoPoint("waitlistEntrantLocations." + entrantId);
 
             if (addEntrant) {
-                if (geolocationRequired && entrantLocation == null) {
+                if (geolocationRequired && entrantLocation == null && existingEntrantLocation == null) {
                     throw new IllegalStateException("Location is required to join this waitlist");
                 }
                 if (waitlistEntrants.contains(entrantId)) {
