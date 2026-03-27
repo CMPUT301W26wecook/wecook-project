@@ -54,7 +54,7 @@
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_events_title" />
+        app:layout_constraintTop_toBottomOf="@id/ll_events_header" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_events"
@@ -69,7 +69,7 @@
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_events_title" />
+        app:layout_constraintTop_toBottomOf="@id/ll_events_header" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
