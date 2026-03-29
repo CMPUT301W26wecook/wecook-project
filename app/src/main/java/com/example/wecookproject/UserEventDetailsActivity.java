@@ -384,8 +384,8 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * Declines an invitation.
      */
     private void declineInvitation() {
-        // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
-        // The entrant is returned to the waitlist and can be considered again in reruns.
+        // Remove the entrant from selected/replacement pools and mark as declined.
+        // Declined entrants are not re-added to waitlist and are no longer eligible for lottery.
         db.collection("events").document(eventId)
                 .update(
                         "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
@@ -393,9 +393,12 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                         "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
                         "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
                 )
-                .addOnSuccessListener(unused ->
-                        updateWaitlistMembership(true, UserEventRecord.STATUS_WAITLISTED, false, "Invitation declined", null)
-                )
+                .addOnSuccessListener(unused -> {
+                    currentEvent.setHistoryStatus(UserEventRecord.STATUS_REJECTED);
+                    upsertHistoryDocument(UserEventRecord.STATUS_REJECTED);
+                    Toast.makeText(this, "Invitation declined", Toast.LENGTH_SHORT).show();
+                    loadEvent();
+                })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
                 );

@@ -520,8 +520,8 @@ public class UserEventActivity extends AppCompatActivity {
      * @param dialog details dialog
      */
     private void declineInvitation(UserEventRecord eventRecord, AlertDialog dialog) {
-        // Remove the entrant from selectedEntrantIds so the lottery can rerun to replace them.
-        // The entrant is returned to the waitlist and can be considered again in reruns.
+        // Remove the entrant from selected/replacement pools and mark as declined.
+        // Declined entrants are not re-added to waitlist and are no longer eligible for lottery.
         db.collection("events").document(eventRecord.getEventId())
                 .update(
                         "selectedEntrantIds", FieldValue.arrayRemove(entrantId),
@@ -529,17 +529,14 @@ public class UserEventActivity extends AppCompatActivity {
                         "declinedEntrantIds", FieldValue.arrayUnion(entrantId),
                         "acceptedEntrantIds", FieldValue.arrayRemove(entrantId)
                 )
-                .addOnSuccessListener(unused ->
-                        updateWaitlistMembership(
-                                eventRecord,
-                                true,
-                                UserEventRecord.STATUS_WAITLISTED,
-                                false,
-                                "Invitation declined",
-                                dialog,
-                                null
-                        )
-                )
+                .addOnSuccessListener(unused -> {
+                    eventRecord.setHistoryStatus(UserEventRecord.STATUS_REJECTED);
+                    upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_REJECTED);
+                    eventAdapter.notifyDataSetChanged();
+                    Toast.makeText(this, "Invitation declined", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                    loadEventsAndHistory();
+                })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
                 );
