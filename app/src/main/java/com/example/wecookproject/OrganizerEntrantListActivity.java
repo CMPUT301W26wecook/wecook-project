@@ -59,6 +59,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private final List<String> waitlistEntrantIds = new ArrayList<>();
     private final List<String> selectedEntrantIds = new ArrayList<>();
     private final List<String> replacementEntrantIds = new ArrayList<>();
+    private final List<String> declinedEntrantIds = new ArrayList<>();
     private int lotteryCount = 0;
     private Date registrationEndDate;
     private boolean waitlistLoaded = false;
@@ -311,6 +312,16 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                         }
                     }
 
+                    declinedEntrantIds.clear();
+                    Object rawDeclined = documentSnapshot.get("declinedEntrantIds");
+                    if (rawDeclined instanceof List<?>) {
+                        for (Object item : (List<?>) rawDeclined) {
+                            if (item instanceof String) {
+                                declinedEntrantIds.add((String) item);
+                            }
+                        }
+                    }
+
                     Object rawLotteryCount = documentSnapshot.get("lotteryCount");
                     if (rawLotteryCount instanceof Number) {
                         lotteryCount = ((Number) rawLotteryCount).intValue();
@@ -549,17 +560,20 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             return;
         }
 
-        if (waitlistEntrantIds.isEmpty()) {
+        List<String> eligiblePool = new ArrayList<>(waitlistEntrantIds);
+        eligiblePool.removeAll(declinedEntrantIds);
+
+        if (eligiblePool.isEmpty()) {
             Toast.makeText(this, "No entrants in the waitlist", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (lotteryCount > waitlistEntrantIds.size()) {
-            Toast.makeText(this, "Lottery number exceeds waitlist size", Toast.LENGTH_SHORT).show();
+        if (lotteryCount > eligiblePool.size()) {
+            Toast.makeText(this, "Lottery number exceeds eligible waitlist size", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        List<String> shuffledEntrants = new ArrayList<>(waitlistEntrantIds);
+        List<String> shuffledEntrants = new ArrayList<>(eligiblePool);
         java.util.Collections.shuffle(shuffledEntrants);
 
         List<String> selected = new ArrayList<>(shuffledEntrants.subList(0, lotteryCount));
@@ -631,6 +645,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             return;
         }
         List<String> pool = new ArrayList<>(waitlistEntrantIds);
+        pool.removeAll(declinedEntrantIds);
         pool.removeAll(selectedEntrantIds);
         pool.removeAll(replacementEntrantIds);
         if (pool.isEmpty()) {
