@@ -532,6 +532,7 @@ public class UserEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(unused -> {
                     eventRecord.setHistoryStatus(UserEventRecord.STATUS_REJECTED);
                     upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_REJECTED);
+                    triggerAutomaticReplacementDraw(eventRecord.getEventId());
                     eventAdapter.notifyDataSetChanged();
                     Toast.makeText(this, "Invitation declined", Toast.LENGTH_SHORT).show();
                     dialog.dismiss();
@@ -540,6 +541,60 @@ public class UserEventActivity extends AppCompatActivity {
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to decline invitation", Toast.LENGTH_SHORT).show()
                 );
+    }
+
+    private void triggerAutomaticReplacementDraw(String eventId) {
+        DocumentReference eventReference = db.collection("events").document(eventId);
+        db.runTransaction(transaction -> {
+            DocumentSnapshot snapshot = transaction.get(eventReference);
+            if (!snapshot.exists()) {
+                return false;
+            }
+
+            Long lotteryCountValue = snapshot.getLong("lotteryCount");
+            int lotteryCount = lotteryCountValue == null ? 0 : lotteryCountValue.intValue();
+            if (lotteryCount <= 0) {
+                return false;
+            }
+
+            List<String> waitlist = FirestoreFieldUtils.getStringList(snapshot, "waitlistEntrantIds");
+            waitlist = waitlist == null ? new ArrayList<>() : new ArrayList<>(waitlist);
+            List<String> selected = FirestoreFieldUtils.getStringList(snapshot, "selectedEntrantIds");
+            selected = selected == null ? new ArrayList<>() : new ArrayList<>(selected);
+            List<String> replacements = FirestoreFieldUtils.getStringList(snapshot, "replacementEntrantIds");
+            replacements = replacements == null ? new ArrayList<>() : new ArrayList<>(replacements);
+            List<String> declined = FirestoreFieldUtils.getStringList(snapshot, "declinedEntrantIds");
+            declined = declined == null ? new ArrayList<>() : new ArrayList<>(declined);
+
+            int vacancies = lotteryCount - selected.size();
+            if (vacancies <= 0) {
+                return false;
+            }
+
+            List<String> pool = new ArrayList<>(waitlist);
+            pool.removeAll(declined);
+            pool.removeAll(selected);
+            pool.removeAll(replacements);
+            if (pool.isEmpty()) {
+                return false;
+            }
+
+            java.util.Collections.shuffle(pool);
+            int drawCount = Math.min(vacancies, pool.size());
+            List<String> drawn = new ArrayList<>(pool.subList(0, drawCount));
+
+            selected.addAll(drawn);
+            replacements.addAll(drawn);
+            waitlist.removeAll(drawn);
+
+            transaction.update(eventReference,
+                    "selectedEntrantIds", selected,
+                    "replacementEntrantIds", replacements,
+                    "waitlistEntrantIds", waitlist,
+                    "currentWaitlistCount", waitlist.size(),
+                    "declinedEntrantIds", FieldValue.arrayRemove(drawn.toArray()));
+            return true;
+        });
     }
 
     /**
