@@ -124,6 +124,7 @@ public class SignupFlowTest {
         safeSleep(2000);
 
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("7805551234"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
 
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
@@ -163,6 +164,49 @@ public class SignupFlowTest {
 
         onView(withId(R.id.et_birthday)).perform(typeText("12251999"), closeSoftKeyboard());
         onView(withId(R.id.et_birthday)).check(matches(withText("12/25/1999")));
+    }
+
+    /** Invalid birthday format blocks entrant signup details. */
+    @Test
+    public void test8b_DetailsInvalidBirthdayBlocksNavigation() {
+        onView(withId(R.id.btn_entrant_login)).perform(click());
+        safeSleep(2000);
+
+        onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_birthday)).perform(typeText("13322020"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("7805551234"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
+    }
+
+    /** Invalid entrant email blocks signup details. */
+    @Test
+    public void test8c_DetailsInvalidEmailBlocksNavigation() {
+        onView(withId(R.id.btn_entrant_login)).perform(click());
+        safeSleep(2000);
+
+        onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
+        onView(withId(R.id.et_email)).perform(typeText("invalid-email"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("7805551234"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
+    }
+
+    /** Invalid entrant phone number blocks signup details. */
+    @Test
+    public void test8d_DetailsInvalidPhoneBlocksNavigation() {
+        onView(withId(R.id.btn_entrant_login)).perform(click());
+        safeSleep(2000);
+
+        onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
+        onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("12345"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        onView(withId(R.id.tv_screen_title)).check(matches(withText("Details")));
     }
 
     // ──────────────────────────────────────────────
@@ -226,6 +270,19 @@ public class SignupFlowTest {
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
     }
 
+    /** Address with invalid postal code blocks navigation. */
+    @Test
+    public void testDa_AddressInvalidPostalCodeBlocksNavigation() {
+        navigateToAddressScreen();
+
+        onView(withId(R.id.et_address_line_1)).perform(typeText("123 Main St"), closeSoftKeyboard());
+        onView(withId(R.id.et_city)).perform(typeText("Edmonton"), closeSoftKeyboard());
+        onView(withId(R.id.et_postal_code)).perform(typeText("12345"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
+    }
+
     // ──────────────────────────────────────────────
     //  Happy-path flows
     // ──────────────────────────────────────────────
@@ -244,6 +301,7 @@ public class SignupFlowTest {
         onView(withId(R.id.et_first_name)).perform(typeText("John"), closeSoftKeyboard());
         onView(withId(R.id.et_last_name)).perform(typeText("Doe"), closeSoftKeyboard());
         onView(withId(R.id.et_birthday)).perform(typeText("01012000"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("7805551234"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
         safeSleep(1500);
         onView(withId(R.id.tv_screen_title)).check(matches(withText("Address")));
@@ -269,6 +327,7 @@ public class SignupFlowTest {
 
         onView(withId(R.id.et_first_name)).perform(typeText("Jane"), closeSoftKeyboard());
         onView(withId(R.id.et_birthday)).perform(typeText("05051995"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("5875551212"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
         safeSleep(1500);
 
@@ -348,6 +407,7 @@ public class SignupFlowTest {
 
         onView(withId(R.id.et_first_name)).perform(typeText("Test"), closeSoftKeyboard());
         onView(withId(R.id.et_birthday)).perform(typeText("06061990"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(typeText("7805550000"), closeSoftKeyboard());
         onView(withId(R.id.btn_continue)).perform(click());
         safeSleep(1500);
 
