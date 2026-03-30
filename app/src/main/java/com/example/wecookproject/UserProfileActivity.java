@@ -15,6 +15,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 
@@ -41,6 +42,13 @@ public class UserProfileActivity extends AppCompatActivity {
     private TextInputEditText etCity;
     private TextInputEditText etPostalCode;
     private TextInputEditText etCountry;
+    private TextInputLayout tilFirstName;
+    private TextInputLayout tilBirthday;
+    private TextInputLayout tilEmail;
+    private TextInputLayout tilAddress;
+    private TextInputLayout tilCity;
+    private TextInputLayout tilPostalCode;
+    private TextInputLayout tilCountry;
 
     private FirebaseFirestore db;
     private String androidId;
@@ -73,6 +81,13 @@ public class UserProfileActivity extends AppCompatActivity {
         etCity = findViewById(R.id.et_city);
         etPostalCode = findViewById(R.id.et_postal_code);
         etCountry = findViewById(R.id.et_country);
+        tilFirstName = findViewById(R.id.til_first_name);
+        tilBirthday = findViewById(R.id.til_birthday);
+        tilEmail = findViewById(R.id.til_email);
+        tilAddress = findViewById(R.id.til_address);
+        tilCity = findViewById(R.id.til_city);
+        tilPostalCode = findViewById(R.id.til_postal_code);
+        tilCountry = findViewById(R.id.til_country);
 
         db = FirebaseFirestore.getInstance();
         androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -257,8 +272,25 @@ public class UserProfileActivity extends AppCompatActivity {
         String country = textOf(etCountry);
         boolean autoLogin = switchAutoLogin.isChecked();
 
-        if (firstName.isEmpty()) {
-            Toast.makeText(this, "First name cannot be empty", Toast.LENGTH_SHORT).show();
+        clearValidationErrors();
+        Map<String, String> errors = UserInputValidator.validateEntrantProfile(
+                firstName,
+                birthday,
+                email,
+                addressLine1,
+                city,
+                postalCode,
+                country
+        );
+        if (!errors.isEmpty()) {
+            applyError(tilFirstName, errors.get(UserInputValidator.FIELD_FIRST_NAME));
+            applyError(tilBirthday, errors.get(UserInputValidator.FIELD_BIRTHDAY));
+            applyError(tilEmail, errors.get(UserInputValidator.FIELD_EMAIL));
+            applyError(tilAddress, errors.get(UserInputValidator.FIELD_ADDRESS_LINE_1));
+            applyError(tilCity, errors.get(UserInputValidator.FIELD_CITY));
+            applyError(tilPostalCode, errors.get(UserInputValidator.FIELD_POSTAL_CODE));
+            applyError(tilCountry, errors.get(UserInputValidator.FIELD_COUNTRY));
+            Toast.makeText(this, errors.values().iterator().next(), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -356,5 +388,21 @@ public class UserProfileActivity extends AppCompatActivity {
      */
     private String textOf(TextInputEditText editText) {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
+    }
+
+    private void clearValidationErrors() {
+        tilFirstName.setError(null);
+        tilBirthday.setError(null);
+        tilEmail.setError(null);
+        tilAddress.setError(null);
+        tilCity.setError(null);
+        tilPostalCode.setError(null);
+        tilCountry.setError(null);
+    }
+
+    private void applyError(TextInputLayout layout, String error) {
+        if (error != null && !error.trim().isEmpty()) {
+            layout.setError(error);
+        }
     }
 }

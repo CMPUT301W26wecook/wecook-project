@@ -7,9 +7,12 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 import android.provider.Settings;
+
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,6 +37,10 @@ public class SignupAddressActivity extends AppCompatActivity {
         EditText etCity = findViewById(R.id.et_city);
         EditText etPostalCode = findViewById(R.id.et_postal_code);
         EditText etCountry = findViewById(R.id.et_country);
+        TextInputLayout tilAddressLine1 = findViewById(R.id.til_address_line_1);
+        TextInputLayout tilCity = findViewById(R.id.til_city);
+        TextInputLayout tilPostalCode = findViewById(R.id.til_postal_code);
+        TextInputLayout tilCountry = findViewById(R.id.til_country);
 
         backButton.setOnClickListener(v -> finish());
         continueButton.setOnClickListener(v -> handleContinue(
@@ -41,7 +48,11 @@ public class SignupAddressActivity extends AppCompatActivity {
                 etAddressLine2,
                 etCity,
                 etPostalCode,
-                etCountry
+                etCountry,
+                tilAddressLine1,
+                tilCity,
+                tilPostalCode,
+                tilCountry
         ));
     }
 
@@ -58,16 +69,16 @@ public class SignupAddressActivity extends AppCompatActivity {
                                 EditText addressLine2Input,
                                 EditText cityInput,
                                 EditText postalCodeInput,
-                                EditText countryInput) {
+                                EditText countryInput,
+                                TextInputLayout addressLine1Layout,
+                                TextInputLayout cityLayout,
+                                TextInputLayout postalCodeLayout,
+                                TextInputLayout countryLayout) {
         String addressLine1 = addressLine1Input.getText().toString().trim();
         String addressLine2 = addressLine2Input.getText().toString().trim();
         String city = cityInput.getText().toString().trim();
         String postalCode = postalCodeInput.getText().toString().trim();
         String country = countryInput.getText().toString().trim();
-        if (addressLine1.isEmpty() || city.isEmpty() || postalCode.isEmpty()) {
-            Toast.makeText(this, "Address line 1, City, and Postal code cannot be empty", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
         Intent intentFromDetails = getIntent();
         String firstName = intentFromDetails.getStringExtra("firstName");
@@ -77,6 +88,37 @@ public class SignupAddressActivity extends AppCompatActivity {
         String phoneNumber = intentFromDetails.getStringExtra("phoneNumber");
         String clickedRole = intentFromDetails.getStringExtra("clickedRole");
         String role = "ORGANIZER".equals(clickedRole) ? "organizer" : "entrant";
+
+        clearError(addressLine1Layout);
+        clearError(cityLayout);
+        clearError(postalCodeLayout);
+        clearError(countryLayout);
+
+        Map<String, String> detailErrors = UserInputValidator.validateSignupDetails(
+                "ORGANIZER".equals(clickedRole),
+                firstName,
+                lastName,
+                birthday,
+                email,
+                phoneNumber
+        );
+        Map<String, String> addressErrors = UserInputValidator.validateSignupAddress(
+                addressLine1,
+                city,
+                postalCode,
+                country
+        );
+        if (!detailErrors.isEmpty() || !addressErrors.isEmpty()) {
+            applyError(addressLine1Layout, addressErrors.get(UserInputValidator.FIELD_ADDRESS_LINE_1));
+            applyError(cityLayout, addressErrors.get(UserInputValidator.FIELD_CITY));
+            applyError(postalCodeLayout, addressErrors.get(UserInputValidator.FIELD_POSTAL_CODE));
+            applyError(countryLayout, addressErrors.get(UserInputValidator.FIELD_COUNTRY));
+            String message = !detailErrors.isEmpty()
+                    ? detailErrors.values().iterator().next()
+                    : addressErrors.values().iterator().next();
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         Map<String, Object> userData = new HashMap<>();
@@ -115,5 +157,15 @@ public class SignupAddressActivity extends AppCompatActivity {
         }
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
+    }
+
+    private void clearError(TextInputLayout layout) {
+        layout.setError(null);
+    }
+
+    private void applyError(TextInputLayout layout, String error) {
+        if (error != null && !error.trim().isEmpty()) {
+            layout.setError(error);
+        }
     }
 }
