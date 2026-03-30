@@ -128,6 +128,46 @@ public class UserFlowTest {
         onView(withId(R.id.et_last_name)).check(matches(withText("NewName")));
     }
 
+    @Test
+    public void test8_ProfileUpdateInvalidBirthdayBlocked() {
+        prepareTestUser();
+        ActivityScenario.launch(UserProfileActivity.class);
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.et_birthday)).perform(clearText(), typeText("13322020"));
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.btn_update)).check(matches(withText("Save Changes")));
+    }
+
+    @Test
+    public void test8b_ProfileUpdateInvalidEmailBlocked() {
+        prepareTestUser();
+        ActivityScenario.launch(UserProfileActivity.class);
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.et_email)).perform(clearText(), typeText("bad-email"));
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.btn_update)).check(matches(withText("Save Changes")));
+    }
+
+    @Test
+    public void test8c_ProfileUpdateInvalidPostalCodeBlocked() {
+        prepareTestUser();
+        ActivityScenario.launch(UserProfileActivity.class);
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.et_postal_code)).perform(clearText(), typeText("12345"));
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.btn_update)).check(matches(withText("Save Changes")));
+    }
+
+    @Test
+    public void test8d_ProfileUpdateEmptyRequiredFieldBlocked() {
+        prepareTestUser();
+        ActivityScenario.launch(UserProfileActivity.class);
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.et_city)).perform(clearText());
+        onView(withId(R.id.btn_update)).perform(click());
+        onView(withId(R.id.btn_update)).check(matches(withText("Save Changes")));
+    }
+
 //    @Test
 //    public void test8_ProfileNotificationToggle() {
 //        prepareTestUser();
@@ -245,6 +285,12 @@ public class UserFlowTest {
         Map<String, Object> user = new HashMap<>();
         user.put("firstName", "Integration");
         user.put("lastName", "Tester");
+        user.put("birthday", "01/01/2000");
+        user.put("email", "integration@test.com");
+        user.put("addressLine1", "123 Main St");
+        user.put("city", "Edmonton");
+        user.put("postalCode", "T6G 2R3");
+        user.put("country", "Canada");
         user.put("role", "entrant");
         user.put("profileCompleted", true);
         db.collection("users").document(androidId).set(user).addOnCompleteListener(t -> latch.countDown());
