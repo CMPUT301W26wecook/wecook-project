@@ -390,7 +390,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             return "Just now";
         }
         Date createdAt = timestamp.toDate();
-        SimpleDateFormat formatter = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.CANADA);
+        SimpleDateFormat formatter = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault());
         return formatter.format(createdAt);
     }
 
