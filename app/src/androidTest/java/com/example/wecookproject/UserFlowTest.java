@@ -2,8 +2,11 @@ package com.example.wecookproject;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.pressBack;
+import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.clearText;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.replaceText;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.action.ViewActions.typeText;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
@@ -153,7 +156,7 @@ public class UserFlowTest {
         prepareTestUser();
         ActivityScenario.launch(UserProfileActivity.class);
         onView(withId(R.id.btn_update)).perform(click());
-        onView(withId(R.id.et_postal_code)).perform(clearText(), typeText("12345"));
+        onView(withId(R.id.et_postal_code)).perform(scrollTo(), replaceText("12345"), closeSoftKeyboard());
         onView(withId(R.id.btn_update)).perform(click());
         onView(withId(R.id.btn_update)).check(matches(withText("Save Changes")));
     }
