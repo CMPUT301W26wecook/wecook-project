@@ -14,9 +14,11 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -38,10 +40,17 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.GeoPoint;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 import com.google.zxing.WriterException;
 
+import com.example.wecookproject.model.EventComment;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 
@@ -67,8 +76,14 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     private TextView tvWaitlist;
     private TextView tvStatus;
     private TextView tvDescription;
+    private EditText etComment;
+    private TextView tvCommentsEmpty;
+    private LinearLayout commentsContainer;
+    private ListenerRegistration commentsListener;
     private Button btnSecondary;
     private Button btnPrimary;
+    private Button btnPostComment;
+    private String entrantDisplayName;
 
     /**
      * Initializes details UI, navigation, and event loading.
@@ -111,8 +126,12 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         tvWaitlist = findViewById(R.id.tv_detail_waitlist);
         tvStatus = findViewById(R.id.tv_detail_status_chip);
         tvDescription = findViewById(R.id.tv_detail_description);
+        etComment = findViewById(R.id.et_event_comment);
+        tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
+        commentsContainer = findViewById(R.id.layout_comments_container);
         btnSecondary = findViewById(R.id.btn_detail_secondary);
         btnPrimary = findViewById(R.id.btn_detail_primary);
+        btnPostComment = findViewById(R.id.btn_post_comment);
 
         findViewById(R.id.iv_detail_back).setOnClickListener(v -> finish());
         findViewById(R.id.btn_detail_show_qr).setOnClickListener(v -> {
@@ -124,6 +143,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         });
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
+        btnPostComment.setOnClickListener(v -> submitComment());
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_events);
@@ -151,7 +171,9 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             return true;
         });
 
+        loadEntrantProfile();
         loadEvent();
+        observeComments();
     }
 
     /**
@@ -161,6 +183,15 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEvent();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (commentsListener != null) {
+            commentsListener.remove();
+            commentsListener = null;
+        }
     }
 
     /**
@@ -181,6 +212,22 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                             .addOnFailureListener(e -> Toast.makeText(this, "Failed to load event", Toast.LENGTH_SHORT).show());
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Loads the entrant profile so new comments carry a readable author name.
+     */
+    private void loadEntrantProfile() {
+        db.collection("users")
+                .document(entrantId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    String firstName = getSafeTrimmedString(snapshot, "firstName");
+                    String lastName = getSafeTrimmedString(snapshot, "lastName");
+                    String fullName = (firstName + " " + lastName).trim();
+                    entrantDisplayName = fullName.isEmpty() ? entrantId : fullName;
+                })
+                .addOnFailureListener(e -> entrantDisplayName = entrantId);
     }
 
     /**
@@ -226,6 +273,133 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         }
 
         configureActionButtons();
+    }
+
+    /**
+     * Attaches a real-time listener for event comments.
+     */
+    private void observeComments() {
+        if (commentsListener != null) {
+            commentsListener.remove();
+        }
+        commentsListener = db.collection("events")
+                .document(eventId)
+                .collection("comments")
+                .orderBy("createdAt", Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this, "Failed to load comments", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    List<EventComment> comments = new ArrayList<>();
+                    if (snapshots != null) {
+                        for (DocumentSnapshot snapshot : snapshots.getDocuments()) {
+                            EventComment comment = snapshot.toObject(EventComment.class);
+                            if (comment == null) {
+                                continue;
+                            }
+                            comment.setCommentId(snapshot.getId());
+                            comments.add(comment);
+                        }
+                    }
+                    renderComments(comments);
+                });
+    }
+
+    /**
+     * Creates a new event comment on behalf of the current entrant.
+     */
+    private void submitComment() {
+        String commentText = etComment.getText() == null ? "" : etComment.getText().toString().trim();
+        if (commentText.isEmpty()) {
+            etComment.setError("Comment cannot be empty");
+            return;
+        }
+
+        btnPostComment.setEnabled(false);
+        DocumentReference commentReference = db.collection("events")
+                .document(eventId)
+                .collection("comments")
+                .document();
+
+        Map<String, Object> commentData = new HashMap<>();
+        commentData.put("commentId", commentReference.getId());
+        commentData.put("eventId", eventId);
+        commentData.put("authorId", entrantId);
+        commentData.put("authorName", entrantDisplayName == null || entrantDisplayName.trim().isEmpty()
+                ? entrantId
+                : entrantDisplayName);
+        commentData.put("authorRole", "entrant");
+        commentData.put("commentText", commentText);
+        commentData.put("createdAt", FieldValue.serverTimestamp());
+
+        commentReference.set(commentData)
+                .addOnSuccessListener(unused -> {
+                    etComment.setText("");
+                    Toast.makeText(this, "Comment posted", Toast.LENGTH_SHORT).show();
+                    btnPostComment.setEnabled(true);
+                })
+                .addOnFailureListener(e -> {
+                    btnPostComment.setEnabled(true);
+                    Toast.makeText(this, "Failed to post comment", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    /**
+     * Renders the current event comments into the details screen.
+     *
+     * @param comments loaded event comments
+     */
+    private void renderComments(List<EventComment> comments) {
+        commentsContainer.removeAllViews();
+        boolean hasComments = comments != null && !comments.isEmpty();
+        tvCommentsEmpty.setVisibility(hasComments ? View.GONE : View.VISIBLE);
+        if (!hasComments) {
+            return;
+        }
+
+        LayoutInflater inflater = LayoutInflater.from(this);
+        for (EventComment comment : comments) {
+            View itemView = inflater.inflate(R.layout.item_user_event_comment, commentsContainer, false);
+            TextView tvAuthor = itemView.findViewById(R.id.tv_comment_author);
+            TextView tvCreatedAt = itemView.findViewById(R.id.tv_comment_created_at);
+            TextView tvText = itemView.findViewById(R.id.tv_comment_text);
+
+            tvAuthor.setText(getDisplayAuthorName(comment));
+            tvCreatedAt.setText(formatCommentDate(comment.getCreatedAt()));
+            tvText.setText(comment.getCommentText() == null ? "" : comment.getCommentText());
+
+            commentsContainer.addView(itemView);
+        }
+    }
+
+    private String getDisplayAuthorName(EventComment comment) {
+        if (comment == null) {
+            return "";
+        }
+        String authorName = comment.getAuthorName();
+        if (authorName != null && !authorName.trim().isEmpty()) {
+            return authorName.trim();
+        }
+        String authorId = comment.getAuthorId();
+        return authorId == null ? "Unknown user" : authorId;
+    }
+
+    private String formatCommentDate(com.google.firebase.Timestamp timestamp) {
+        if (timestamp == null) {
+            return "Just now";
+        }
+        Date createdAt = timestamp.toDate();
+        SimpleDateFormat formatter = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.CANADA);
+        return formatter.format(createdAt);
+    }
+
+    private String getSafeTrimmedString(DocumentSnapshot snapshot, String fieldName) {
+        if (snapshot == null) {
+            return "";
+        }
+        String value = snapshot.getString(fieldName);
+        return value == null ? "" : value.trim();
     }
 
     /**
