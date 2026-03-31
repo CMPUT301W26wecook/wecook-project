@@ -506,6 +506,67 @@ public class OrganizerFlowTest {
         awaitLatch(deleteLatch, 10, "mock qr-link event deletion");
     }
 
+    @Test
+    public void test8c_OrganizerCanViewAndDeleteEntrantComment() throws Exception {
+        String organizerAndroidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        String eventId = "organizer-comments-" + UUID.randomUUID();
+        createOrganizerUser(organizerAndroidId, "Org", "Owner");
+        createOwnedEventDocument(eventId, "Organizer Comment Moderation Event", organizerAndroidId);
+        createEventComment(eventId, "entrant-1", "Entrant One", "entrant", "Please confirm the event time.");
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withText("Event Comments")).perform(nestedScrollTo());
+        onView(withText("Entrant One")).perform(nestedScrollTo());
+        onView(withText("Entrant One")).check(matches(isDisplayed()));
+        onView(withText("Please confirm the event time.")).perform(nestedScrollTo());
+        onView(withText("Please confirm the event time.")).check(matches(isDisplayed()));
+        onView(withId(R.id.btn_delete_comment)).perform(nestedScrollTo(), click());
+
+        waitUntilCommentDeleted(eventId, "Please confirm the event time.");
+
+        cleanupCommentsForEvent(eventId);
+        deleteEventDocument(eventId);
+        deleteUserDocument(organizerAndroidId);
+    }
+
+    @Test
+    public void test8d_OrganizerCanPostCommentWithOrganizerTag() throws Exception {
+        String organizerAndroidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        String eventId = "organizer-post-comment-" + UUID.randomUUID();
+        createOrganizerUser(organizerAndroidId, "Owner", "Commenter");
+        createOwnedEventDocument(eventId, "Organizer Post Comment Event", organizerAndroidId);
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.et_organizer_comment))
+                .perform(nestedScrollTo(), replaceText("Organizer note for entrants"), closeSoftKeyboard());
+        onView(withId(R.id.btn_post_organizer_comment)).perform(nestedScrollTo(), click());
+
+        Map<String, Object> comment = waitForCommentByText(eventId, "Organizer note for entrants");
+        assertNotNull(comment);
+        assertEquals("organizer", comment.get("authorRole"));
+
+        onView(withText("Organizer note for entrants")).perform(nestedScrollTo());
+        onView(withText("Organizer note for entrants")).check(matches(isDisplayed()));
+        onView(withText("ORGANIZER")).perform(nestedScrollTo());
+        onView(withText("ORGANIZER")).check(matches(isDisplayed()));
+
+        cleanupCommentsForEvent(eventId);
+        deleteEventDocument(eventId);
+        deleteUserDocument(organizerAndroidId);
+    }
+
     /**
      * test9: Launching OrganizerEditEventActivity without an "eventId" extra
      * must cause the activity to finish immediately (state = DESTROYED).
@@ -746,12 +807,84 @@ public class OrganizerFlowTest {
         awaitLatch(latch, 15, "event creation");
     }
 
+    private void createOwnedEventDocument(String eventId, String eventName, String organizerId) {
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("eventId", eventId);
+        eventData.put("organizerId", organizerId);
+        eventData.put("eventName", eventName);
+        eventData.put("registrationStartDate", parseTestDate("2026-03-01 00:00"));
+        eventData.put("registrationEndDate", parseTestDate("2026-03-10 00:00"));
+        eventData.put("maxWaitlist", 25);
+        eventData.put("currentWaitlistCount", 0);
+        eventData.put("capacity", 100);
+        eventData.put("geolocationRequired", false);
+        eventData.put("location", "Edmonton");
+        eventData.put("description", "Organizer comments test event");
+        eventData.put("waitlistEntrantIds", new ArrayList<String>());
+        eventData.put("selectedEntrantIds", new ArrayList<String>());
+        eventData.put("replacementEntrantIds", new ArrayList<String>());
+        eventData.put("acceptedEntrantIds", new ArrayList<String>());
+        eventData.put("declinedEntrantIds", new ArrayList<String>());
+        eventData.put("lotteryCount", 0);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .set(eventData)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "owned event creation");
+    }
+
+    private void createOrganizerUser(String organizerId, String firstName, String lastName) {
+        CountDownLatch latch = new CountDownLatch(1);
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("firstName", firstName);
+        userData.put("lastName", lastName);
+        userData.put("role", "organizer");
+        userData.put("profileCompleted", true);
+        db.collection("users").document(organizerId)
+                .set(userData)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "organizer user creation");
+    }
+
+    private void createEventComment(String eventId,
+                                    String authorId,
+                                    String authorName,
+                                    String authorRole,
+                                    String commentText) {
+        String commentId = "comment-" + UUID.randomUUID();
+        Map<String, Object> comment = new HashMap<>();
+        comment.put("commentId", commentId);
+        comment.put("eventId", eventId);
+        comment.put("authorId", authorId);
+        comment.put("authorName", authorName);
+        comment.put("authorRole", authorRole);
+        comment.put("commentText", commentText);
+        comment.put("createdAt", com.google.firebase.Timestamp.now());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .collection("comments")
+                .document(commentId)
+                .set(comment)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "event comment creation");
+    }
+
     private void deleteEventDocument(String eventId) {
         CountDownLatch latch = new CountDownLatch(1);
         db.collection("events").document(eventId)
                 .delete()
                 .addOnCompleteListener(task -> latch.countDown());
         awaitLatch(latch, 15, "event cleanup");
+    }
+
+    private void deleteUserDocument(String userId) {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users").document(userId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "user cleanup");
     }
 
     private void createEntrantUsers(List<String> entrantIds) {
@@ -825,6 +958,74 @@ public class OrganizerFlowTest {
             total += countRef.get();
         }
         return total;
+    }
+
+    private void cleanupCommentsForEvent(String eventId) {
+        CountDownLatch readLatch = new CountDownLatch(1);
+        AtomicReference<List<DocumentSnapshot>> snapshotsRef = new AtomicReference<>(new ArrayList<>());
+        db.collection("events").document(eventId).collection("comments")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    snapshotsRef.set(new ArrayList<>(querySnapshot.getDocuments()));
+                    readLatch.countDown();
+                })
+                .addOnFailureListener(e -> readLatch.countDown());
+        awaitLatch(readLatch, 15, "comment cleanup read");
+
+        List<DocumentSnapshot> snapshots = snapshotsRef.get();
+        if (snapshots == null || snapshots.isEmpty()) {
+            return;
+        }
+
+        CountDownLatch deleteLatch = new CountDownLatch(snapshots.size());
+        for (DocumentSnapshot snapshot : snapshots) {
+            snapshot.getReference().delete().addOnCompleteListener(task -> deleteLatch.countDown());
+        }
+        awaitLatch(deleteLatch, 15, "comment cleanup delete");
+    }
+
+    private Map<String, Object> waitForCommentByText(String eventId, String commentText) throws Exception {
+        for (int i = 0; i < 15; i++) {
+            DocumentSnapshot match = null;
+            com.google.firebase.firestore.QuerySnapshot querySnapshot = Tasks.await(
+                    db.collection("events").document(eventId).collection("comments").get(),
+                    10,
+                    TimeUnit.SECONDS
+            );
+            for (DocumentSnapshot snapshot : querySnapshot.getDocuments()) {
+                if (commentText.equals(snapshot.getString("commentText"))) {
+                    match = snapshot;
+                    break;
+                }
+            }
+            if (match != null) {
+                return match.getData();
+            }
+            safeSleep(1000);
+        }
+        throw new AssertionError("Timed out waiting for comment text: " + commentText);
+    }
+
+    private void waitUntilCommentDeleted(String eventId, String commentText) throws Exception {
+        for (int i = 0; i < 15; i++) {
+            boolean exists = false;
+            com.google.firebase.firestore.QuerySnapshot querySnapshot = Tasks.await(
+                    db.collection("events").document(eventId).collection("comments").get(),
+                    10,
+                    TimeUnit.SECONDS
+            );
+            for (DocumentSnapshot snapshot : querySnapshot.getDocuments()) {
+                if (commentText.equals(snapshot.getString("commentText"))) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                return;
+            }
+            safeSleep(1000);
+        }
+        throw new AssertionError("Comment was not deleted in time: " + commentText);
     }
 
     private boolean isViewDisplayed(int viewId) {
