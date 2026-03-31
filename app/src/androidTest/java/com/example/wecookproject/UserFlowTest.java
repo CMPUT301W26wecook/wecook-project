@@ -17,6 +17,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
 import static androidx.test.espresso.matcher.ViewMatchers.Visibility.VISIBLE;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -376,11 +377,14 @@ public class UserFlowTest {
         waitForVisibleText("Comments", 8000);
         waitForVisibleText("Organizer One", 8000);
         waitForVisibleText("Welcome to the event.", 8000);
+        waitForVisibleText("ORGANIZER", 8000);
 
         onView(withText("Organizer One")).perform(scrollTo());
         onView(withText("Organizer One")).check(matches(isDisplayed()));
-        onView(withText("Welcome to the event.")).perform(scrollTo());
-        onView(withText("Welcome to the event.")).check(matches(isDisplayed()));
+        onView(allOf(withId(R.id.tv_comment_text), withText("Welcome to the event."))).perform(scrollTo());
+        onView(allOf(withId(R.id.tv_comment_text), withText("Welcome to the event."))).check(matches(isDisplayed()));
+        onView(allOf(withId(R.id.tv_comment_author_tag), withText("ORGANIZER"))).perform(scrollTo());
+        onView(allOf(withId(R.id.tv_comment_author_tag), withText("ORGANIZER"))).check(matches(isDisplayed()));
 
         cleanupCommentsForEvent(eventId);
         cleanupEvent(eventId);

@@ -15,18 +15,34 @@
 
         <TextView
             android:id="@+id/tv_comment_author"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Integration Tester"
+            android:text="Comment author"
             android:textColor="@color/text_dark"
             android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tv_comment_created_at"
+            android:id="@+id/tv_comment_author_tag"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_comment_organizer_tag"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:text="ORGANIZER"
+            android:textColor="@color/text_dark"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tv_comment_created_at"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:gravity="end"
             android:text="Mar 31, 2026 10:30 AM"
             android:textColor="@color/text_muted"
             android:textSize="12sp" />

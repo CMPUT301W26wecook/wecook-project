@@ -557,10 +557,10 @@ public class OrganizerFlowTest {
         assertNotNull(comment);
         assertEquals("organizer", comment.get("authorRole"));
 
-        onView(withText("Organizer note for entrants")).perform(nestedScrollTo());
-        onView(withText("Organizer note for entrants")).check(matches(isDisplayed()));
-        onView(withText("ORGANIZER")).perform(nestedScrollTo());
-        onView(withText("ORGANIZER")).check(matches(isDisplayed()));
+        onView(allOf(withId(R.id.tv_comment_text), withText("Organizer note for entrants"))).perform(nestedScrollTo());
+        onView(allOf(withId(R.id.tv_comment_text), withText("Organizer note for entrants"))).check(matches(isDisplayed()));
+        onView(allOf(withId(R.id.tv_comment_author_tag), withText("ORGANIZER"))).perform(nestedScrollTo());
+        onView(allOf(withId(R.id.tv_comment_author_tag), withText("ORGANIZER"))).check(matches(isDisplayed()));
 
         cleanupCommentsForEvent(eventId);
         deleteEventDocument(eventId);

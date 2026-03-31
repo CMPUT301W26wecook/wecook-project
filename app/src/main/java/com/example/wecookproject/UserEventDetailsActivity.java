@@ -362,12 +362,15 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         for (EventComment comment : comments) {
             View itemView = inflater.inflate(R.layout.item_user_event_comment, commentsContainer, false);
             TextView tvAuthor = itemView.findViewById(R.id.tv_comment_author);
+            TextView tvAuthorTag = itemView.findViewById(R.id.tv_comment_author_tag);
             TextView tvCreatedAt = itemView.findViewById(R.id.tv_comment_created_at);
             TextView tvText = itemView.findViewById(R.id.tv_comment_text);
 
             tvAuthor.setText(getDisplayAuthorName(comment));
             tvCreatedAt.setText(formatCommentDate(comment.getCreatedAt()));
             tvText.setText(comment.getCommentText() == null ? "" : comment.getCommentText());
+            boolean organizerComment = "organizer".equalsIgnoreCase(comment.getAuthorRole());
+            tvAuthorTag.setVisibility(organizerComment ? View.VISIBLE : View.GONE);
 
             commentsContainer.addView(itemView);
         }
