@@ -44,7 +44,17 @@ public class UserNotificationActivity extends AppCompatActivity {
         findViewById(R.id.iv_back).setOnClickListener(v -> finish());
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new UserNotificationAdapter(items);
+        adapter = new UserNotificationAdapter(items, new UserNotificationAdapter.NotificationActionListener() {
+            @Override
+            public void onNotificationOpened(UserNotificationItem item) {
+                openNotification(item);
+            }
+
+            @Override
+            public void onMarkReadClicked(UserNotificationItem item) {
+                markNotificationRead(item, false);
+            }
+        });
         recyclerView.setAdapter(adapter);
 
         setupBottomNav();
@@ -112,5 +122,49 @@ public class UserNotificationActivity extends AppCompatActivity {
             emptyState.setVisibility(View.GONE);
             recyclerView.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void openNotification(UserNotificationItem item) {
+        markNotificationRead(item, true);
+    }
+
+    private void markNotificationRead(UserNotificationItem item, boolean openAfterRead) {
+        if (item == null) {
+            return;
+        }
+
+        if (!item.isUnread()) {
+            if (openAfterRead) {
+                navigateToNotificationTarget(item);
+            }
+            return;
+        }
+
+        NotificationHelper.markAsRead(db, entrantId, item.getId())
+                .addOnSuccessListener(unused -> {
+                    loadNotifications();
+                    if (openAfterRead) {
+                        navigateToNotificationTarget(item);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    if (openAfterRead) {
+                        navigateToNotificationTarget(item);
+                    } else {
+                        Toast.makeText(this, "Failed to mark notification as read", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void navigateToNotificationTarget(UserNotificationItem item) {
+        String eventId = item.getActionTarget().isEmpty() ? item.getEventId() : item.getActionTarget();
+        if (eventId == null || eventId.trim().isEmpty()) {
+            Toast.makeText(this, "Event details unavailable for this notification", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Intent intent = new Intent(this, UserEventDetailsActivity.class);
+        intent.putExtra("eventId", eventId);
+        startActivity(intent);
     }
 }

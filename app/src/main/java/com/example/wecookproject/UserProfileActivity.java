@@ -32,6 +32,7 @@ public class UserProfileActivity extends AppCompatActivity {
     private MaterialButton btnLogout;
     private MaterialButton btnViewInbox;
     private SwitchMaterial switchAutoLogin;
+    private SwitchMaterial switchNotifications;
     private BottomNavigationView bottomNav;
 
     private TextInputEditText etFirstName;
@@ -54,7 +55,8 @@ public class UserProfileActivity extends AppCompatActivity {
     private String androidId;
 
     private boolean isEditing = false;
-    private boolean notificationsEnabled = false;
+    private boolean isLoadingProfile = false;
+    private boolean notificationsEnabled = true;
 
     /**
      * Initializes profile views, loads user data, and wires interactions.
@@ -71,6 +73,7 @@ public class UserProfileActivity extends AppCompatActivity {
         btnLogout = findViewById(R.id.btn_logout);
         btnViewInbox = findViewById(R.id.btn_view_inbox);
         switchAutoLogin = findViewById(R.id.switch_auto_login);
+        switchNotifications = findViewById(R.id.switch_notifications);
         bottomNav = findViewById(R.id.bottom_nav);
 
         etFirstName = findViewById(R.id.et_first_name);
@@ -95,6 +98,13 @@ public class UserProfileActivity extends AppCompatActivity {
         setupBirthdayWatcher();
         setupBottomNav();
         findViewById(R.id.iv_back).setOnClickListener(v -> finish());
+        switchNotifications.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isLoadingProfile) {
+                return;
+            }
+            notificationsEnabled = isChecked;
+            saveNotificationPreference(isChecked);
+        });
 
         setEditable(false);
         loadUserProfile();
@@ -167,6 +177,7 @@ public class UserProfileActivity extends AppCompatActivity {
         etPostalCode.setEnabled(enabled);
         etCountry.setEnabled(enabled);
         switchAutoLogin.setEnabled(enabled);
+        switchNotifications.setEnabled(true);
     }
 
     /**
@@ -231,6 +242,7 @@ public class UserProfileActivity extends AppCompatActivity {
      * Loads profile fields from Firestore.
      */
     private void loadUserProfile() {
+        isLoadingProfile = true;
         db.collection("users").document(androidId).get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
@@ -252,10 +264,26 @@ public class UserProfileActivity extends AppCompatActivity {
                         if (notifications != null) {
                             notificationsEnabled = notifications;
                         }
+                        switchNotifications.setChecked(notificationsEnabled);
                     }
+                    isLoadingProfile = false;
                 })
-                .addOnFailureListener(e ->
-                        Toast.makeText(UserProfileActivity.this, "Error loading profile", Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e -> {
+                    isLoadingProfile = false;
+                    Toast.makeText(UserProfileActivity.this, "Error loading profile", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void saveNotificationPreference(boolean enabled) {
+        db.collection("users").document(androidId)
+                .set(Map.of("notificationsEnabled", enabled), SetOptions.merge())
+                .addOnFailureListener(e -> {
+                    notificationsEnabled = !enabled;
+                    isLoadingProfile = true;
+                    switchNotifications.setChecked(!enabled);
+                    isLoadingProfile = false;
+                    Toast.makeText(UserProfileActivity.this, "Error updating notification setting", Toast.LENGTH_SHORT).show();
+                });
     }
 
     /**
@@ -271,6 +299,7 @@ public class UserProfileActivity extends AppCompatActivity {
         String postalCode = textOf(etPostalCode);
         String country = textOf(etCountry);
         boolean autoLogin = switchAutoLogin.isChecked();
+        notificationsEnabled = switchNotifications.isChecked();
 
         clearValidationErrors();
         Map<String, String> errors = UserInputValidator.validateEntrantProfile(

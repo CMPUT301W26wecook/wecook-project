@@ -72,6 +72,21 @@
         </LinearLayout>
 
         <!-- Notification message body -->
+        <TextView
+            android:id="@+id/tv_notification_recipient_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Send To"
+            android:textColor="@color/text_dark"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/spinner_notification_recipients"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/til_notification_message"
             android:layout_width="match_parent"

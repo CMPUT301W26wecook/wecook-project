@@ -69,6 +69,33 @@
         app:thumbTint="@android:color/white"
         app:trackTint="#4CD964" />
 
+    <TextView
+        android:id="@+id/tv_notifications_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/badge_yellow_bg"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:text="Enable Notifications"
+        android:textColor="#856404"
+        android:textSize="14sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_auto_login_label" />
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_notifications"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="20dp"
+        android:checked="true"
+        app:layout_constraintBottom_toBottomOf="@id/tv_notifications_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tv_notifications_label"
+        app:thumbTint="@android:color/white"
+        app:trackTint="#4CD964" />
+
     <ScrollView
         android:id="@+id/scroll_profile"
         android:layout_width="0dp"
@@ -78,7 +105,7 @@
         app:layout_constraintBottom_toTopOf="@id/btn_update"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_auto_login_label">
+        app:layout_constraintTop_toBottomOf="@id/tv_notifications_label">
 
         <LinearLayout
             android:layout_width="match_parent"

@@ -134,6 +134,7 @@ public class SignupAddressActivity extends AppCompatActivity {
         userData.put("postalCode", postalCode);
         userData.put("country", country);
         userData.put("role", role);
+        userData.put("notificationsEnabled", true);
         userData.put("profileCompleted", true);
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();

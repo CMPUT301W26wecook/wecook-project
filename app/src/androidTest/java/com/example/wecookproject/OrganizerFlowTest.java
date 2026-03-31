@@ -47,8 +47,10 @@ import org.junit.runners.MethodSorters;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.hamcrest.Matcher;
@@ -121,8 +123,16 @@ public class OrganizerFlowTest {
     @Before
     public void setUp() {
         if (!emulatorConfigured) {
-            FirebaseFirestore.getInstance().useEmulator("10.0.2.2", 8080);
-            FirebaseAuth.getInstance().useEmulator("10.0.2.2", 9099);
+            try {
+                FirebaseFirestore.getInstance().useEmulator("10.0.2.2", 8080);
+            } catch (IllegalStateException ignored) {
+                // Another test class may have initialized Firestore first in the same process.
+            }
+            try {
+                FirebaseAuth.getInstance().useEmulator("10.0.2.2", 9099);
+            } catch (IllegalStateException ignored) {
+                // Another test class may have initialized Auth first in the same process.
+            }
             emulatorConfigured = true;
         }
 
@@ -281,12 +291,19 @@ public class OrganizerFlowTest {
     public void test6_NotificationScreenIsReachableAndShowsHintField() {
         performFullSignup();
 
+        String notificationEventId = "notification-screen-" + UUID.randomUUID();
+        createEventDocument(notificationEventId, "Notification Screen Event", new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), 0);
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), OrganizerNotificationActivity.class);
+        intent.putExtra("eventId", notificationEventId);
         ActivityScenario<OrganizerNotificationActivity> notifScenario =
-                ActivityScenario.launch(OrganizerNotificationActivity.class);
+                ActivityScenario.launch(intent);
 
         onView(withId(R.id.et_notification_message)).check(matches(isDisplayed()));
+        onView(withId(R.id.spinner_notification_recipients)).check(matches(isDisplayed()));
 
         notifScenario.close();
+        deleteEventDocument(notificationEventId);
     }
 
     /**
@@ -553,24 +570,16 @@ public class OrganizerFlowTest {
         String lotteryWithEntrantsEventId = "lottery-entrants-test-" + UUID.randomUUID();
 
         List<String> entrants = Arrays.asList("entrant1", "entrant2", "entrant3", "entrant4", "entrant5");
+        createEntrantUsers(entrants);
 
-        java.util.Map<String, Object> eventData = new java.util.HashMap<>();
-        eventData.put("eventId", lotteryWithEntrantsEventId);
-        eventData.put("organizerId", "organizer-test");
-        eventData.put("eventName", "Lottery With Entrants Test Event");
-        eventData.put("registrationStartDate", parseTestDate("2026-03-01 00:00"));
-        eventData.put("registrationEndDate", parseTestDate("2026-03-10 00:00"));
-        eventData.put("maxWaitlist", 25);
-        eventData.put("currentWaitlistCount", entrants.size());
-        eventData.put("geolocationRequired", false);
-        eventData.put("location", "Edmonton");
-        eventData.put("description", "Test event for lottery with entrants");
-        eventData.put("waitlistEntrantIds", new ArrayList<>(entrants));
-        eventData.put("selectedEntrantIds", new ArrayList<String>());
-        eventData.put("replacementEntrantIds", new ArrayList<String>());
-        eventData.put("lotteryCount", 0);
-
-        db.collection("events").document(lotteryWithEntrantsEventId).set(eventData);
+        createEventDocument(
+                lotteryWithEntrantsEventId,
+                "Lottery With Entrants Test Event",
+                new ArrayList<>(entrants),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                0
+        );
 
         safeSleep(WAIT_LONG);
 
@@ -595,10 +604,14 @@ public class OrganizerFlowTest {
         List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
         assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
         assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
+        assertEquals("Each selected entrant should receive one lottery notification",
+                3, countNotificationsByType(selectedEntrants, NotificationHelper.TYPE_LOTTERY_SELECTED));
 
         scenario.close();
 
-        db.collection("events").document(lotteryWithEntrantsEventId).delete();
+        deleteNotificationsForUsers(entrants);
+        deleteEventDocument(lotteryWithEntrantsEventId);
+        deleteEntrantUsers(entrants);
     }
 
     /**
@@ -608,29 +621,16 @@ public class OrganizerFlowTest {
     @Test
     public void test12_ReplacementDrawPicksRandomApplicant() throws InterruptedException {
         String replacementEventId = "replacement-test-" + UUID.randomUUID();
-        Event replacementEvent = new Event(
-                replacementEventId,
-                "organizer-test",
-                "Replacement Draw Event",
-                parseTestDate("2026-03-01 00:00"),
-                parseTestDate("2026-03-10 00:00"),
-                25,
-                0,
-                false,
-                "Edmonton",
-                "Event for replacement test"
-        );
         List<String> entrants = Arrays.asList("a1", "a2", "a3", "a4", "a5");
-        replacementEvent.setWaitlistEntrantIds(entrants);
-        replacementEvent.setCurrentWaitlistCount(entrants.size());
-        replacementEvent.setSelectedEntrantIds(Arrays.asList("a1", "a2"));
-        replacementEvent.setLotteryCount(3);
-
-        CountDownLatch createLatch = new CountDownLatch(1);
-        db.collection("events").document(replacementEventId)
-                .set(replacementEvent)
-                .addOnCompleteListener(task -> createLatch.countDown());
-        awaitLatch(createLatch, 15, "replacement event creation");
+        createEntrantUsers(entrants);
+        createEventDocument(
+                replacementEventId,
+                "Replacement Draw Event",
+                new ArrayList<>(entrants),
+                new ArrayList<>(Arrays.asList("a1", "a2")),
+                new ArrayList<>(),
+                3
+        );
 
         Intent intent = new Intent(
                 ApplicationProvider.getApplicationContext(),
@@ -661,13 +661,13 @@ public class OrganizerFlowTest {
         assertFalse("Replacement should not be an originally selected applicant",
                 Arrays.asList("a1", "a2").contains(chosen));
         assertTrue("Replacement should come from waitlist pool", entrants.contains(chosen));
+        assertEquals("Replacement entrant should receive one replacement notification",
+                1, countNotificationsByType(List.of(chosen), NotificationHelper.TYPE_REPLACEMENT_SELECTED));
 
         scenario.close();
-        CountDownLatch delLatch = new CountDownLatch(1);
-        db.collection("events").document(replacementEventId)
-                .delete()
-                .addOnCompleteListener(task -> delLatch.countDown());
-        awaitLatch(delLatch, 15, "replacement event cleanup");
+        deleteNotificationsForUsers(entrants);
+        deleteEventDocument(replacementEventId);
+        deleteEntrantUsers(entrants);
     }
 
 
@@ -713,6 +713,118 @@ public class OrganizerFlowTest {
         } catch (Exception e) {
             throw new AssertionError("Unable to parse test date: " + value, e);
         }
+    }
+
+    private void createEventDocument(String eventId,
+                                     String eventName,
+                                     List<String> waitlistEntrants,
+                                     List<String> selectedEntrants,
+                                     List<String> replacementEntrants,
+                                     int lotteryCount) {
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("eventId", eventId);
+        eventData.put("organizerId", "organizer-test");
+        eventData.put("eventName", eventName);
+        eventData.put("registrationStartDate", parseTestDate("2026-03-01 00:00"));
+        eventData.put("registrationEndDate", parseTestDate("2026-03-10 00:00"));
+        eventData.put("maxWaitlist", 25);
+        eventData.put("currentWaitlistCount", waitlistEntrants.size());
+        eventData.put("geolocationRequired", false);
+        eventData.put("location", "Edmonton");
+        eventData.put("description", "Test event for notifications");
+        eventData.put("waitlistEntrantIds", waitlistEntrants);
+        eventData.put("selectedEntrantIds", selectedEntrants);
+        eventData.put("replacementEntrantIds", replacementEntrants);
+        eventData.put("acceptedEntrantIds", new ArrayList<String>());
+        eventData.put("declinedEntrantIds", new ArrayList<String>());
+        eventData.put("lotteryCount", lotteryCount);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .set(eventData)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "event creation");
+    }
+
+    private void deleteEventDocument(String eventId) {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "event cleanup");
+    }
+
+    private void createEntrantUsers(List<String> entrantIds) {
+        CountDownLatch latch = new CountDownLatch(entrantIds.size());
+        for (String entrantId : entrantIds) {
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("firstName", "Entrant");
+            userData.put("lastName", entrantId);
+            userData.put("email", entrantId + "@example.com");
+            userData.put("notificationsEnabled", true);
+            userData.put("role", "entrant");
+            db.collection("users").document(entrantId)
+                    .set(userData)
+                    .addOnCompleteListener(task -> latch.countDown());
+        }
+        awaitLatch(latch, 15, "entrant user creation");
+    }
+
+    private void deleteEntrantUsers(List<String> entrantIds) {
+        CountDownLatch latch = new CountDownLatch(entrantIds.size());
+        for (String entrantId : entrantIds) {
+            db.collection("users").document(entrantId)
+                    .delete()
+                    .addOnCompleteListener(task -> latch.countDown());
+        }
+        awaitLatch(latch, 15, "entrant user cleanup");
+    }
+
+    private void deleteNotificationsForUsers(List<String> entrantIds) {
+        for (String entrantId : entrantIds) {
+            CountDownLatch readLatch = new CountDownLatch(1);
+            AtomicReference<List<DocumentSnapshot>> snapshotsRef = new AtomicReference<>(new ArrayList<>());
+            db.collection("users").document(entrantId).collection("notifications")
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        snapshotsRef.set(new ArrayList<>(querySnapshot.getDocuments()));
+                        readLatch.countDown();
+                    })
+                    .addOnFailureListener(e -> readLatch.countDown());
+            awaitLatch(readLatch, 15, "notification cleanup read");
+
+            List<DocumentSnapshot> snapshots = snapshotsRef.get();
+            if (snapshots == null || snapshots.isEmpty()) {
+                continue;
+            }
+
+            CountDownLatch deleteLatch = new CountDownLatch(snapshots.size());
+            for (DocumentSnapshot snapshot : snapshots) {
+                snapshot.getReference().delete().addOnCompleteListener(task -> deleteLatch.countDown());
+            }
+            awaitLatch(deleteLatch, 15, "notification cleanup delete");
+        }
+    }
+
+    private int countNotificationsByType(List<String> entrantIds, String type) throws InterruptedException {
+        int total = 0;
+        for (String entrantId : entrantIds) {
+            AtomicReference<Integer> countRef = new AtomicReference<>(0);
+            CountDownLatch latch = new CountDownLatch(1);
+            db.collection("users")
+                    .document(entrantId)
+                    .collection("notifications")
+                    .whereEqualTo("type", type)
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        countRef.set(querySnapshot.size());
+                        latch.countDown();
+                    })
+                    .addOnFailureListener(e -> latch.countDown());
+            assertTrue("Timed out counting notifications", latch.await(10, TimeUnit.SECONDS));
+            total += countRef.get();
+        }
+        return total;
     }
 
     private boolean isViewDisplayed(int viewId) {

@@ -18,7 +18,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -65,6 +64,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private boolean waitlistLoaded = false;
     private boolean isPrivateEvent = false;
     private Button inviteSelectedButton;
+    private String organizerId;
 
 
     /**
@@ -79,6 +79,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
 
         db = FirebaseFirestore.getInstance();
         eventId = getIntent().getStringExtra("eventId");
+        organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
         searchView = findViewById(R.id.sv_search_entrant);
         entrantsRecyclerView = findViewById(R.id.rv_entrants);
@@ -472,7 +473,6 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             }
             String eventName = eventSnapshot.getString("eventName");
             String eventLocation = eventSnapshot.getString("location");
-            String organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             for (String entrantId : invitedEntrants) {
                 Map<String, Object> historyData = new HashMap<>();
                 historyData.put("eventId", eventId);
@@ -489,23 +489,14 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                 db.collection("users").document(entrantId)
                         .collection("eventHistory").document(eventId)
                         .set(historyData, SetOptions.merge());
-
-                Map<String, Object> notification = new HashMap<>();
-                notification.put("eventId", eventId);
-                notification.put("eventName", eventName == null || eventName.trim().isEmpty() ? "Event Invitation" : eventName);
-                notification.put("location", eventLocation == null ? "" : eventLocation);
-                notification.put("message", "You have been invited to this private event. Open Events to accept or decline.");
-                notification.put("recipientId", entrantId);
-                notification.put("senderId", organizerId);
-                notification.put("status", "unread");
-                notification.put("createdAt", Timestamp.now());
-
-                db.collection("users")
-                        .document(entrantId)
-                        .collection("notifications")
-                        .document()
-                        .set(notification, SetOptions.merge());
             }
+            sendNotifications(
+                    invitedEntrants,
+                    eventName == null || eventName.trim().isEmpty() ? "Event Invitation" : eventName,
+                    eventLocation == null ? "" : eventLocation,
+                    "You have been invited to this private event. Open Events to accept or decline.",
+                    NotificationHelper.TYPE_PRIVATE_INVITE
+            );
         });
     }
 
@@ -596,6 +587,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
 
                     db.collection("events").document(eventId).get().addOnSuccessListener(eventSnapshot -> {
                         if (eventSnapshot.exists()) {
+                            List<String> lotteryRecipients = new ArrayList<>();
                             for (String winnerId : selected) {
                                 java.util.Map<String, Object> historyData = new java.util.HashMap<>();
                                 historyData.put("eventId", eventId);
@@ -612,7 +604,16 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                                 db.collection("users").document(winnerId)
                                         .collection("eventHistory").document(eventId)
                                         .set(historyData, com.google.firebase.firestore.SetOptions.merge());
+                                lotteryRecipients.add(winnerId);
                             }
+
+                            sendNotifications(
+                                    lotteryRecipients,
+                                    eventSnapshot.getString("eventName"),
+                                    eventSnapshot.getString("location"),
+                                    "You were selected in the lottery. Open the event to accept or decline.",
+                                    NotificationHelper.TYPE_LOTTERY_SELECTED
+                            );
                         }
                     });
                 })
@@ -676,9 +677,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     selectedEntrantIds.clear();
                     selectedEntrantIds.addAll(newSelected);
                     Toast.makeText(this, "Replacement selected", Toast.LENGTH_SHORT).show();
-                    for (String entrant : drawn) {
-                        sendReplacementNotification(entrant);
-                    }
+                    sendReplacementNotifications(drawn);
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to save replacement", Toast.LENGTH_SHORT).show());
@@ -701,9 +700,51 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
     }
 
-    private void sendReplacementNotification(String entrantId) {
-        // TODO: implement push notification logic or FCM integration
-        // placeholder to satisfy optional acceptance criterion
-        // Log.d("REPLACEMENT", "Would notify entrant " + entrantId);
+    private void sendReplacementNotifications(List<String> entrantIds) {
+        if (entrantIds == null || entrantIds.isEmpty()) {
+            return;
+        }
+
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(eventSnapshot -> {
+                    if (!eventSnapshot.exists()) {
+                        return;
+                    }
+
+                    sendNotifications(
+                            entrantIds,
+                            eventSnapshot.getString("eventName"),
+                            eventSnapshot.getString("location"),
+                            "A replacement spot is available for you. Open the event to accept or decline.",
+                            NotificationHelper.TYPE_REPLACEMENT_SELECTED
+                    );
+                });
+    }
+
+    private void sendNotifications(List<String> recipientIds,
+                                   String eventName,
+                                   String eventLocation,
+                                   String message,
+                                   String type) {
+        if (recipientIds == null || recipientIds.isEmpty()) {
+            return;
+        }
+
+        List<com.google.android.gms.tasks.Task<Boolean>> tasks = new ArrayList<>();
+        for (String recipientId : recipientIds) {
+            tasks.add(NotificationHelper.sendEventNotification(
+                    db,
+                    recipientId,
+                    organizerId,
+                    eventId,
+                    eventName,
+                    eventLocation,
+                    message,
+                    type,
+                    eventId
+            ));
+        }
+
+        com.google.android.gms.tasks.Tasks.whenAllComplete(tasks);
     }
 }
