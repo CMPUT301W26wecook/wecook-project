@@ -15,6 +15,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
@@ -25,6 +27,8 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import org.junit.After;
@@ -41,6 +45,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
@@ -281,6 +286,51 @@ public class UserFlowTest {
         onView(withId(R.id.tv_detail_event_name)).check(matches(isDisplayed()));
     }
 
+    @Test
+    public void test16_NotificationReadButtonMarksNotificationRead() throws Exception {
+        prepareTestUser();
+        String eventId = "notif-read-" + UUID.randomUUID();
+        createDetailedEvent(eventId, "Inbox Read Event");
+        String notificationId = createNotification(eventId, "Inbox Read Event", NotificationHelper.TYPE_PRIVATE_INVITE);
+
+        ActivityScenario.launch(UserNotificationActivity.class);
+        safeSleep(1000);
+
+        onView(withText("Read")).perform(click());
+        safeSleep(1000);
+
+        DocumentSnapshot snapshot = readNotification(notificationId);
+        assertNotNull(snapshot);
+        assertEquals(NotificationHelper.STATUS_READ, snapshot.getString("status"));
+        assertNotNull(snapshot.getTimestamp("readAt"));
+
+        cleanupNotification(notificationId);
+        cleanupEvent(eventId);
+    }
+
+    @Test
+    public void test17_NotificationTapOpensEventDetailsAndMarksRead() throws Exception {
+        prepareTestUser();
+        String eventId = "notif-open-" + UUID.randomUUID();
+        createDetailedEvent(eventId, "Inbox Open Event");
+        String notificationId = createNotification(eventId, "Inbox Open Event", NotificationHelper.TYPE_LOTTERY_SELECTED);
+
+        ActivityScenario.launch(UserNotificationActivity.class);
+        safeSleep(1000);
+
+        onView(withText("Inbox Open Event")).perform(click());
+        safeSleep(1500);
+        onView(withId(R.id.tv_detail_event_name)).check(matches(withText("Inbox Open Event")));
+
+        DocumentSnapshot snapshot = readNotification(notificationId);
+        assertNotNull(snapshot);
+        assertEquals(NotificationHelper.STATUS_READ, snapshot.getString("status"));
+        assertNotNull(snapshot.getTimestamp("readAt"));
+
+        cleanupNotification(notificationId);
+        cleanupEvent(eventId);
+    }
+
 
 
     private void prepareTestUser() {
@@ -334,6 +384,92 @@ public class UserFlowTest {
                 .set(eventData)
                 .addOnCompleteListener(t -> latch.countDown());
         assertTrue(latch.await(5, TimeUnit.SECONDS));
+    }
+
+    private void createDetailedEvent(String eventId, String eventName) throws InterruptedException {
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("eventId", eventId);
+        eventData.put("eventName", eventName);
+        eventData.put("location", "Edmonton");
+        eventData.put("organizerId", "org-test");
+        eventData.put("description", "Notification detail test");
+        eventData.put("enrollmentCriteria", "Open to all");
+        eventData.put("lotteryMethodology", "System generates");
+        eventData.put("maxWaitlist", 50L);
+        eventData.put("waitlistEntrantIds", new ArrayList<String>());
+        eventData.put("currentWaitlistCount", 0L);
+        eventData.put("selectedEntrantIds", new ArrayList<String>());
+        eventData.put("replacementEntrantIds", new ArrayList<String>());
+        eventData.put("acceptedEntrantIds", new ArrayList<String>());
+        eventData.put("geolocationRequired", false);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .set(eventData)
+                .addOnCompleteListener(t -> latch.countDown());
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+    }
+
+    private String createNotification(String eventId, String eventName, String type) throws InterruptedException {
+        String notificationId = "notification-" + UUID.randomUUID();
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("eventId", eventId);
+        notification.put("eventName", eventName);
+        notification.put("location", "Edmonton");
+        notification.put("message", "Open this notification");
+        notification.put("recipientId", androidId);
+        notification.put("senderId", "organizer-test");
+        notification.put("status", NotificationHelper.STATUS_UNREAD);
+        notification.put("type", type);
+        notification.put("actionTarget", eventId);
+        notification.put("createdAt", Timestamp.now());
+        notification.put("readAt", null);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users")
+                .document(androidId)
+                .collection("notifications")
+                .document(notificationId)
+                .set(notification)
+                .addOnCompleteListener(task -> latch.countDown());
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        return notificationId;
+    }
+
+    private DocumentSnapshot readNotification(String notificationId) throws InterruptedException {
+        AtomicReference<DocumentSnapshot> snapshotRef = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users")
+                .document(androidId)
+                .collection("notifications")
+                .document(notificationId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    snapshotRef.set(snapshot);
+                    latch.countDown();
+                })
+                .addOnFailureListener(e -> latch.countDown());
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        return snapshotRef.get();
+    }
+
+    private void cleanupNotification(String notificationId) throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users")
+                .document(androidId)
+                .collection("notifications")
+                .document(notificationId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        latch.await(5, TimeUnit.SECONDS);
+    }
+
+    private void cleanupEvent(String eventId) throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        latch.await(5, TimeUnit.SECONDS);
     }
 
     private void createHistoryForQrTest(String eventId) throws InterruptedException {

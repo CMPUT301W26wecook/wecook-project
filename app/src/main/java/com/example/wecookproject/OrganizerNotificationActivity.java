@@ -3,7 +3,9 @@ package com.example.wecookproject;
 import android.content.Intent;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -13,15 +15,11 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.SetOptions;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Activity for organizers to access the notification-sending screen from the organizer workflow.
@@ -43,6 +41,12 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
     private TextView tvEventLocation;
     private TextInputEditText etMessage;
     private Button btnSendNotification;
+    private Spinner recipientSpinner;
+    private String organizerId;
+
+    private static final String RECIPIENT_WAITLIST = "All waitlist";
+    private static final String RECIPIENT_SELECTED = "Selected entrants only";
+    private static final String RECIPIENT_ACCEPTED = "Accepted entrants";
 
     /**
      * Initializes organizer notification UI and navigation.
@@ -55,11 +59,21 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
         setContentView(R.layout.activity_organizer_notification);
         db = FirebaseFirestore.getInstance();
         eventId = getIntent().getStringExtra("eventId");
+        organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
         tvEventName = findViewById(R.id.tv_notification_event_name);
         tvEventLocation = findViewById(R.id.tv_notification_location);
         etMessage = findViewById(R.id.et_notification_message);
         btnSendNotification = findViewById(R.id.btn_send_notification);
+        recipientSpinner = findViewById(R.id.spinner_notification_recipients);
+
+        ArrayAdapter<String> recipientAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                new String[]{RECIPIENT_WAITLIST, RECIPIENT_SELECTED, RECIPIENT_ACCEPTED}
+        );
+        recipientAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        recipientSpinner.setAdapter(recipientAdapter);
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setOnItemSelectedListener(item -> {
@@ -142,14 +156,14 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                         return;
                     }
 
-                    List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds");
-                    if (waitlistEntrants.isEmpty()) {
+                    List<String> recipients = getRecipientsForSelection(eventSnapshot);
+                    if (recipients.isEmpty()) {
                         btnSendNotification.setEnabled(true);
-                        Toast.makeText(this, "No users on the waitlist to notify", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "No matching recipients for this notification", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
-                    deliverToWaitlist(waitlistEntrants, message);
+                    deliverNotifications(recipients, message);
                 })
                 .addOnFailureListener(e -> {
                     btnSendNotification.setEnabled(true);
@@ -157,9 +171,9 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                 });
     }
 
-    private void deliverToWaitlist(List<String> waitlistEntrants, String message) {
+    private void deliverNotifications(List<String> recipientIds, String message) {
         List<Task<Boolean>> deliveryTasks = new ArrayList<>();
-        for (String entrantId : waitlistEntrants) {
+        for (String entrantId : recipientIds) {
             deliveryTasks.add(deliverSingleNotification(entrantId, message));
         }
 
@@ -170,7 +184,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
 
                     for (int i = 0; i < deliveryTasks.size(); i++) {
                         Task<Boolean> task = deliveryTasks.get(i);
-                        String entrantId = waitlistEntrants.get(i);
+                        String entrantId = recipientIds.get(i);
                         if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
                             successCount++;
                         } else {
@@ -182,7 +196,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                     if (failedEntrants.isEmpty()) {
                         Toast.makeText(
                                 this,
-                                "Notification sent successfully to " + successCount + " waitlisted users",
+                                "Notification sent successfully to " + successCount + " users",
                                 Toast.LENGTH_LONG
                         ).show();
                     } else {
@@ -200,34 +214,33 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
     }
 
     private Task<Boolean> deliverSingleNotification(String entrantId, String message) {
-        return db.collection("users").document(entrantId).get()
-                .continueWithTask(userTask -> {
-                    if (!userTask.isSuccessful()) {
-                        return Tasks.forResult(false);
-                    }
+        return NotificationHelper.sendEventNotification(
+                db,
+                entrantId,
+                organizerId,
+                eventId,
+                eventName,
+                eventLocation,
+                message,
+                NotificationHelper.TYPE_MANUAL_WAITLIST_UPDATE,
+                eventId
+        );
+    }
 
-                    DocumentSnapshot userSnapshot = userTask.getResult();
-                    if (userSnapshot == null || !userSnapshot.exists()) {
-                        return Tasks.forResult(false);
-                    }
+    private List<String> getRecipientsForSelection(DocumentSnapshot eventSnapshot) {
+        List<String> recipients;
+        String selectedOption = recipientSpinner.getSelectedItem() == null
+                ? RECIPIENT_WAITLIST
+                : recipientSpinner.getSelectedItem().toString();
 
-                    String organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-                    Map<String, Object> notification = new HashMap<>();
-                    notification.put("eventId", eventId);
-                    notification.put("eventName", eventName);
-                    notification.put("location", eventLocation);
-                    notification.put("message", message);
-                    notification.put("recipientId", entrantId);
-                    notification.put("senderId", organizerId);
-                    notification.put("status", "unread");
-                    notification.put("createdAt", Timestamp.now());
+        if (RECIPIENT_SELECTED.equals(selectedOption)) {
+            recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
+        } else if (RECIPIENT_ACCEPTED.equals(selectedOption)) {
+            recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "acceptedEntrantIds");
+        } else {
+            recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds");
+        }
 
-                    return db.collection("users")
-                            .document(entrantId)
-                            .collection("notifications")
-                            .document()
-                            .set(notification, SetOptions.merge())
-                            .continueWith(writeTask -> writeTask.isSuccessful());
-                });
+        return new ArrayList<>(new java.util.LinkedHashSet<>(recipients));
     }
 }

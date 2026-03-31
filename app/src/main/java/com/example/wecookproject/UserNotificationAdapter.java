@@ -14,10 +14,17 @@ import java.util.List;
  * RecyclerView adapter for entrant notifications.
  */
 public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificationAdapter.ViewHolder> {
-    private final List<UserNotificationItem> items;
+    interface NotificationActionListener {
+        void onNotificationOpened(UserNotificationItem item);
+        void onMarkReadClicked(UserNotificationItem item);
+    }
 
-    public UserNotificationAdapter(List<UserNotificationItem> items) {
+    private final List<UserNotificationItem> items;
+    private final NotificationActionListener actionListener;
+
+    public UserNotificationAdapter(List<UserNotificationItem> items, NotificationActionListener actionListener) {
         this.items = items;
+        this.actionListener = actionListener;
     }
 
     @NonNull
@@ -35,7 +42,13 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         holder.tvLocation.setText(item.getLocation().isEmpty() ? "Location unavailable" : item.getLocation());
         holder.tvMessage.setText(item.getMessage());
         holder.tvTimestamp.setText(item.getFormattedTime());
-        holder.tvStatus.setText(item.getStatus().equalsIgnoreCase("unread") ? "Unread" : "Read");
+        holder.tvType.setText(formatType(item.getType()));
+        holder.tvStatus.setText(item.isUnread() ? "Unread" : "Read");
+        holder.btnRead.setEnabled(item.isUnread());
+        holder.btnRead.setAlpha(item.isUnread() ? 1f : 0.5f);
+
+        holder.itemView.setOnClickListener(v -> actionListener.onNotificationOpened(item));
+        holder.btnRead.setOnClickListener(v -> actionListener.onMarkReadClicked(item));
     }
 
     @Override
@@ -49,6 +62,8 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         private final TextView tvMessage;
         private final TextView tvTimestamp;
         private final TextView tvStatus;
+        private final TextView tvType;
+        private final TextView btnRead;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -57,6 +72,21 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
             tvMessage = itemView.findViewById(R.id.tv_notification_message);
             tvTimestamp = itemView.findViewById(R.id.tv_notification_timestamp);
             tvStatus = itemView.findViewById(R.id.tv_notification_status);
+            tvType = itemView.findViewById(R.id.tv_notification_type);
+            btnRead = itemView.findViewById(R.id.btn_notification_mark_read);
         }
+    }
+
+    private static String formatType(String type) {
+        if (NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)) {
+            return "Invitation";
+        }
+        if (NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)) {
+            return "Lottery";
+        }
+        if (NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type)) {
+            return "Replacement";
+        }
+        return "Update";
     }
 }
