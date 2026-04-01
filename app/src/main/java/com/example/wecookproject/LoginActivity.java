@@ -60,11 +60,11 @@ public class LoginActivity extends AppCompatActivity {
         com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful()) {
                 Log.w("FCM", "Fetching FCM registration token failed", task.getException());
-                return;
+            } else {
+                String token = task.getResult();
+                Log.d("LOGIN_INFO", "Device ID: " + androidId);
+                Log.d("LOGIN_INFO", "FCM Token: " + token);
             }
-            String token = task.getResult();
-            Log.d("LOGIN_INFO", "Device ID: " + androidId);
-            Log.d("LOGIN_INFO", "FCM Token: " + token);
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("users").document(androidId).get().addOnCompleteListener(userTask -> {
