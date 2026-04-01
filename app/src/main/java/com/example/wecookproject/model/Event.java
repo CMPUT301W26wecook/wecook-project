@@ -17,6 +17,7 @@ public class Event {
     private int capacity;
     private Date registrationStartDate;
     private Date registrationEndDate;
+    private Date eventTime;
     private int maxWaitlist;
     private int currentWaitlistCount;
     private boolean geolocationRequired;
@@ -45,6 +46,38 @@ public class Event {
      * @param eventName event name
      * @param registrationStartDate registration start date
      * @param registrationEndDate registration end date
+     * @param eventTime scheduled event time
+     * @param maxWaitlist waitlist capacity
+     * @param currentWaitlistCount current waitlist size
+     * @param geolocationRequired geolocation requirement flag
+     * @param location event location label
+     * @param description event description
+     */
+    public Event(String eventId, String organizerId, String eventName, Date registrationStartDate, Date registrationEndDate,
+                 Date eventTime,
+                 int maxWaitlist, int currentWaitlistCount,
+                 boolean geolocationRequired, String location, String description) {
+        this.eventId = eventId;
+        this.organizerId = organizerId;
+        this.eventName = eventName;
+        this.registrationStartDate = registrationStartDate;
+        this.registrationEndDate = registrationEndDate;
+        this.eventTime = eventTime;
+        this.maxWaitlist = maxWaitlist;
+        this.currentWaitlistCount = currentWaitlistCount;
+        this.geolocationRequired = geolocationRequired;
+        this.location = location;
+        this.description = description;
+    }
+
+    /**
+     * Backward-compatible constructor for call sites that do not yet pass event time.
+     *
+     * @param eventId event identifier
+     * @param organizerId organizer identifier
+     * @param eventName event name
+     * @param registrationStartDate registration start date
+     * @param registrationEndDate registration end date
      * @param maxWaitlist waitlist capacity
      * @param currentWaitlistCount current waitlist size
      * @param geolocationRequired geolocation requirement flag
@@ -54,16 +87,8 @@ public class Event {
     public Event(String eventId, String organizerId, String eventName, Date registrationStartDate, Date registrationEndDate,
                  int maxWaitlist, int currentWaitlistCount,
                  boolean geolocationRequired, String location, String description) {
-        this.eventId = eventId;
-        this.organizerId = organizerId;
-        this.eventName = eventName;
-        this.registrationStartDate = registrationStartDate;
-        this.registrationEndDate = registrationEndDate;
-        this.maxWaitlist = maxWaitlist;
-        this.currentWaitlistCount = currentWaitlistCount;
-        this.geolocationRequired = geolocationRequired;
-        this.location = location;
-        this.description = description;
+        this(eventId, organizerId, eventName, registrationStartDate, registrationEndDate, null,
+                maxWaitlist, currentWaitlistCount, geolocationRequired, location, description);
     }
 
     /**
@@ -148,6 +173,20 @@ public class Event {
      */
     public void setRegistrationEndDate(Date registrationEndDate) {
         this.registrationEndDate = registrationEndDate;
+    }
+
+    /**
+     * @return scheduled event time
+     */
+    public Date getEventTime() {
+        return eventTime;
+    }
+
+    /**
+     * @param eventTime scheduled event time
+     */
+    public void setEventTime(Date eventTime) {
+        this.eventTime = eventTime;
     }
 
     /**

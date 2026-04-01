@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.ImageView;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.concurrent.ExecutorService;
@@ -46,13 +47,16 @@ public final class PosterLoader {
 
         EXECUTOR.execute(() -> {
             try (InputStream inputStream = new URL(posterPath).openStream()) {
-                Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+                byte[] imageBytes = readAllBytes(inputStream);
+                Bitmap bitmap = decodeSampledBitmap(imageBytes, imageView.getWidth(), imageView.getHeight());
                 if (bitmap == null) {
                     return;
                 }
                 MAIN_HANDLER.post(() -> {
                     Object tag = imageView.getTag();
                     if (tag instanceof String && posterPath.equals(tag)) {
+                        imageView.setPadding(0, 0, 0, 0);
+                        imageView.setAdjustViewBounds(true);
                         imageView.setImageBitmap(bitmap);
                     }
                 });
@@ -60,5 +64,44 @@ public final class PosterLoader {
                 // Keep placeholder if loading fails.
             }
         });
+    }
+
+    private static byte[] readAllBytes(InputStream inputStream) throws Exception {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, read);
+        }
+        return outputStream.toByteArray();
+    }
+
+    private static Bitmap decodeSampledBitmap(byte[] imageBytes, int requestedWidth, int requestedHeight) {
+        BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
+        boundsOptions.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length, boundsOptions);
+
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = calculateInSampleSize(
+                boundsOptions.outWidth,
+                boundsOptions.outHeight,
+                requestedWidth,
+                requestedHeight
+        );
+        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length, decodeOptions);
+    }
+
+    private static int calculateInSampleSize(int width, int height, int requestedWidth, int requestedHeight) {
+        if (requestedWidth <= 0 || requestedHeight <= 0) {
+            return 1;
+        }
+
+        int inSampleSize = 1;
+        int halfWidth = width / 2;
+        int halfHeight = height / 2;
+        while ((halfWidth / inSampleSize) >= requestedWidth && (halfHeight / inSampleSize) >= requestedHeight) {
+            inSampleSize *= 2;
+        }
+        return Math.max(inSampleSize, 1);
     }
 }

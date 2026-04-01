@@ -284,6 +284,7 @@ public class UserEventActivity extends AppCompatActivity {
         TextView tvWaitlist = dialogView.findViewById(R.id.tv_dialog_waitlist);
         TextView tvStatusChip = dialogView.findViewById(R.id.tv_dialog_status_chip);
         TextView tvDescription = dialogView.findViewById(R.id.tv_dialog_description);
+        Button btnOpenDetails = dialogView.findViewById(R.id.btn_dialog_open_details);
         Button btnSecondary = dialogView.findViewById(R.id.btn_dialog_secondary);
         Button btnJoinWaitlist = dialogView.findViewById(R.id.btn_join_waitlist);
 
@@ -316,6 +317,12 @@ public class UserEventActivity extends AppCompatActivity {
 
         btnShowQr.setOnClickListener(v ->
                 showQrDialog(QrCodeUtils.buildPromotionalEventLink(eventRecord.getEventId())));
+        btnOpenDetails.setOnClickListener(v -> {
+            dialog.dismiss();
+            Intent intent = new Intent(this, UserEventDetailsActivity.class);
+            intent.putExtra("eventId", eventRecord.getEventId());
+            startActivity(intent);
+        });
 
         configureDialogActions(dialog, eventRecord, btnJoinWaitlist, btnSecondary);
         dialog.show();

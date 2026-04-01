@@ -25,6 +25,7 @@ public class UserEventRecord {
     private final String entrantId;
     private final Timestamp registrationStartDate;
     private final Timestamp registrationEndDate;
+    private final Timestamp eventTime;
     private final boolean geolocationRequired;
 
     private List<String> waitlistEntrantIds;
@@ -43,6 +44,7 @@ public class UserEventRecord {
      * @param entrantId current entrant identifier
      * @param registrationStartDate registration start timestamp
      * @param registrationEndDate registration end timestamp
+     * @param eventTime event time timestamp
      * @param geolocationRequired geolocation requirement flag
      * @param waitlistEntrantIds current waitlist entrant ids
      * @param historyStatus current entrant history status
@@ -57,6 +59,7 @@ public class UserEventRecord {
                            String entrantId,
                            Timestamp registrationStartDate,
                            Timestamp registrationEndDate,
+                           Timestamp eventTime,
                            boolean geolocationRequired,
                            List<String> waitlistEntrantIds,
                            String historyStatus) {
@@ -70,6 +73,7 @@ public class UserEventRecord {
         this.entrantId = entrantId;
         this.registrationStartDate = registrationStartDate;
         this.registrationEndDate = registrationEndDate;
+        this.eventTime = eventTime;
         this.geolocationRequired = geolocationRequired;
         this.waitlistEntrantIds = waitlistEntrantIds;
         this.historyStatus = historyStatus == null ? "" : historyStatus;
@@ -104,6 +108,7 @@ public class UserEventRecord {
                 entrantId,
                 snapshot.getTimestamp("registrationStartDate"),
                 snapshot.getTimestamp("registrationEndDate"),
+                snapshot.getTimestamp("eventTime"),
                 getBoolean(snapshot, "geolocationRequired", true),
                 waitlistEntrants,
                 resolvedStatus
@@ -223,6 +228,13 @@ public class UserEventRecord {
      */
     public Timestamp getRegistrationEndDate() {
         return registrationEndDate;
+    }
+
+    /**
+     * @return event time timestamp, or {@code null}
+     */
+    public Timestamp getEventTime() {
+        return eventTime;
     }
 
     /**

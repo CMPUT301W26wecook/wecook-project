@@ -8,9 +8,14 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -20,15 +25,23 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.wecookproject.model.Event;
+import com.example.wecookproject.model.EventComment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 import com.google.zxing.WriterException;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Activity for organizers to view an event's details, observe live updates, and navigate to
@@ -48,10 +61,17 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
     
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ListenerRegistration eventListener;
+    private ListenerRegistration commentsListener;
     private SwitchMaterial geolocationSwitch;
     private boolean suppressSwitchCallback;
     private Event currentEvent;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
+    private String organizerId;
+    private String organizerDisplayName;
+    private EditText etComment;
+    private Button btnPostComment;
+    private TextView tvCommentsEmpty;
+    private LinearLayout commentsContainer;
 
     /**
      * Initializes event detail rendering and related navigation actions.
@@ -64,17 +84,25 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         setContentView(R.layout.activity_organizer_event_details);
 
         String eventId = getIntent().getStringExtra("eventId");
+        organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         
         TextView tvEventNameBig = findViewById(R.id.tv_event_name);
         TextView tvEventLocation = findViewById(R.id.tv_event_location);
         TextView tvEventNameDetail = findViewById(R.id.tv_event_name_detail);
         TextView tvEventDates = findViewById(R.id.tv_event_dates);
+        ImageView ivEventPoster = findViewById(R.id.iv_event_poster);
         TextView tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
         TextView tvWaitlistLabel = findViewById(R.id.tv_waitlist_label);
         TextView tvCapacityLabel = findViewById(R.id.tv_capacity_label);
         TextView tvEventVisibility = findViewById(R.id.tv_event_visibility);
         TextView tvEventDescription = findViewById(R.id.tv_event_description);
         geolocationSwitch = findViewById(R.id.switch_geolocation);
+        etComment = findViewById(R.id.et_organizer_comment);
+        btnPostComment = findViewById(R.id.btn_post_organizer_comment);
+        tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
+        commentsContainer = findViewById(R.id.layout_comments_container);
+
+        loadOrganizerProfile();
 
         if (eventId != null) {
             geolocationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -107,6 +135,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 tvEventNameBig.setText(event.getEventName());
                                 tvEventLocation.setText(event.getLocation());
                                 tvEventNameDetail.setText(event.getEventName());
+                                PosterLoader.loadInto(ivEventPoster, event.getPosterPath());
                                 
                                 // Format registration dates
                                 String registrationDateText = "TBD";
@@ -116,6 +145,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                     registrationDateText = "From " + dateFormat.format(event.getRegistrationStartDate());
                                 } else if (event.getRegistrationEndDate() != null) {
                                     registrationDateText = "Until " + dateFormat.format(event.getRegistrationEndDate());
+                                }
+                                if (event.getEventTime() != null) {
+                                    registrationDateText = registrationDateText + "\nEvent time: " + dateFormat.format(event.getEventTime());
                                 }
                                 tvEventDates.setText(registrationDateText);
                                 
@@ -143,6 +175,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                             finish();
                         }
                     });
+            observeComments(eventId);
         } else {
             Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
             finish();
@@ -232,6 +265,165 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
             }
             showQrDialog(qrPayload);
         });
+        btnPostComment.setOnClickListener(v -> submitComment(eventId));
+    }
+
+    private void loadOrganizerProfile() {
+        db.collection("users")
+                .document(organizerId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    String firstName = getSafeTrimmedString(snapshot, "firstName");
+                    String lastName = getSafeTrimmedString(snapshot, "lastName");
+                    String fullName = (firstName + " " + lastName).trim();
+                    organizerDisplayName = fullName.isEmpty() ? "Organizer" : fullName;
+                })
+                .addOnFailureListener(e -> organizerDisplayName = "Organizer");
+    }
+
+    private void observeComments(String eventId) {
+        if (commentsListener != null) {
+            commentsListener.remove();
+        }
+        commentsListener = db.collection("events")
+                .document(eventId)
+                .collection("comments")
+                .orderBy("createdAt", Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this, "Failed to load comments", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    List<EventComment> comments = new ArrayList<>();
+                    if (snapshots != null) {
+                        for (DocumentSnapshot snapshot : snapshots.getDocuments()) {
+                            EventComment comment = snapshot.toObject(EventComment.class);
+                            if (comment == null) {
+                                continue;
+                            }
+                            comment.setCommentId(snapshot.getId());
+                            comments.add(comment);
+                        }
+                    }
+                    renderComments(comments, eventId);
+                });
+    }
+
+    private void submitComment(String eventId) {
+        if (eventId == null || eventId.trim().isEmpty()) {
+            Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String commentText = etComment.getText() == null ? "" : etComment.getText().toString().trim();
+        if (commentText.isEmpty()) {
+            etComment.setError("Comment cannot be empty");
+            return;
+        }
+
+        btnPostComment.setEnabled(false);
+        DocumentReference commentReference = db.collection("events")
+                .document(eventId)
+                .collection("comments")
+                .document();
+
+        Map<String, Object> commentData = new HashMap<>();
+        commentData.put("commentId", commentReference.getId());
+        commentData.put("eventId", eventId);
+        commentData.put("authorId", organizerId);
+        commentData.put("authorName", organizerDisplayName == null || organizerDisplayName.trim().isEmpty()
+                ? "Organizer"
+                : organizerDisplayName);
+        commentData.put("authorRole", "organizer");
+        commentData.put("commentText", commentText);
+        commentData.put("createdAt", FieldValue.serverTimestamp());
+
+        commentReference.set(commentData)
+                .addOnSuccessListener(unused -> {
+                    etComment.setText("");
+                    btnPostComment.setEnabled(true);
+                    Toast.makeText(this, "Comment posted", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    btnPostComment.setEnabled(true);
+                    Toast.makeText(this, "Failed to post comment", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void renderComments(List<EventComment> comments, String eventId) {
+        commentsContainer.removeAllViews();
+        boolean hasComments = comments != null && !comments.isEmpty();
+        tvCommentsEmpty.setVisibility(hasComments ? View.GONE : View.VISIBLE);
+        if (!hasComments) {
+            return;
+        }
+
+        LayoutInflater inflater = LayoutInflater.from(this);
+        for (EventComment comment : comments) {
+            View itemView = inflater.inflate(R.layout.item_organizer_event_comment, commentsContainer, false);
+            TextView tvAuthor = itemView.findViewById(R.id.tv_comment_author);
+            TextView tvAuthorTag = itemView.findViewById(R.id.tv_comment_author_tag);
+            TextView tvCreatedAt = itemView.findViewById(R.id.tv_comment_created_at);
+            TextView tvText = itemView.findViewById(R.id.tv_comment_text);
+            TextView btnDelete = itemView.findViewById(R.id.btn_delete_comment);
+
+            tvAuthor.setText(getDisplayAuthorName(comment));
+            tvCreatedAt.setText(formatCommentDate(comment.getCreatedAt()));
+            tvText.setText(comment.getCommentText() == null ? "" : comment.getCommentText());
+
+            boolean organizerComment = "organizer".equalsIgnoreCase(comment.getAuthorRole());
+            tvAuthorTag.setVisibility(organizerComment ? View.VISIBLE : View.GONE);
+
+            boolean entrantComment = "entrant".equalsIgnoreCase(comment.getAuthorRole());
+            btnDelete.setVisibility(entrantComment ? View.VISIBLE : View.GONE);
+            btnDelete.setOnClickListener(v -> deleteComment(eventId, comment.getCommentId()));
+
+            commentsContainer.addView(itemView);
+        }
+    }
+
+    private void deleteComment(String eventId, String commentId) {
+        if (eventId == null || eventId.trim().isEmpty() || commentId == null || commentId.trim().isEmpty()) {
+            Toast.makeText(this, "Comment unavailable", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        db.collection("events")
+                .document(eventId)
+                .collection("comments")
+                .document(commentId)
+                .delete()
+                .addOnSuccessListener(unused ->
+                        Toast.makeText(this, "Comment deleted", Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to delete comment", Toast.LENGTH_SHORT).show());
+    }
+
+    private String getDisplayAuthorName(EventComment comment) {
+        if (comment == null) {
+            return "";
+        }
+        String authorName = comment.getAuthorName();
+        if (authorName != null && !authorName.trim().isEmpty()) {
+            return authorName.trim();
+        }
+        String authorId = comment.getAuthorId();
+        return authorId == null ? "Unknown user" : authorId;
+    }
+
+    private String formatCommentDate(com.google.firebase.Timestamp timestamp) {
+        if (timestamp == null) {
+            return "Just now";
+        }
+        return new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.CANADA).format(timestamp.toDate());
+    }
+
+    private String getSafeTrimmedString(DocumentSnapshot snapshot, String fieldName) {
+        if (snapshot == null) {
+            return "";
+        }
+        String value = snapshot.getString(fieldName);
+        return value == null ? "" : value.trim();
     }
 
     private String ensureQrPathExists(FirebaseFirestore db, String eventDocId, Event event) {
@@ -332,6 +524,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         // Detach the listener to prevent memory leaks
         if (eventListener != null) {
             eventListener.remove();
+        }
+        if (commentsListener != null) {
+            commentsListener.remove();
         }
     }
 }
