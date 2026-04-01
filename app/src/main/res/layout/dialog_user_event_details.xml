@@ -149,6 +149,17 @@
                 android:textColor="@color/text_muted"
                 android:textSize="14sp" />
 
+            <Button
+                android:id="@+id/btn_dialog_open_details"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/btn_secondary_bg"
+                android:minWidth="0dp"
+                android:text="Open Details"
+                android:textAllCaps="false"
+                android:textColor="@color/text_dark" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

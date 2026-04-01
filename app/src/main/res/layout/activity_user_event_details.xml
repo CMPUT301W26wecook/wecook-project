@@ -173,6 +173,55 @@
                 android:textAllCaps="false"
                 android:textColor="@color/text_dark" />
 
+            <TextView
+                android:id="@+id/tv_comments_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Comments"
+                android:textColor="@color/text_dark"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/et_event_comment"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/edit_text_selector"
+                android:gravity="top|start"
+                android:hint="Add a comment"
+                android:inputType="textMultiLine|textCapSentences"
+                android:minHeight="96dp"
+                android:padding="14dp"
+                android:textColor="@color/text_dark"
+                android:textColorHint="@color/text_muted" />
+
+            <Button
+                android:id="@+id/btn_post_comment"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/btn_secondary_bg"
+                android:text="Post Comment"
+                android:textAllCaps="false"
+                android:textColor="@color/text_dark" />
+
+            <TextView
+                android:id="@+id/tv_comments_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="No comments yet."
+                android:textColor="@color/text_muted"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:id="@+id/layout_comments_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -33,7 +33,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
 import com.example.wecookproject.model.Event;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.android.gms.tasks.Tasks;
@@ -96,8 +95,8 @@ import java.util.concurrent.atomic.AtomicReference;
  *   registration closes selects the requested number of entrants and saves them to Firestore.
  *
  * Outstanding issues:
- * - Several tests interact with real Firestore state, so failures can be influenced by network,
- *   emulator timing, or shared backend conditions.
+ * - Several tests interact with shared Firestore state, so failures can still be influenced by
+ *   backend timing or cleanup order across runs.
  */
 @RunWith(AndroidJUnit4.class)
 @LargeTest
@@ -111,7 +110,6 @@ public class OrganizerFlowTest {
     private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
 
     private FirebaseFirestore db;
-    private static boolean emulatorConfigured = false;
     private ActivityScenario<LoginActivity> activityScenario;
     /** Stable event ID used by test9 / test10 to exercise the edit flow. */
     private String editEventId;
@@ -122,20 +120,6 @@ public class OrganizerFlowTest {
      */
     @Before
     public void setUp() {
-        if (!emulatorConfigured) {
-            try {
-                FirebaseFirestore.getInstance().useEmulator("10.0.2.2", 8080);
-            } catch (IllegalStateException ignored) {
-                // Another test class may have initialized Firestore first in the same process.
-            }
-            try {
-                FirebaseAuth.getInstance().useEmulator("10.0.2.2", 9099);
-            } catch (IllegalStateException ignored) {
-                // Another test class may have initialized Auth first in the same process.
-            }
-            emulatorConfigured = true;
-        }
-
         db = FirebaseFirestore.getInstance();
 
         String androidId = Settings.Secure.getString(
@@ -365,7 +349,7 @@ public class OrganizerFlowTest {
      * flow validates them when the organizer submits the form.</p>
      */
     @Test
-    public void test7_CreateEventAndVerifyInList() {
+    public void test7_CreateEventAndVerifyInList() throws InterruptedException {
         performFullSignup();
 
         ActivityScenario<OrganizerHomeActivity> homeScenario =
@@ -377,18 +361,15 @@ public class OrganizerFlowTest {
         onView(withId(R.id.et_event_name))
                 .perform(replaceText("Espresso Test Event"), closeSoftKeyboard());
         onView(withId(R.id.et_registration_start_date))
-                .perform(replaceText("2026-03-10 17:00"), closeSoftKeyboard());
+                .perform(replaceText(formatFutureDate(1)), closeSoftKeyboard());
         onView(withId(R.id.et_registration_end_date))
-                .perform(replaceText("2026-03-01 09:00"), closeSoftKeyboard());
+                .perform(replaceText(formatFutureDate(2)), closeSoftKeyboard());
         onView(withId(R.id.et_max_waitlist))
                 .perform(replaceText("50"), closeSoftKeyboard());
 
         onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
 
-        // Wait for Firestore write and navigation back to Home
-        safeSleep(WAIT_LONG);
-
-        onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
+        waitUntilOrganizerEventsListVisible();
 
         homeScenario.close();
     }
@@ -506,6 +487,67 @@ public class OrganizerFlowTest {
         awaitLatch(deleteLatch, 10, "mock qr-link event deletion");
     }
 
+    @Test
+    public void test8c_OrganizerCanViewAndDeleteEntrantComment() throws Exception {
+        String organizerAndroidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        String eventId = "organizer-comments-" + UUID.randomUUID();
+        createOrganizerUser(organizerAndroidId, "Org", "Owner");
+        createOwnedEventDocument(eventId, "Organizer Comment Moderation Event", organizerAndroidId);
+        createEventComment(eventId, "entrant-1", "Entrant One", "entrant", "Please confirm the event time.");
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withText("Event Comments")).perform(nestedScrollTo());
+        onView(withText("Entrant One")).perform(nestedScrollTo());
+        onView(withText("Entrant One")).check(matches(isDisplayed()));
+        onView(withText("Please confirm the event time.")).perform(nestedScrollTo());
+        onView(withText("Please confirm the event time.")).check(matches(isDisplayed()));
+        onView(withId(R.id.btn_delete_comment)).perform(nestedScrollTo(), click());
+
+        waitUntilCommentDeleted(eventId, "Please confirm the event time.");
+
+        cleanupCommentsForEvent(eventId);
+        deleteEventDocument(eventId);
+        deleteUserDocument(organizerAndroidId);
+    }
+
+    @Test
+    public void test8d_OrganizerCanPostCommentWithOrganizerTag() throws Exception {
+        String organizerAndroidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        String eventId = "organizer-post-comment-" + UUID.randomUUID();
+        createOrganizerUser(organizerAndroidId, "Owner", "Commenter");
+        createOwnedEventDocument(eventId, "Organizer Post Comment Event", organizerAndroidId);
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.et_organizer_comment))
+                .perform(nestedScrollTo(), replaceText("Organizer note for entrants"), closeSoftKeyboard());
+        onView(withId(R.id.btn_post_organizer_comment)).perform(nestedScrollTo(), click());
+
+        Map<String, Object> comment = waitForCommentByText(eventId, "Organizer note for entrants");
+        assertNotNull(comment);
+        assertEquals("organizer", comment.get("authorRole"));
+
+        onView(allOf(withId(R.id.tv_comment_text), withText("Organizer note for entrants"))).perform(nestedScrollTo());
+        onView(allOf(withId(R.id.tv_comment_text), withText("Organizer note for entrants"))).check(matches(isDisplayed()));
+        onView(allOf(withId(R.id.tv_comment_author_tag), withText("ORGANIZER"))).perform(nestedScrollTo());
+        onView(allOf(withId(R.id.tv_comment_author_tag), withText("ORGANIZER"))).check(matches(isDisplayed()));
+
+        cleanupCommentsForEvent(eventId);
+        deleteEventDocument(eventId);
+        deleteUserDocument(organizerAndroidId);
+    }
+
     /**
      * test9: Launching OrganizerEditEventActivity without an "eventId" extra
      * must cause the activity to finish immediately (state = DESTROYED).
@@ -571,6 +613,7 @@ public class OrganizerFlowTest {
 
         List<String> entrants = Arrays.asList("entrant1", "entrant2", "entrant3", "entrant4", "entrant5");
         createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
 
         createEventDocument(
                 lotteryWithEntrantsEventId,
@@ -605,7 +648,11 @@ public class OrganizerFlowTest {
         assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
         assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
         assertEquals("Each selected entrant should receive one lottery notification",
-                3, countNotificationsByType(selectedEntrants, NotificationHelper.TYPE_LOTTERY_SELECTED));
+                3, waitForNotificationCountByType(
+                        selectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_SELECTED,
+                        3
+                ));
 
         scenario.close();
 
@@ -623,6 +670,7 @@ public class OrganizerFlowTest {
         String replacementEventId = "replacement-test-" + UUID.randomUUID();
         List<String> entrants = Arrays.asList("a1", "a2", "a3", "a4", "a5");
         createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
         createEventDocument(
                 replacementEventId,
                 "Replacement Draw Event",
@@ -662,7 +710,11 @@ public class OrganizerFlowTest {
                 Arrays.asList("a1", "a2").contains(chosen));
         assertTrue("Replacement should come from waitlist pool", entrants.contains(chosen));
         assertEquals("Replacement entrant should receive one replacement notification",
-                1, countNotificationsByType(List.of(chosen), NotificationHelper.TYPE_REPLACEMENT_SELECTED));
+                1, waitForNotificationCountByType(
+                        List.of(chosen),
+                        NotificationHelper.TYPE_REPLACEMENT_SELECTED,
+                        1
+                ));
 
         scenario.close();
         deleteNotificationsForUsers(entrants);
@@ -715,6 +767,17 @@ public class OrganizerFlowTest {
         }
     }
 
+    private String formatFutureDate(int daysAhead) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.DAY_OF_MONTH, daysAhead);
+        calendar.set(Calendar.HOUR_OF_DAY, 12);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return new SimpleDateFormat(DATE_TIME_PATTERN, java.util.Locale.getDefault())
+                .format(calendar.getTime());
+    }
+
     private void createEventDocument(String eventId,
                                      String eventName,
                                      List<String> waitlistEntrants,
@@ -746,12 +809,84 @@ public class OrganizerFlowTest {
         awaitLatch(latch, 15, "event creation");
     }
 
+    private void createOwnedEventDocument(String eventId, String eventName, String organizerId) {
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("eventId", eventId);
+        eventData.put("organizerId", organizerId);
+        eventData.put("eventName", eventName);
+        eventData.put("registrationStartDate", parseTestDate("2026-03-01 00:00"));
+        eventData.put("registrationEndDate", parseTestDate("2026-03-10 00:00"));
+        eventData.put("maxWaitlist", 25);
+        eventData.put("currentWaitlistCount", 0);
+        eventData.put("capacity", 100);
+        eventData.put("geolocationRequired", false);
+        eventData.put("location", "Edmonton");
+        eventData.put("description", "Organizer comments test event");
+        eventData.put("waitlistEntrantIds", new ArrayList<String>());
+        eventData.put("selectedEntrantIds", new ArrayList<String>());
+        eventData.put("replacementEntrantIds", new ArrayList<String>());
+        eventData.put("acceptedEntrantIds", new ArrayList<String>());
+        eventData.put("declinedEntrantIds", new ArrayList<String>());
+        eventData.put("lotteryCount", 0);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .set(eventData)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "owned event creation");
+    }
+
+    private void createOrganizerUser(String organizerId, String firstName, String lastName) {
+        CountDownLatch latch = new CountDownLatch(1);
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("firstName", firstName);
+        userData.put("lastName", lastName);
+        userData.put("role", "organizer");
+        userData.put("profileCompleted", true);
+        db.collection("users").document(organizerId)
+                .set(userData)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "organizer user creation");
+    }
+
+    private void createEventComment(String eventId,
+                                    String authorId,
+                                    String authorName,
+                                    String authorRole,
+                                    String commentText) {
+        String commentId = "comment-" + UUID.randomUUID();
+        Map<String, Object> comment = new HashMap<>();
+        comment.put("commentId", commentId);
+        comment.put("eventId", eventId);
+        comment.put("authorId", authorId);
+        comment.put("authorName", authorName);
+        comment.put("authorRole", authorRole);
+        comment.put("commentText", commentText);
+        comment.put("createdAt", com.google.firebase.Timestamp.now());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .collection("comments")
+                .document(commentId)
+                .set(comment)
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "event comment creation");
+    }
+
     private void deleteEventDocument(String eventId) {
         CountDownLatch latch = new CountDownLatch(1);
         db.collection("events").document(eventId)
                 .delete()
                 .addOnCompleteListener(task -> latch.countDown());
         awaitLatch(latch, 15, "event cleanup");
+    }
+
+    private void deleteUserDocument(String userId) {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users").document(userId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 15, "user cleanup");
     }
 
     private void createEntrantUsers(List<String> entrantIds) {
@@ -827,6 +962,87 @@ public class OrganizerFlowTest {
         return total;
     }
 
+    private int waitForNotificationCountByType(List<String> entrantIds, String type, int expectedCount)
+            throws InterruptedException {
+        for (int i = 0; i < 15; i++) {
+            int count = countNotificationsByType(entrantIds, type);
+            if (count == expectedCount) {
+                return count;
+            }
+            safeSleep(1000);
+        }
+
+        return countNotificationsByType(entrantIds, type);
+    }
+
+    private void cleanupCommentsForEvent(String eventId) {
+        CountDownLatch readLatch = new CountDownLatch(1);
+        AtomicReference<List<DocumentSnapshot>> snapshotsRef = new AtomicReference<>(new ArrayList<>());
+        db.collection("events").document(eventId).collection("comments")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    snapshotsRef.set(new ArrayList<>(querySnapshot.getDocuments()));
+                    readLatch.countDown();
+                })
+                .addOnFailureListener(e -> readLatch.countDown());
+        awaitLatch(readLatch, 15, "comment cleanup read");
+
+        List<DocumentSnapshot> snapshots = snapshotsRef.get();
+        if (snapshots == null || snapshots.isEmpty()) {
+            return;
+        }
+
+        CountDownLatch deleteLatch = new CountDownLatch(snapshots.size());
+        for (DocumentSnapshot snapshot : snapshots) {
+            snapshot.getReference().delete().addOnCompleteListener(task -> deleteLatch.countDown());
+        }
+        awaitLatch(deleteLatch, 15, "comment cleanup delete");
+    }
+
+    private Map<String, Object> waitForCommentByText(String eventId, String commentText) throws Exception {
+        for (int i = 0; i < 15; i++) {
+            DocumentSnapshot match = null;
+            com.google.firebase.firestore.QuerySnapshot querySnapshot = Tasks.await(
+                    db.collection("events").document(eventId).collection("comments").get(),
+                    10,
+                    TimeUnit.SECONDS
+            );
+            for (DocumentSnapshot snapshot : querySnapshot.getDocuments()) {
+                if (commentText.equals(snapshot.getString("commentText"))) {
+                    match = snapshot;
+                    break;
+                }
+            }
+            if (match != null) {
+                return match.getData();
+            }
+            safeSleep(1000);
+        }
+        throw new AssertionError("Timed out waiting for comment text: " + commentText);
+    }
+
+    private void waitUntilCommentDeleted(String eventId, String commentText) throws Exception {
+        for (int i = 0; i < 15; i++) {
+            boolean exists = false;
+            com.google.firebase.firestore.QuerySnapshot querySnapshot = Tasks.await(
+                    db.collection("events").document(eventId).collection("comments").get(),
+                    10,
+                    TimeUnit.SECONDS
+            );
+            for (DocumentSnapshot snapshot : querySnapshot.getDocuments()) {
+                if (commentText.equals(snapshot.getString("commentText"))) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                return;
+            }
+            safeSleep(1000);
+        }
+        throw new AssertionError("Comment was not deleted in time: " + commentText);
+    }
+
     private boolean isViewDisplayed(int viewId) {
         try {
             onView(withId(viewId)).check(matches(isDisplayed()));
@@ -834,6 +1050,27 @@ public class OrganizerFlowTest {
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    private void waitUntilOrganizerEventsListVisible() throws InterruptedException {
+        boolean tappedEventsTab = false;
+
+        for (int i = 0; i < 15; i++) {
+            if (isViewDisplayed(R.id.rv_events)) {
+                return;
+            }
+
+            if (!tappedEventsTab
+                    && isViewDisplayed(R.id.btn_create_event)
+                    && isViewDisplayed(R.id.nav_events)) {
+                onView(withId(R.id.nav_events)).perform(click());
+                tappedEventsTab = true;
+            }
+
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Organizer home events list never became visible after creating an event");
     }
 
     private void safeSleep(long millis) {
