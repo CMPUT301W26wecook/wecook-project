@@ -93,7 +93,12 @@ public final class UserEventUiUtils {
      * @return description string
      */
     public static String buildDescription(UserEventRecord eventRecord) {
-        return eventRecord.getDescription();
+        String description = eventRecord.getDescription();
+        Timestamp eventTime = eventRecord.getEventTime();
+        if (eventTime == null) {
+            return description;
+        }
+        return "Event time: " + formatTimestamp(eventTime) + "\n\n" + description;
     }
 
     /**

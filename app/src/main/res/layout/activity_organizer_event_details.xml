@@ -11,55 +11,58 @@
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="24dp"
-        android:layout_marginBottom="56dp">
+        android:layout_marginBottom="56dp"
+        android:fillViewport="true"
+        android:padding="20dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Back + Screen Title -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
                 android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
+                android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/iv_back"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:src="@android:drawable/ic_menu_revert"
-                    android:contentDescription="Back" />
+                    android:contentDescription="Back"
+                    android:src="@android:drawable/ic_menu_revert" />
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="Event Info"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
                     android:textColor="@color/text_dark"
-                    android:gravity="center" />
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <Space
+                    android:layout_width="24dp"
+                    android:layout_height="1dp" />
             </LinearLayout>
 
-            <!-- Enable Geolocation toggle -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:layout_marginTop="18dp"
                 android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
+                android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Enable Geolocation Requirement"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_dark" />
+                    android:textColor="@color/text_dark"
+                    android:textSize="13sp" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switch_geolocation"
@@ -67,206 +70,218 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <!-- Event Header Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:layout_marginTop="18dp"
                 android:gravity="center_vertical"
-                android:layout_marginTop="16dp">
+                android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/iv_organizer_avatar"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:src="@android:drawable/ic_menu_myplaces"
-                    android:contentDescription="Organizer avatar" />
+                    android:contentDescription="Organizer avatar"
+                    android:src="@android:drawable/ic_menu_myplaces" />
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
                     android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="8dp">
+                    android:orientation="vertical">
 
                     <TextView
                         android:id="@+id/tv_event_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Event 1"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_dark" />
+                        android:textColor="@color/text_dark"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/tv_event_location"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
                         android:text="Edmonton"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_muted" />
+                        android:textColor="@color/text_muted"
+                        android:textSize="13sp" />
                 </LinearLayout>
 
                 <Button
                     android:id="@+id/btn_show_qr"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minHeight="40dp"
                     android:text="Show QR Code"
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- Poster placeholder -->
             <FrameLayout
                 android:id="@+id/fl_event_poster"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
-                android:layout_marginTop="16dp"
+                android:layout_height="180dp"
+                android:layout_marginTop="18dp"
                 android:background="@color/bg_light">
 
                 <ImageView
-                    android:layout_width="60dp"
-                    android:layout_height="60dp"
-                    android:layout_gravity="center"
-                    android:src="@android:drawable/ic_menu_gallery"
-                    android:contentDescription="Event poster placeholder" />
+                    android:id="@+id/iv_event_poster"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="true"
+                    android:contentDescription="Event poster"
+                    android:scaleType="centerCrop"
+                    android:src="@android:drawable/ic_menu_gallery" />
             </FrameLayout>
 
-            <!-- Event details -->
-            <RelativeLayout
+            <TextView
+                android:id="@+id/tv_event_name_detail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
+                android:layout_marginTop="18dp"
+                android:text="Event name"
+                android:textColor="@color/text_dark"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/tv_event_name_detail"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_alignParentTop="true"
-                    android:text="Event name"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_dark" />
+            <TextView
+                android:id="@+id/tv_event_dates"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="2dp"
+                android:text="02/02/2026 - 20/03/2026"
+                android:textColor="@color/text_muted"
+                android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/tv_event_dates"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_alignBaseline="@id/tv_event_name_detail"
-                    android:text="02/02/2026 - 20/03/2026"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_muted" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tv_organizer_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_below="@id/tv_event_name_detail"
-                    android:layout_marginTop="4dp"
-                    android:text="Organizer 1"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_muted" />
-
-                <TextView
-                    android:id="@+id/tv_waitlist_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_alignBaseline="@id/tv_organizer_label"
-                    android:text="Waitlist: 50/100"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_muted" />
-
-                <TextView
-                    android:id="@+id/tv_capacity_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_below="@id/tv_organizer_label"
-                    android:layout_marginTop="4dp"
-                    android:text="Capacity: 100"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_muted" />
-
-                <TextView
-                    android:id="@+id/tv_event_visibility"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_below="@id/tv_waitlist_label"
-                    android:layout_marginTop="4dp"
-                    android:text="Visibility: Public"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_muted" />
-
-                <TextView
-                    android:id="@+id/tv_event_description"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_below="@id/tv_event_visibility"
-                    android:layout_marginTop="8dp"
-                    android:text="Text detail of the event\nOther details of the event\n \u2022 Result is picked by organizer"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_muted"
-                    android:lineSpacingExtra="4dp" />
-            </RelativeLayout>
+                    android:orientation="horizontal">
 
-            <!-- Action buttons matching mockup -->
-            <RelativeLayout
+                    <TextView
+                        android:id="@+id/tv_organizer_label"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:text="Organizer 1"
+                        android:textColor="@color/text_muted"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tv_waitlist_label"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:text="Waitlist: 50/100"
+                        android:textColor="@color/text_muted"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_capacity_label"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:text="Capacity: 100"
+                        android:textColor="@color/text_muted"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tv_event_visibility"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:text="Visibility: Public"
+                        android:textColor="@color/text_muted"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_event_description"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginTop="14dp"
+                android:lineSpacingExtra="4dp"
+                android:text="Text detail of the event"
+                android:textColor="@color/text_muted"
+                android:textSize="14sp" />
 
-                <Button
-                    android:id="@+id/btn_edit_event"
-                    android:layout_width="140dp"
-                    android:layout_height="wrap_content"
-                    android:minHeight="44dp"
-                    android:layout_alignParentStart="true"
-                    android:layout_alignParentTop="true"
-                    android:backgroundTint="#65559F"
-                    android:textColor="@color/white"
-                    android:textSize="12sp"
-                    android:textAllCaps="false"
-                    android:text="Edit the Event" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:orientation="vertical">
 
-                <Button
-                    android:id="@+id/btn_view_waitlist"
-                    android:layout_width="140dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="44dp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_alignParentTop="true"
-                    android:backgroundTint="#65559F"
-                    android:textColor="@color/white"
-                    android:textSize="12sp"
-                    android:textAllCaps="false"
-                    android:text="View the Waitlist" />
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_edit_event"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="10dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="#65559F"
+                        android:minHeight="48dp"
+                        android:text="Edit the Event"
+                        android:textAllCaps="false"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btn_view_waitlist"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="#65559F"
+                        android:minHeight="48dp"
+                        android:text="View the Waitlist"
+                        android:textAllCaps="false"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/btn_registration_map"
-                    android:layout_width="140dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="44dp"
-                    android:layout_below="@id/btn_view_waitlist"
-                    android:layout_alignParentEnd="true"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="12dp"
                     android:backgroundTint="#65559F"
-                    android:textColor="@color/white"
-                    android:textSize="12sp"
+                    android:minHeight="48dp"
+                    android:text="Registration Map"
                     android:textAllCaps="false"
-                    android:text="Registration Map" />
-
-            </RelativeLayout>
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tv_comments_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="24dp"
                 android:text="Event Comments"
                 android:textColor="@color/text_dark"
                 android:textSize="18sp"
@@ -309,12 +324,11 @@
                 android:id="@+id/layout_comments_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="20dp"
                 android:orientation="vertical" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"

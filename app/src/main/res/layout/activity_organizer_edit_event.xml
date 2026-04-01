@@ -205,6 +205,21 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_event_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Event Time (YYYY-MM-DD HH:mm)">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_event_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:focusable="false"
+                    android:clickable="true" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_capacity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -229,6 +244,24 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="number" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_event_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Event Description"
+                app:counterEnabled="true"
+                app:counterMaxLength="500">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_event_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="top|start"
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:maxLength="500"
+                    android:minLines="4" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <TextView

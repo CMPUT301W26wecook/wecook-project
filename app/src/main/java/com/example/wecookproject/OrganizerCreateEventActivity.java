@@ -1,17 +1,25 @@
 package com.example.wecookproject;
 
+import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 import android.widget.RadioGroup;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import android.annotation.SuppressLint;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -26,22 +34,30 @@ import java.util.UUID;
 
 /**
  * Activity for organizers to configure and create new events from a form-driven workflow. Within
- * the app it acts as the UI controller for the organizer event-creation flow, validating input and
- * persisting a new Event document directly to Firestore.
- *
- * Outstanding issues:
- * - Creation relies on default placeholder values for fields such as location and description,
- *   which leaves newly created events only partially configured.
- * - Firestore writes and organizer-identity lookup are handled directly in the Activity, which
- *   tightly couples UI and data logic instead of separating them through a repository or
- *   ViewModel-style layer.
- * - Firestore and Storage access are handled directly in the Activity, which is not implemented yet,
- *   as connecting to Firebase storage require addition setup that might incur extra costs.
+ * the app it acts as the UI controller for the organizer event-creation flow, validating input,
+ * uploading an optional poster, and persisting a new Event document directly to Firestore.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
+    private static final int DESCRIPTION_MAX_LENGTH = 500;
+    private static final long ONE_HOUR_MILLIS = 60L * 60L * 1000L;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
+
+    private FirebaseFirestore db;
+    private TextInputEditText etEventName;
+    private TextInputEditText etRegistrationStartDate;
+    private TextInputEditText etRegistrationEndDate;
+    private TextInputEditText etEventTime;
+    private TextInputEditText etCapacity;
+    private TextInputEditText etMaxWaitlist;
+    private TextInputEditText etEventDescription;
+    private RadioGroup rgEventVisibility;
+    private ImageView ivPosterPreview;
+    private TextView tvPosterUploadTitle;
+    private TextView tvPosterUploadSubtitle;
+    private Uri selectedPosterUri;
+    private ActivityResultLauncher<String> posterPickerLauncher;
 
     /**
      * Initializes event creation form, validators, and navigation.
@@ -53,18 +69,33 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_organizer_create_event);
         dateFormat.setLenient(false);
+        db = FirebaseFirestore.getInstance();
 
-        TextInputEditText etEventName = findViewById(R.id.et_event_name);
-        TextInputEditText etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
-        TextInputEditText etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
-        TextInputEditText etCapacity = findViewById(R.id.et_capacity);
-        TextInputEditText etMaxWaitlist = findViewById(R.id.et_max_waitlist);
-        RadioGroup rgEventVisibility = findViewById(R.id.rg_event_visibility);
+        etEventName = findViewById(R.id.et_event_name);
+        etRegistrationStartDate = findViewById(R.id.et_registration_start_date);
+        etRegistrationEndDate = findViewById(R.id.et_registration_end_date);
+        etEventTime = findViewById(R.id.et_event_time);
+        etCapacity = findViewById(R.id.et_capacity);
+        etMaxWaitlist = findViewById(R.id.et_max_waitlist);
+        etEventDescription = findViewById(R.id.et_event_description);
+        rgEventVisibility = findViewById(R.id.rg_event_visibility);
+        ivPosterPreview = findViewById(R.id.iv_poster_preview);
+        tvPosterUploadTitle = findViewById(R.id.tv_poster_upload_title);
+        tvPosterUploadSubtitle = findViewById(R.id.tv_poster_upload_subtitle);
+        FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
+
+        posterPickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.GetContent(),
+                this::handlePosterSelection
+        );
 
         etRegistrationStartDate.setOnClickListener(v ->
                 showDatePicker(etRegistrationStartDate, "Registration Start Time"));
         etRegistrationEndDate.setOnClickListener(v ->
                 showDatePicker(etRegistrationEndDate, "Registration End Time"));
+        etEventTime.setOnClickListener(v ->
+                showDatePicker(etEventTime, "Event Time"));
+        flPosterUpload.setOnClickListener(v -> posterPickerLauncher.launch("image/*"));
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_create_events);
@@ -81,107 +112,184 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         });
 
         findViewById(R.id.iv_back).setOnClickListener(v -> finish());
-
         findViewById(R.id.btn_cancel).setOnClickListener(v -> finish());
+        findViewById(R.id.btn_create_event).setOnClickListener(v -> createEvent());
+    }
 
-        findViewById(R.id.btn_create_event).setOnClickListener(v -> {
-            String eventName = etEventName.getText() != null ? etEventName.getText().toString().trim() : "";
-            String startDateStr = etRegistrationStartDate.getText() != null ? etRegistrationStartDate.getText().toString().trim() : "";
-            String endDateStr = etRegistrationEndDate.getText() != null ? etRegistrationEndDate.getText().toString().trim() : "";
-            String capacityStr = etCapacity.getText() != null ? etCapacity.getText().toString().trim() : "";
-            String maxWaitlistStr = etMaxWaitlist.getText() != null ? etMaxWaitlist.getText().toString().trim() : "";
+    private void createEvent() {
+        String eventName = getTrimmedText(etEventName);
+        String startDateStr = getTrimmedText(etRegistrationStartDate);
+        String endDateStr = getTrimmedText(etRegistrationEndDate);
+        String eventTimeStr = getTrimmedText(etEventTime);
+        String capacityStr = getTrimmedText(etCapacity);
+        String maxWaitlistStr = getTrimmedText(etMaxWaitlist);
+        String eventDescription = getTrimmedText(etEventDescription);
 
-            if (eventName.isEmpty() || startDateStr.isEmpty() || endDateStr.isEmpty() || capacityStr.isEmpty() || maxWaitlistStr.isEmpty()) {
-                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        if (eventName.isEmpty() || startDateStr.isEmpty() || endDateStr.isEmpty()
+                || eventTimeStr.isEmpty() || capacityStr.isEmpty()
+                || maxWaitlistStr.isEmpty() || eventDescription.isEmpty()) {
+            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            Date registrationStartDate = parseDateTime(startDateStr);
-            Date registrationEndDate = parseDateTime(endDateStr);
-            Date now = new Date();
-            boolean invalidStartTime = registrationStartDate == null || registrationStartDate.before(now);
-            boolean invalidEndTime = registrationEndDate == null
-                    || registrationEndDate.before(now)
-                    || (registrationStartDate != null && registrationEndDate.before(registrationStartDate));
-            if (invalidStartTime && invalidEndTime) {
-                Toast.makeText(this, "invalid start and end time", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (invalidStartTime) {
-                Toast.makeText(this, "invalid start time", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (invalidEndTime) {
-                Toast.makeText(this, "invalid end time", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        Date registrationStartDate = parseDateTime(startDateStr);
+        Date registrationEndDate = parseDateTime(endDateStr);
+        Date eventTime = parseDateTime(eventTimeStr);
+        Date now = new Date();
+        boolean invalidStartTime = registrationStartDate == null || registrationStartDate.before(now);
+        boolean invalidEndTime = registrationEndDate == null
+                || registrationEndDate.before(now)
+                || (registrationStartDate != null && registrationEndDate.before(registrationStartDate));
+        if (invalidStartTime && invalidEndTime) {
+            Toast.makeText(this, "invalid start and end time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (invalidStartTime) {
+            Toast.makeText(this, "invalid start time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (invalidEndTime) {
+            Toast.makeText(this, "invalid end time", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            int capacity;
-            try {
-                capacity = Integer.parseInt(capacityStr);
-            } catch (NumberFormatException e) {
-                Toast.makeText(this, "Invalid capacity number", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        if (eventTime == null) {
+            Toast.makeText(this, "invalid event time", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            int maxWaitlist;
-            try {
-                maxWaitlist = Integer.parseInt(maxWaitlistStr);
-            } catch (NumberFormatException e) {
-                Toast.makeText(this, "Invalid maximum waitlist number", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        Date minimumEventTime = new Date(registrationEndDate.getTime() + ONE_HOUR_MILLIS);
+        if (eventTime.before(minimumEventTime)) {
+            Toast.makeText(this, "Event time must be at least 1 hour after registration end time", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            if (capacity <= 0) {
-                Toast.makeText(this, "Capacity must be greater than 0", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        if (eventDescription.length() > DESCRIPTION_MAX_LENGTH) {
+            Toast.makeText(this, "Event description must be 500 characters or fewer", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            if (maxWaitlist < 0) {
-                Toast.makeText(this, "Maximum waitlist must be 0 or more", Toast.LENGTH_SHORT).show();
-                return;
-            }
+        int capacity;
+        try {
+            capacity = Integer.parseInt(capacityStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid capacity number", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            @SuppressLint("HardwareIds")
-            String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            String eventId = UUID.randomUUID().toString();
+        int maxWaitlist;
+        try {
+            maxWaitlist = Integer.parseInt(maxWaitlistStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid maximum waitlist number", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            Event newEvent = new Event(
-                    eventId,
-                    androidId, // organizer ID
-                    eventName,
-                    registrationStartDate,
-                    registrationEndDate,
-                    maxWaitlist,
-                    0, // currentWaitlistCount starts at 0
-                    false, // Default geolocation
-                    "Location TBD", // Default location
-                    "" // Default description
-            );
-            newEvent.setCapacity(capacity);
-            int selectedVisibilityId = rgEventVisibility.getCheckedRadioButtonId();
-            String visibilityTag = selectedVisibilityId == R.id.rb_visibility_private
-                    ? Event.VISIBILITY_PRIVATE
-                    : Event.VISIBILITY_PUBLIC;
-            newEvent.setVisibilityTag(visibilityTag);
-            if (Event.VISIBILITY_PUBLIC.equals(visibilityTag)) {
-                newEvent.setQrCodePath(QrCodeUtils.buildPromotionalEventLink(eventId));
-            } else {
-                newEvent.setQrCodePath("");
-            }
+        if (capacity <= 0) {
+            Toast.makeText(this, "Capacity must be greater than 0", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-            FirebaseFirestore db = FirebaseFirestore.getInstance();
-            db.collection("events").document(eventId)
-                    .set(newEvent)
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(this, "Event created successfully", Toast.LENGTH_SHORT).show();
-                        Intent intent = new Intent(this, OrganizerHomeActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                        startActivity(intent);
-                        finish();
-                    })
-                    .addOnFailureListener(e -> Toast.makeText(this, "Failed to create event: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-        });
+        if (maxWaitlist < 0) {
+            Toast.makeText(this, "Maximum waitlist must be 0 or more", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (capacity > maxWaitlist) {
+            Toast.makeText(this, "Capacity must not be greater than maximum waitlist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        @SuppressLint("HardwareIds")
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        String eventId = UUID.randomUUID().toString();
+
+        Event newEvent = new Event(
+                eventId,
+                androidId,
+                eventName,
+                registrationStartDate,
+                registrationEndDate,
+                eventTime,
+                maxWaitlist,
+                0,
+                false,
+                "Location TBD",
+                eventDescription
+        );
+        newEvent.setCapacity(capacity);
+
+        int selectedVisibilityId = rgEventVisibility.getCheckedRadioButtonId();
+        String visibilityTag = selectedVisibilityId == R.id.rb_visibility_private
+                ? Event.VISIBILITY_PRIVATE
+                : Event.VISIBILITY_PUBLIC;
+        newEvent.setVisibilityTag(visibilityTag);
+        if (Event.VISIBILITY_PUBLIC.equals(visibilityTag)) {
+            newEvent.setQrCodePath(QrCodeUtils.buildPromotionalEventLink(eventId));
+        } else {
+            newEvent.setQrCodePath("");
+        }
+
+        if (selectedPosterUri != null) {
+            Toast.makeText(this, "Uploading poster...", Toast.LENGTH_SHORT).show();
+            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.Callback() {
+                @Override
+                public void onSuccess(String imageUrl) {
+                    newEvent.setPosterPath(imageUrl);
+                    saveEvent(newEvent);
+                }
+
+                @Override
+                public void onFailure(String message) {
+                    Toast.makeText(OrganizerCreateEventActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            });
+            return;
+        }
+
+        saveEvent(newEvent);
+    }
+
+    private void saveEvent(Event newEvent) {
+        db.collection("events").document(newEvent.getEventId())
+                .set(newEvent)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Event created successfully", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(this, OrganizerHomeActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    startActivity(intent);
+                    finish();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to create event: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    }
+
+    private void handlePosterSelection(Uri imageUri) {
+        if (imageUri == null) {
+            return;
+        }
+
+        String mimeType = getContentResolver().getType(imageUri);
+        if (!isValidPosterMimeType(mimeType)) {
+            Toast.makeText(this, "Only JPG, JPEG, and PNG images are allowed", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        selectedPosterUri = imageUri;
+        ivPosterPreview.setPadding(0, 0, 0, 0);
+        ivPosterPreview.setImageURI(imageUri);
+        tvPosterUploadTitle.setText("Poster ready to upload");
+        tvPosterUploadSubtitle.setText("This image will be uploaded when you create the event");
+    }
+
+    private boolean isValidPosterMimeType(String mimeType) {
+        return "image/jpeg".equalsIgnoreCase(mimeType)
+                || "image/jpg".equalsIgnoreCase(mimeType)
+                || "image/png".equalsIgnoreCase(mimeType);
+    }
+
+    private String getTrimmedText(TextInputEditText editText) {
+        return editText.getText() == null ? "" : editText.getText().toString().trim();
     }
 
     private Date parseDateTime(String value) {

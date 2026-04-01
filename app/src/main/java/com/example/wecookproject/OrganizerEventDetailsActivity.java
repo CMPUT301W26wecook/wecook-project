@@ -90,6 +90,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         TextView tvEventLocation = findViewById(R.id.tv_event_location);
         TextView tvEventNameDetail = findViewById(R.id.tv_event_name_detail);
         TextView tvEventDates = findViewById(R.id.tv_event_dates);
+        ImageView ivEventPoster = findViewById(R.id.iv_event_poster);
         TextView tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
         TextView tvWaitlistLabel = findViewById(R.id.tv_waitlist_label);
         TextView tvCapacityLabel = findViewById(R.id.tv_capacity_label);
@@ -134,6 +135,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 tvEventNameBig.setText(event.getEventName());
                                 tvEventLocation.setText(event.getLocation());
                                 tvEventNameDetail.setText(event.getEventName());
+                                PosterLoader.loadInto(ivEventPoster, event.getPosterPath());
                                 
                                 // Format registration dates
                                 String registrationDateText = "TBD";
@@ -143,6 +145,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                     registrationDateText = "From " + dateFormat.format(event.getRegistrationStartDate());
                                 } else if (event.getRegistrationEndDate() != null) {
                                     registrationDateText = "Until " + dateFormat.format(event.getRegistrationEndDate());
+                                }
+                                if (event.getEventTime() != null) {
+                                    registrationDateText = registrationDateText + "\nEvent time: " + dateFormat.format(event.getEventTime());
                                 }
                                 tvEventDates.setText(registrationDateText);
                                 
