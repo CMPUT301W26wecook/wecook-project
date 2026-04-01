@@ -3,8 +3,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
+    android:gravity="center_vertical"
     android:background="@drawable/bg_list_item"
-    android:layout_margin="4dp">
+    android:layout_margin="4dp"
+    android:padding="4dp">
 
     <CheckBox
         android:id="@+id/cb_select_element"
@@ -17,7 +19,17 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textSize="18sp"
+        android:layout_marginStart="8dp"
         android:text="Element" />
+
+    <TextView
+        android:id="@+id/tv_element_detail"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="12sp"
+        android:layout_marginStart="8dp"
+        android:text="Details" />
 
     <ImageButton
         android:id="@+id/btn_element_menu"
