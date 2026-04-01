@@ -33,7 +33,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
 import com.example.wecookproject.model.Event;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.android.gms.tasks.Tasks;
@@ -96,8 +95,8 @@ import java.util.concurrent.atomic.AtomicReference;
  *   registration closes selects the requested number of entrants and saves them to Firestore.
  *
  * Outstanding issues:
- * - Several tests interact with real Firestore state, so failures can be influenced by network,
- *   emulator timing, or shared backend conditions.
+ * - Several tests interact with shared Firestore state, so failures can still be influenced by
+ *   backend timing or cleanup order across runs.
  */
 @RunWith(AndroidJUnit4.class)
 @LargeTest
@@ -111,7 +110,6 @@ public class OrganizerFlowTest {
     private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
 
     private FirebaseFirestore db;
-    private static boolean emulatorConfigured = false;
     private ActivityScenario<LoginActivity> activityScenario;
     /** Stable event ID used by test9 / test10 to exercise the edit flow. */
     private String editEventId;
@@ -122,20 +120,6 @@ public class OrganizerFlowTest {
      */
     @Before
     public void setUp() {
-        if (!emulatorConfigured) {
-            try {
-                FirebaseFirestore.getInstance().useEmulator("10.0.2.2", 8080);
-            } catch (IllegalStateException ignored) {
-                // Another test class may have initialized Firestore first in the same process.
-            }
-            try {
-                FirebaseAuth.getInstance().useEmulator("10.0.2.2", 9099);
-            } catch (IllegalStateException ignored) {
-                // Another test class may have initialized Auth first in the same process.
-            }
-            emulatorConfigured = true;
-        }
-
         db = FirebaseFirestore.getInstance();
 
         String androidId = Settings.Secure.getString(
@@ -365,7 +349,7 @@ public class OrganizerFlowTest {
      * flow validates them when the organizer submits the form.</p>
      */
     @Test
-    public void test7_CreateEventAndVerifyInList() {
+    public void test7_CreateEventAndVerifyInList() throws InterruptedException {
         performFullSignup();
 
         ActivityScenario<OrganizerHomeActivity> homeScenario =
@@ -377,18 +361,15 @@ public class OrganizerFlowTest {
         onView(withId(R.id.et_event_name))
                 .perform(replaceText("Espresso Test Event"), closeSoftKeyboard());
         onView(withId(R.id.et_registration_start_date))
-                .perform(replaceText("2026-03-10 17:00"), closeSoftKeyboard());
+                .perform(replaceText(formatFutureDate(1)), closeSoftKeyboard());
         onView(withId(R.id.et_registration_end_date))
-                .perform(replaceText("2026-03-01 09:00"), closeSoftKeyboard());
+                .perform(replaceText(formatFutureDate(2)), closeSoftKeyboard());
         onView(withId(R.id.et_max_waitlist))
                 .perform(replaceText("50"), closeSoftKeyboard());
 
         onView(withId(R.id.btn_create_event)).perform(nestedScrollTo(), click());
 
-        // Wait for Firestore write and navigation back to Home
-        safeSleep(WAIT_LONG);
-
-        onView(withId(R.id.rv_events)).check(matches(isDisplayed()));
+        waitUntilOrganizerEventsListVisible();
 
         homeScenario.close();
     }
@@ -632,6 +613,7 @@ public class OrganizerFlowTest {
 
         List<String> entrants = Arrays.asList("entrant1", "entrant2", "entrant3", "entrant4", "entrant5");
         createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
 
         createEventDocument(
                 lotteryWithEntrantsEventId,
@@ -666,7 +648,11 @@ public class OrganizerFlowTest {
         assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
         assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
         assertEquals("Each selected entrant should receive one lottery notification",
-                3, countNotificationsByType(selectedEntrants, NotificationHelper.TYPE_LOTTERY_SELECTED));
+                3, waitForNotificationCountByType(
+                        selectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_SELECTED,
+                        3
+                ));
 
         scenario.close();
 
@@ -684,6 +670,7 @@ public class OrganizerFlowTest {
         String replacementEventId = "replacement-test-" + UUID.randomUUID();
         List<String> entrants = Arrays.asList("a1", "a2", "a3", "a4", "a5");
         createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
         createEventDocument(
                 replacementEventId,
                 "Replacement Draw Event",
@@ -723,7 +710,11 @@ public class OrganizerFlowTest {
                 Arrays.asList("a1", "a2").contains(chosen));
         assertTrue("Replacement should come from waitlist pool", entrants.contains(chosen));
         assertEquals("Replacement entrant should receive one replacement notification",
-                1, countNotificationsByType(List.of(chosen), NotificationHelper.TYPE_REPLACEMENT_SELECTED));
+                1, waitForNotificationCountByType(
+                        List.of(chosen),
+                        NotificationHelper.TYPE_REPLACEMENT_SELECTED,
+                        1
+                ));
 
         scenario.close();
         deleteNotificationsForUsers(entrants);
@@ -774,6 +765,17 @@ public class OrganizerFlowTest {
         } catch (Exception e) {
             throw new AssertionError("Unable to parse test date: " + value, e);
         }
+    }
+
+    private String formatFutureDate(int daysAhead) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.DAY_OF_MONTH, daysAhead);
+        calendar.set(Calendar.HOUR_OF_DAY, 12);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return new SimpleDateFormat(DATE_TIME_PATTERN, java.util.Locale.getDefault())
+                .format(calendar.getTime());
     }
 
     private void createEventDocument(String eventId,
@@ -960,6 +962,19 @@ public class OrganizerFlowTest {
         return total;
     }
 
+    private int waitForNotificationCountByType(List<String> entrantIds, String type, int expectedCount)
+            throws InterruptedException {
+        for (int i = 0; i < 15; i++) {
+            int count = countNotificationsByType(entrantIds, type);
+            if (count == expectedCount) {
+                return count;
+            }
+            safeSleep(1000);
+        }
+
+        return countNotificationsByType(entrantIds, type);
+    }
+
     private void cleanupCommentsForEvent(String eventId) {
         CountDownLatch readLatch = new CountDownLatch(1);
         AtomicReference<List<DocumentSnapshot>> snapshotsRef = new AtomicReference<>(new ArrayList<>());
@@ -1035,6 +1050,27 @@ public class OrganizerFlowTest {
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    private void waitUntilOrganizerEventsListVisible() throws InterruptedException {
+        boolean tappedEventsTab = false;
+
+        for (int i = 0; i < 15; i++) {
+            if (isViewDisplayed(R.id.rv_events)) {
+                return;
+            }
+
+            if (!tappedEventsTab
+                    && isViewDisplayed(R.id.btn_create_event)
+                    && isViewDisplayed(R.id.nav_events)) {
+                onView(withId(R.id.nav_events)).perform(click());
+                tappedEventsTab = true;
+            }
+
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Organizer home events list never became visible after creating an event");
     }
 
     private void safeSleep(long millis) {
