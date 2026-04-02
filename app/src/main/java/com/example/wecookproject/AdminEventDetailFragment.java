@@ -18,7 +18,6 @@ import com.example.wecookproject.model.Event;
 import com.example.wecookproject.model.User;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -27,8 +26,6 @@ import java.util.Map;
  * A Fragment that displays the details of a specific event for administrative purposes.
  */
 public class AdminEventDetailFragment extends Fragment {
-    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
-
     private AdminViewModel viewModel;
     private FirebaseFirestore db = FirebaseFirestore.getInstance();;
     private Event currentEvent;
@@ -69,8 +66,6 @@ public class AdminEventDetailFragment extends Fragment {
         Button btnDeletePoster = view.findViewById(R.id.btn_delete_poster);
         Button btnDeleteEvent = view.findViewById(R.id.btn_delete_event);
 
-        SimpleDateFormat sdf = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
-
         viewModel.getSelectedEvent().observe(getViewLifecycleOwner(), event -> {
             if (event != null) {
                 currentEvent = event;
@@ -78,9 +73,13 @@ public class AdminEventDetailFragment extends Fragment {
                 tvNameLabel.setText(event.getEventName());
                 tvLocation.setText(event.getLocation());
                 
-                String startDate = event.getRegistrationStartDate() != null ? sdf.format(event.getRegistrationStartDate()) : "N/A";
-                String endDate = event.getRegistrationEndDate() != null ? sdf.format(event.getRegistrationEndDate()) : "N/A";
-                tvDate.setText(String.format("%s - %s", startDate, endDate));
+                String startDate = event.getRegistrationStartDate() != null
+                        ? UserEventUiUtils.formatRegistrationDate(event.getRegistrationStartDate())
+                        : "N/A";
+                String endDate = event.getRegistrationEndDate() != null
+                        ? UserEventUiUtils.formatRegistrationDate(event.getRegistrationEndDate())
+                        : "N/A";
+                tvDate.setText(String.format(Locale.getDefault(), "%s - %s", startDate, endDate));
                 
                 tvWaitlistStatus.setText(String.format(Locale.getDefault(), "Waitlist: %d/%d", event.getCurrentWaitlistCount(), event.getMaxWaitlist()));
                 tvDetails.setText(event.getDescription());
