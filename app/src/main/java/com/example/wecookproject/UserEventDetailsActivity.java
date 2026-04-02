@@ -476,6 +476,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             joinWaitlist(null);
             return;
         }
+
         if (hasLocationPermission()) {
             fetchLocationAndJoinWaitlist();
             return;
@@ -494,18 +495,11 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Location permission is required to join the waitlist", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         try {
             fusedLocationClient.getLastLocation()
                     .addOnSuccessListener(location -> {
                         if (location != null) {
-                            joinWaitlist(location);
+                            joinWaitlist(TestingLocationPool.createRandomCountryLocation(this));
                             return;
                         }
 
@@ -522,7 +516,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                                         Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
                                         return;
                                     }
-                                    joinWaitlist(currentLocation);
+                                    joinWaitlist(TestingLocationPool.createRandomCountryLocation(this));
                                 })
                                 .addOnFailureListener(e ->
                                         Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
@@ -688,7 +682,6 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
             GeoPoint existingEntrantLocation = snapshot.getGeoPoint("waitlistEntrantLocations." + entrantId);
-
             if (addEntrant) {
                 if (geolocationRequired && entrantLocation == null && existingEntrantLocation == null) {
                     throw new IllegalStateException("Location is required to join this waitlist");
