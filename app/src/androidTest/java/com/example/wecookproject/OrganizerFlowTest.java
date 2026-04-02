@@ -621,7 +621,7 @@ public class OrganizerFlowTest {
                 new ArrayList<>(entrants),
                 new ArrayList<>(),
                 new ArrayList<>(),
-                0
+                3
         );
 
         safeSleep(WAIT_LONG);
@@ -647,17 +647,130 @@ public class OrganizerFlowTest {
         List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
         assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
         assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
+        List<String> notSelectedEntrants = new ArrayList<>(entrants);
+        notSelectedEntrants.removeAll(selectedEntrants);
         assertEquals("Each selected entrant should receive one lottery notification",
                 3, waitForNotificationCountByType(
                         selectedEntrants,
                         NotificationHelper.TYPE_LOTTERY_SELECTED,
                         3
                 ));
+        assertEquals("Each non-selected entrant should receive one waitlist update notification once max draw count is reached",
+                2, waitForNotificationCountByType(
+                        notSelectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_NOT_SELECTED,
+                        2
+                ));
 
         scenario.close();
 
         deleteNotificationsForUsers(entrants);
         deleteEventDocument(lotteryWithEntrantsEventId);
+        deleteEntrantUsers(entrants);
+    }
+
+    @Test
+    public void test11b_LotteryBelowConfiguredMaxDoesNotNotifyNonSelectedEntrants() throws Exception {
+        String eventId = "lottery-partial-test-" + UUID.randomUUID();
+        List<String> entrants = Arrays.asList("partial1", "partial2", "partial3", "partial4", "partial5");
+        createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
+
+        createEventDocument(
+                eventId,
+                "Lottery Partial Draw Event",
+                new ArrayList<>(entrants),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                3
+        );
+
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantListActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario<OrganizerEntrantListActivity> scenario =
+                ActivityScenario.launch(intent);
+
+        waitUntilLotteryButtonEnabled(scenario);
+
+        onView(withId(R.id.et_lottery_count)).perform(replaceText("2"), closeSoftKeyboard());
+        onView(withId(R.id.btn_lottery_draw)).perform(click());
+
+        DocumentSnapshot snapshot = waitForSelectedEntrants(eventId, 2);
+        assertTrue("Event document must exist after lottery", snapshot.exists());
+
+        @SuppressWarnings("unchecked")
+        List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+        assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
+        assertEquals("Should have selected 2 winners", 2, selectedEntrants.size());
+
+        List<String> notSelectedEntrants = new ArrayList<>(entrants);
+        notSelectedEntrants.removeAll(selectedEntrants);
+
+        assertEquals("Selected entrants should receive lottery notifications",
+                2, waitForNotificationCountByType(
+                        selectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_SELECTED,
+                        2
+                ));
+        assertEquals("Non-selected entrants should not be notified before the configured max draw count is reached",
+                0, waitForNotificationCountByType(
+                        notSelectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_NOT_SELECTED,
+                        0
+                ));
+
+        scenario.close();
+        deleteNotificationsForUsers(entrants);
+        deleteEventDocument(eventId);
+        deleteEntrantUsers(entrants);
+    }
+
+    @Test
+    public void test11c_LotteryDrawCannotExceedConfiguredMax() throws Exception {
+        String eventId = "lottery-max-validation-" + UUID.randomUUID();
+        List<String> entrants = Arrays.asList("max1", "max2", "max3", "max4", "max5");
+        createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
+
+        createEventDocument(
+                eventId,
+                "Lottery Max Validation Event",
+                new ArrayList<>(entrants),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                3
+        );
+
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantListActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario<OrganizerEntrantListActivity> scenario =
+                ActivityScenario.launch(intent);
+
+        waitUntilLotteryButtonEnabled(scenario);
+
+        onView(withId(R.id.et_lottery_count)).perform(replaceText("4"), closeSoftKeyboard());
+        onView(withId(R.id.btn_lottery_draw)).perform(click());
+
+        safeSleep(WAIT_MEDIUM);
+        DocumentSnapshot snapshot = waitForEventDocument(eventId, entrants.size());
+        assertTrue("Event document must still exist", snapshot.exists());
+
+        @SuppressWarnings("unchecked")
+        List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+        assertTrue("Selected entrants should remain empty when draw exceeds configured max",
+                selectedEntrants == null || selectedEntrants.isEmpty());
+        assertEquals("No lottery-selected notifications should be sent when draw is blocked",
+                0, countNotificationsByType(entrants, NotificationHelper.TYPE_LOTTERY_SELECTED));
+        assertEquals("No lottery-not-selected notifications should be sent when draw is blocked",
+                0, countNotificationsByType(entrants, NotificationHelper.TYPE_LOTTERY_NOT_SELECTED));
+
+        scenario.close();
+        deleteNotificationsForUsers(entrants);
+        deleteEventDocument(eventId);
         deleteEntrantUsers(entrants);
     }
 

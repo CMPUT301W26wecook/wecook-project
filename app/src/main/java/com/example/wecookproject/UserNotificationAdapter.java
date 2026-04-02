@@ -84,6 +84,9 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         if (NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)) {
             return "Lottery";
         }
+        if (NotificationHelper.TYPE_LOTTERY_NOT_SELECTED.equals(type)) {
+            return "Not Selected";
+        }
         if (NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type)) {
             return "Replacement";
         }
