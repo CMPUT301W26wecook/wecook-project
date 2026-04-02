@@ -12,8 +12,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.Source;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +34,6 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     
     private EventAdapter eventAdapter;
     private List<Event> eventList;
-    private ListenerRegistration eventsListener;
 
     /**
      * Initializes organizer home list and bottom navigation.
@@ -80,25 +79,32 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     private void loadEvents() {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
-        
-        // Use addSnapshotListener for real-time updates
-        eventsListener = db.collection("events")
+
+        db.collection("events")
                 .whereEqualTo("organizerId", androidId)
-                .addSnapshotListener((value, error) -> {
-                    if (error != null) {
-                        Toast.makeText(this, "Failed to load events: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    if (value != null) {
-                        eventList.clear();
-                        for (QueryDocumentSnapshot document : value) {
-                            Event event = document.toObject(Event.class);
-                            eventList.add(event);
-                        }
-                        eventAdapter.notifyDataSetChanged();
-                    }
+                .get(Source.SERVER)
+                .addOnSuccessListener(value -> bindEvents(value))
+                .addOnFailureListener(error -> {
+                    Toast.makeText(this, "Failed to load organizer events from server. Showing cached events.", Toast.LENGTH_SHORT).show();
+                    db.collection("events")
+                            .whereEqualTo("organizerId", androidId)
+                            .get(Source.CACHE)
+                            .addOnSuccessListener(this::bindEvents)
+                            .addOnFailureListener(cacheError ->
+                                    Toast.makeText(this, "Failed to load events: " + cacheError.getMessage(), Toast.LENGTH_SHORT).show());
                 });
+    }
+
+    private void bindEvents(com.google.firebase.firestore.QuerySnapshot value) {
+        if (value == null) {
+            return;
+        }
+        eventList.clear();
+        for (QueryDocumentSnapshot document : value) {
+            Event event = document.toObject(Event.class);
+            eventList.add(event);
+        }
+        eventAdapter.notifyDataSetChanged();
     }
     
     /**
@@ -107,9 +113,5 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Detach the listener to prevent memory leaks
-        if (eventsListener != null) {
-            eventsListener.remove();
-        }
     }
 }

@@ -13,9 +13,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 
 
 import android.content.Intent;
@@ -433,6 +433,73 @@ public class OrganizerFlowTest {
         detailsScenario.close();
 
         // Clean up the mock document created for this test
+        CountDownLatch deleteLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .delete()
+                .addOnCompleteListener(task -> deleteLatch.countDown());
+        awaitLatch(deleteLatch, 10, "mock event deletion");
+    }
+
+    /**
+     * test8a: Geolocation requirement is fixed at event creation time and cannot be changed later
+     * from organizer detail or registration-map screens.
+     */
+    @Test
+    public void test8a_GeolocationRequirementIsReadOnlyAfterEventCreation() {
+        String mockEventId = "mock-geo-readonly-" + UUID.randomUUID();
+        Event mockEvent = new Event(
+                mockEventId,
+                "org123",
+                "Read Only Geo Event",
+                parseTestDate("2026-01-01 00:00"),
+                parseTestDate("2026-02-02 00:00"),
+                100,
+                50,
+                true,
+                "Edmonton",
+                "Geolocation should remain fixed"
+        );
+
+        CountDownLatch createLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .set(mockEvent)
+                .addOnCompleteListener(task -> createLatch.countDown());
+        awaitLatch(createLatch, 10, "mock event creation");
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", mockEventId);
+        ActivityScenario<OrganizerEventDetailsActivity> detailsScenario =
+                ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+
+        onView(withId(R.id.switch_geolocation)).check(matches(isDisplayed()));
+        onView(withId(R.id.switch_geolocation)).check(matches(org.hamcrest.Matchers.not(isAssignableFrom(Button.class))));
+
+        detailsScenario.close();
+
+        Intent mapIntent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventMapActivity.class);
+        mapIntent.putExtra("eventId", mockEventId);
+        ActivityScenario<OrganizerEventMapActivity> mapScenario =
+                ActivityScenario.launch(mapIntent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.switch_geolocation)).check(matches(isDisplayed()));
+
+        mapScenario.close();
+
+        DocumentSnapshot snapshot;
+        try {
+            snapshot = Tasks.await(db.collection("events").document(mockEventId).get());
+        } catch (Exception e) {
+            throw new AssertionError("Failed to read mock event", e);
+        }
+        assertNotNull(snapshot);
+        Boolean geolocationRequired = snapshot.getBoolean("geolocationRequired");
+        assertTrue("Geolocation requirement should remain unchanged after creation", Boolean.TRUE.equals(geolocationRequired));
+
         CountDownLatch deleteLatch = new CountDownLatch(1);
         db.collection("events").document(mockEventId)
                 .delete()

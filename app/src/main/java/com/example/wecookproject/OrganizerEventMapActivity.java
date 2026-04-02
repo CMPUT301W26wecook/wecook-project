@@ -95,20 +95,8 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
             return;
         }
         geolocationSwitch = findViewById(R.id.switch_geolocation);
-        geolocationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (suppressSwitchCallback) {
-                return;
-            }
-            db.collection("events")
-                    .document(eventId)
-                    .update("geolocationRequired", isChecked)
-                    .addOnFailureListener(e -> {
-                        suppressSwitchCallback = true;
-                        buttonView.setChecked(!isChecked);
-                        suppressSwitchCallback = false;
-                        Toast.makeText(this, "Failed to update geolocation requirement", Toast.LENGTH_SHORT).show();
-                    });
-        });
+        geolocationSwitch.setEnabled(false);
+        geolocationSwitch.setClickable(false);
 
         mapView = findViewById(R.id.map_view);
         if (mapView == null) {
@@ -190,9 +178,7 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
                     tvEventLocation.setText(location == null || location.trim().isEmpty() ? "Location TBD" : location);
                     Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
                     boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
-                    suppressSwitchCallback = true;
                     geolocationSwitch.setChecked(geolocationRequired);
-                    suppressSwitchCallback = false;
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show());
     }
