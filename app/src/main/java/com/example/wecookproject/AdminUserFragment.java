@@ -14,11 +14,14 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.wecookproject.model.User;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Fragment for the Administrator to browse and manage the list of all Entrants in the system.
@@ -84,12 +87,7 @@ public class AdminUserFragment extends Fragment {
              */
             @Override
             public void onDelete(User user, int position) {
-                db.collection("users").document(user.getAndroidId())
-                        .delete()
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "User account deleted", Toast.LENGTH_SHORT).show();
-                        })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ENTRANT, "User account deleted");
             }
         });
 
@@ -104,12 +102,8 @@ public class AdminUserFragment extends Fragment {
             }
 
             for (String userId : userIdsToDelete) {
-                db.collection("users").document(userId)
-                        .delete()
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                removeRoleFromUser(userId, UserDocumentUtils.ROLE_ENTRANT, "Selected accounts deleted");
             }
-
-            Toast.makeText(getContext(), "Selected accounts deleted", Toast.LENGTH_SHORT).show();
         });
 
         return view;
@@ -120,7 +114,6 @@ public class AdminUserFragment extends Fragment {
      */
     private void loadUsersFromFirestore() {
         db.collection("users")
-                .whereEqualTo("role", "entrant")
                 .addSnapshotListener((value, error) -> {
                     if (error != null) {
                         Log.w("AdminUserFragment", "Listen failed.", error);
@@ -131,6 +124,9 @@ public class AdminUserFragment extends Fragment {
                     adapter.getSelectedList().clear();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
+                            if (!UserDocumentUtils.hasRole(doc, UserDocumentUtils.ROLE_ENTRANT)) {
+                                continue;
+                            }
                             User user = doc.toObject(User.class);
                             userList.add(user);
                             adapter.getSelectedList().add(false);
@@ -138,5 +134,43 @@ public class AdminUserFragment extends Fragment {
                     }
                     adapter.notifyDataSetChanged();
                 });
+    }
+
+    private void removeRoleFromUser(String userId, String role, String successMessage) {
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        return;
+                    }
+
+                    if (UserDocumentUtils.getRoleCount(snapshot) <= 1) {
+                        db.collection("users")
+                                .document(userId)
+                                .delete()
+                                .addOnSuccessListener(unused ->
+                                        Toast.makeText(getContext(), successMessage, Toast.LENGTH_SHORT).show())
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("roles." + role, FieldValue.delete());
+                    if (UserDocumentUtils.ROLE_ENTRANT.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))
+                            && UserDocumentUtils.hasRole(snapshot, UserDocumentUtils.ROLE_ORGANIZER)) {
+                        updates.put("role", UserDocumentUtils.ROLE_ORGANIZER);
+                    }
+                    db.collection("users")
+                            .document(userId)
+                            .update(updates)
+                            .addOnSuccessListener(unused ->
+                                    Toast.makeText(getContext(), successMessage, Toast.LENGTH_SHORT).show())
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
     }
 }

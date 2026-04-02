@@ -68,6 +68,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
     private String organizerId;
     private String organizerDisplayName;
+    private TextView tvOrganizerLabel;
     private EditText etComment;
     private Button btnPostComment;
     private TextView tvCommentsEmpty;
@@ -91,7 +92,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         TextView tvEventNameDetail = findViewById(R.id.tv_event_name_detail);
         TextView tvEventDates = findViewById(R.id.tv_event_dates);
         ImageView ivEventPoster = findViewById(R.id.iv_event_poster);
-        TextView tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
+        tvOrganizerLabel = findViewById(R.id.tv_organizer_label);
         TextView tvWaitlistLabel = findViewById(R.id.tv_waitlist_label);
         TextView tvCapacityLabel = findViewById(R.id.tv_capacity_label);
         TextView tvEventVisibility = findViewById(R.id.tv_event_visibility);
@@ -151,7 +152,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 }
                                 tvEventDates.setText(registrationDateText);
                                 
-                                tvOrganizerLabel.setText("Organizer: " + event.getOrganizerId().substring(0, Math.min(event.getOrganizerId().length(), 5)) + "...");
+                                updateOrganizerLabel();
                                 tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
                                 List<String> acceptedEntrantIds = FirestoreFieldUtils.getStringList(documentSnapshot, "acceptedEntrantIds");
                                 int acceptedCount = acceptedEntrantIds.size();
@@ -273,12 +274,23 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                 .document(organizerId)
                 .get()
                 .addOnSuccessListener(snapshot -> {
-                    String firstName = getSafeTrimmedString(snapshot, "firstName");
-                    String lastName = getSafeTrimmedString(snapshot, "lastName");
-                    String fullName = (firstName + " " + lastName).trim();
-                    organizerDisplayName = fullName.isEmpty() ? "Organizer" : fullName;
+                    organizerDisplayName = UserDocumentUtils.buildDisplayName(snapshot, "Organizer");
+                    updateOrganizerLabel();
                 })
-                .addOnFailureListener(e -> organizerDisplayName = "Organizer");
+                .addOnFailureListener(e -> {
+                    organizerDisplayName = "Organizer";
+                    updateOrganizerLabel();
+                });
+    }
+
+    private void updateOrganizerLabel() {
+        if (tvOrganizerLabel == null) {
+            return;
+        }
+        String labelName = organizerDisplayName == null || organizerDisplayName.trim().isEmpty()
+                ? "Organizer"
+                : organizerDisplayName;
+        tvOrganizerLabel.setText("Organizer: " + labelName);
     }
 
     private void observeComments(String eventId) {

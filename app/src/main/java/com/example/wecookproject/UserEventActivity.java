@@ -277,6 +277,7 @@ public class UserEventActivity extends AppCompatActivity {
         TextView tvAvatar = dialogView.findViewById(R.id.tv_dialog_avatar);
         TextView tvHeaderName = dialogView.findViewById(R.id.tv_dialog_event_name);
         TextView tvHeaderLocation = dialogView.findViewById(R.id.tv_dialog_location);
+        TextView tvOrganizer = dialogView.findViewById(R.id.tv_dialog_organizer);
         Button btnShowQr = dialogView.findViewById(R.id.btn_dialog_show_qr);
         ImageView ivPoster = dialogView.findViewById(R.id.iv_dialog_poster);
         TextView tvDetailName = dialogView.findViewById(R.id.tv_dialog_name_detail);
@@ -291,6 +292,7 @@ public class UserEventActivity extends AppCompatActivity {
         tvAvatar.setText(UserEventUiUtils.getAvatarLetter(eventRecord.getEventName()));
         tvHeaderName.setText(eventRecord.getEventName());
         tvHeaderLocation.setText(eventRecord.getLocation());
+        tvOrganizer.setText("Organizer: Loading...");
         tvDetailName.setText(eventRecord.getEventName());
         tvDateRange.setText(UserEventUiUtils.formatDateRange(eventRecord.getRegistrationStartDate(), eventRecord.getRegistrationEndDate()));
         tvWaitlist.setText(UserEventUiUtils.formatWaitlistSummary(eventRecord));
@@ -314,6 +316,7 @@ public class UserEventActivity extends AppCompatActivity {
         }
 
         dialog.setCanceledOnTouchOutside(true);
+        populateOrganizerName(tvOrganizer, eventRecord.getOrganizerId());
 
         btnShowQr.setOnClickListener(v ->
                 showQrDialog(QrCodeUtils.buildPromotionalEventLink(eventRecord.getEventId())));
@@ -326,6 +329,23 @@ public class UserEventActivity extends AppCompatActivity {
 
         configureDialogActions(dialog, eventRecord, btnJoinWaitlist, btnSecondary);
         dialog.show();
+    }
+
+    private void populateOrganizerName(TextView organizerView, String organizerId) {
+        if (organizerView == null) {
+            return;
+        }
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            organizerView.setText("Organizer: Organizer");
+            return;
+        }
+        db.collection("users")
+                .document(organizerId)
+                .get()
+                .addOnSuccessListener(snapshot ->
+                        organizerView.setText("Organizer: "
+                                + UserDocumentUtils.buildDisplayName(snapshot, "Organizer")))
+                .addOnFailureListener(e -> organizerView.setText("Organizer: Organizer"));
     }
 
     /**
@@ -713,11 +733,14 @@ public class UserEventActivity extends AppCompatActivity {
         historyData.put("eventName", eventRecord.getEventName());
         historyData.put("location", eventRecord.getLocation());
         historyData.put("organizerId", eventRecord.getOrganizerId());
+        historyData.put("organizerName", "");
         historyData.put("posterUrl", eventRecord.getPosterPath());
+        historyData.put("eventTime", eventRecord.getEventTime());
         historyData.put("registrationStartDate", eventRecord.getRegistrationStartDate());
         historyData.put("registrationEndDate", eventRecord.getRegistrationEndDate());
         historyData.put("description", eventRecord.getDescription());
         historyData.put("status", status);
+        historyData.put("eventDeleted", false);
         historyData.put("updatedAt", FieldValue.serverTimestamp());
 
         db.collection("users")

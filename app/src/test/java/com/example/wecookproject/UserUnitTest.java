@@ -91,7 +91,7 @@ public class UserUnitTest {
         assertEquals("T6G 2R3", map.get("postalCode"));
         assertEquals(true, map.get("profileCompleted"));
         assertEquals("organizer", map.get("role"));
-        assertEquals(11, map.size());
+        assertEquals(12, map.size());
     }
 
     @Test

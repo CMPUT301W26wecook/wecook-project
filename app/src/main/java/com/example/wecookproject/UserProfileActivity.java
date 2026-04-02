@@ -16,8 +16,10 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -355,18 +357,9 @@ public class UserProfileActivity extends AppCompatActivity {
     private void showDeleteAccountConfirm() {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Account")
-                .setMessage("Are you sure you want to delete your account? This action cannot be undone.")
+                .setMessage("Are you sure you want to delete entrant access from this account?")
                 .setPositiveButton("Delete", (dialog, which) ->
-                        db.collection("users").document(androidId)
-                                .delete()
-                                .addOnSuccessListener(unused -> {
-                                    Toast.makeText(UserProfileActivity.this, "Account deleted", Toast.LENGTH_SHORT).show();
-                                    Intent intent = new Intent(UserProfileActivity.this, LoginActivity.class);
-                                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                    startActivity(intent);
-                                })
-                                .addOnFailureListener(e ->
-                                        Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show())
+                        removeEntrantRole()
                 )
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -397,6 +390,79 @@ public class UserProfileActivity extends AppCompatActivity {
                     startActivity(intent);
                     finish();
                 });
+    }
+
+    private void removeEntrantRole() {
+        deleteEntrantHistory(() -> db.collection("users")
+                .document(androidId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        routeToLogin();
+                        return;
+                    }
+
+                    if (UserDocumentUtils.getRoleCount(snapshot) <= 1) {
+                        db.collection("users")
+                                .document(androidId)
+                                .delete()
+                                .addOnSuccessListener(unused -> {
+                                    Toast.makeText(UserProfileActivity.this, "Account deleted", Toast.LENGTH_SHORT).show();
+                                    routeToLogin();
+                                })
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("roles." + UserDocumentUtils.ROLE_ENTRANT, FieldValue.delete());
+                    if (UserDocumentUtils.ROLE_ENTRANT.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))
+                            && UserDocumentUtils.hasRole(snapshot, UserDocumentUtils.ROLE_ORGANIZER)) {
+                        updates.put("role", UserDocumentUtils.ROLE_ORGANIZER);
+                    }
+
+                    db.collection("users")
+                            .document(androidId)
+                            .update(updates)
+                            .addOnSuccessListener(unused -> {
+                                Toast.makeText(UserProfileActivity.this, "Entrant access removed", Toast.LENGTH_SHORT).show();
+                                routeToLogin();
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show()));
+    }
+
+    private void routeToLogin() {
+        Intent intent = new Intent(UserProfileActivity.this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void deleteEntrantHistory(Runnable onSuccess) {
+        db.collection("users")
+                .document(androidId)
+                .collection("eventHistory")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot.isEmpty()) {
+                        onSuccess.run();
+                        return;
+                    }
+
+                    WriteBatch batch = db.batch();
+                    querySnapshot.getDocuments().forEach(document -> batch.delete(document.getReference()));
+                    batch.commit()
+                            .addOnSuccessListener(unused -> onSuccess.run())
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(UserProfileActivity.this, "Failed to delete event history", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(UserProfileActivity.this, "Failed to delete event history", Toast.LENGTH_SHORT).show());
     }
 
     /**

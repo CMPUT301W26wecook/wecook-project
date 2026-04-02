@@ -10,12 +10,17 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * RecyclerView adapter for rendering user history entries.
  */
 public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.UserHistoryViewHolder> {
+    private final SimpleDateFormat eventTimeFormat =
+            new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.CANADA);
+
     /**
      * Listener for user interactions on history rows.
      */
@@ -73,12 +78,21 @@ public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.
     public void onBindViewHolder(@NonNull UserHistoryViewHolder holder, int position) {
         UserHistoryItem item = items.get(position);
         holder.tvEventName.setText(item.getEventName());
-        holder.tvMeta.setText(item.getLocation() + " • " + UserEventUiUtils.formatDateRange(item.getRegistrationStartDate(), item.getRegistrationEndDate()));
+        holder.tvMeta.setText(item.getOrganizerName() + " • " + formatEventTime(item));
         UserEventUiUtils.applyStatusChip(holder.tvStatus, item.getStatus(), false);
         PosterLoader.loadInto(holder.ivPoster, item.getPosterPath());
+        holder.tvDeleted.setVisibility(item.isDeleted() ? View.VISIBLE : View.GONE);
+        holder.itemView.setAlpha(item.isDeleted() ? 0.6f : 1f);
 
-        holder.itemView.setOnClickListener(v -> listener.onHistoryClicked(item));
+        holder.itemView.setOnClickListener(item.isDeleted() ? null : v -> listener.onHistoryClicked(item));
         holder.btnDelete.setOnClickListener(v -> listener.onDeleteClicked(item));
+    }
+
+    private String formatEventTime(UserHistoryItem item) {
+        if (item.getEventTime() == null) {
+            return "Event time TBD";
+        }
+        return eventTimeFormat.format(item.getEventTime().toDate());
     }
 
     /**
@@ -97,6 +111,7 @@ public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.
         private final TextView tvEventName;
         private final TextView tvMeta;
         private final TextView tvStatus;
+        private final TextView tvDeleted;
         private final ImageButton btnDelete;
 
         /**
@@ -110,6 +125,7 @@ public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.
             tvEventName = itemView.findViewById(R.id.tv_history_event_name);
             tvMeta = itemView.findViewById(R.id.tv_history_meta);
             tvStatus = itemView.findViewById(R.id.tv_history_status);
+            tvDeleted = itemView.findViewById(R.id.tv_history_deleted_tag);
             btnDelete = itemView.findViewById(R.id.btn_delete_history);
         }
     }

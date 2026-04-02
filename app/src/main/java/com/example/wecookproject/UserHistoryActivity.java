@@ -19,6 +19,7 @@ import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -59,6 +60,10 @@ public class UserHistoryActivity extends AppCompatActivity {
              */
             @Override
             public void onHistoryClicked(UserHistoryItem item) {
+                if (item.isDeleted()) {
+                    Toast.makeText(UserHistoryActivity.this, "This event has been deleted", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 Intent intent = new Intent(UserHistoryActivity.this, UserEventDetailsActivity.class);
                 intent.putExtra("eventId", item.getEventId());
                 startActivity(intent);
@@ -134,13 +139,76 @@ public class UserHistoryActivity extends AppCompatActivity {
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     historyItems.clear();
-                    for (QueryDocumentSnapshot document : querySnapshot) {
-                        historyItems.add(UserHistoryItem.fromSnapshot(document));
+                    if (querySnapshot.isEmpty()) {
+                        adapter.notifyDataSetChanged();
+                        updateEmptyState();
+                        return;
                     }
-                    adapter.notifyDataSetChanged();
-                    updateEmptyState();
+
+                    List<UserHistoryItem> resolvedItems = new ArrayList<>(
+                            Collections.nCopies(querySnapshot.size(), null));
+                    final int[] remaining = {querySnapshot.size()};
+                    int index = 0;
+                    for (QueryDocumentSnapshot document : querySnapshot) {
+                        final int resolvedIndex = index++;
+                        enrichHistoryItem(UserHistoryItem.fromSnapshot(document), resolvedItem -> {
+                            resolvedItems.set(resolvedIndex, resolvedItem);
+                            remaining[0]--;
+                            if (remaining[0] == 0) {
+                                historyItems.clear();
+                                for (UserHistoryItem resolved : resolvedItems) {
+                                    if (resolved != null) {
+                                        historyItems.add(resolved);
+                                    }
+                                }
+                                adapter.notifyDataSetChanged();
+                                updateEmptyState();
+                            }
+                        });
+                    }
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show());
+    }
+
+    private void enrichHistoryItem(UserHistoryItem baseItem, HistoryItemCallback callback) {
+        db.collection("users")
+                .document(baseItem.getOrganizerId())
+                .get()
+                .addOnSuccessListener(userSnapshot -> {
+                    String organizerName = UserDocumentUtils.buildDisplayName(userSnapshot, "Organizer");
+                    db.collection("events")
+                            .document(baseItem.getEventId())
+                            .get()
+                            .addOnSuccessListener(eventSnapshot -> {
+                                boolean eventDeleted = !eventSnapshot.exists();
+                                callback.onResolved(baseItem.withResolvedState(
+                                        organizerName,
+                                        eventSnapshot.getTimestamp("eventTime"),
+                                        eventDeleted
+                                ));
+                            })
+                            .addOnFailureListener(e ->
+                                    callback.onResolved(baseItem.withResolvedState(
+                                            organizerName,
+                                            baseItem.getEventTime(),
+                                            false
+                                    )));
+                })
+                .addOnFailureListener(e -> db.collection("events")
+                        .document(baseItem.getEventId())
+                        .get()
+                        .addOnSuccessListener(eventSnapshot ->
+                                callback.onResolved(baseItem.withResolvedState(
+                                        "Organizer",
+                                        eventSnapshot.getTimestamp("eventTime"),
+                                        !eventSnapshot.exists()
+                                )))
+                        .addOnFailureListener(error ->
+                                callback.onResolved(baseItem.withResolvedState(
+                                        "Organizer",
+                                        baseItem.getEventTime(),
+                                        false
+                                ))));
     }
 
     /**
@@ -186,5 +254,9 @@ public class UserHistoryActivity extends AppCompatActivity {
             tvEmptyState.setVisibility(View.GONE);
             rvHistory.setVisibility(View.VISIBLE);
         }
+    }
+
+    private interface HistoryItemCallback {
+        void onResolved(UserHistoryItem item);
     }
 }
