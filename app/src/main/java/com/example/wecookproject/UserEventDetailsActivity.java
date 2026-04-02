@@ -757,11 +757,14 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         historyData.put("eventName", currentEvent.getEventName());
         historyData.put("location", currentEvent.getLocation());
         historyData.put("organizerId", currentEvent.getOrganizerId());
+        historyData.put("organizerName", "");
         historyData.put("posterPath", currentEvent.getPosterPath());
+        historyData.put("eventTime", currentEvent.getEventTime());
         historyData.put("registrationStartDate", currentEvent.getRegistrationStartDate());
         historyData.put("registrationEndDate", currentEvent.getRegistrationEndDate());
         historyData.put("description", currentEvent.getDescription());
         historyData.put("status", status);
+        historyData.put("eventDeleted", false);
         historyData.put("updatedAt", FieldValue.serverTimestamp());
 
         db.collection("users")

@@ -58,6 +58,20 @@
                 android:text="Waitlisted"
                 android:textSize="12sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_history_deleted_tag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:backgroundTint="#DC3545"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="4dp"
+                android:text="Deleted Event"
+                android:textColor="@android:color/holo_red_dark"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
 
         <ImageButton
