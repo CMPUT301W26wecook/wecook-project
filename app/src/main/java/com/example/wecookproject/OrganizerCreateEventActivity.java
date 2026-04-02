@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -284,7 +285,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         ivPosterPreview.setImageURI(imageUri);
         tvPosterUploadTitle.setText("Poster ready to upload");
         tvPosterUploadSubtitle.setText("This image will be uploaded when you create the event");
-        btnRemovePoster.setVisibility(TextView.VISIBLE);
+        btnRemovePoster.setVisibility(View.VISIBLE);
     }
 
     private void clearSelectedPoster() {
