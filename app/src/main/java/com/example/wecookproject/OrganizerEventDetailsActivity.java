@@ -63,7 +63,6 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
     private ListenerRegistration eventListener;
     private ListenerRegistration commentsListener;
     private SwitchMaterial geolocationSwitch;
-    private boolean suppressSwitchCallback;
     private Event currentEvent;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
     private String organizerId;
@@ -98,6 +97,8 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         TextView tvEventVisibility = findViewById(R.id.tv_event_visibility);
         TextView tvEventDescription = findViewById(R.id.tv_event_description);
         geolocationSwitch = findViewById(R.id.switch_geolocation);
+        geolocationSwitch.setEnabled(false);
+        geolocationSwitch.setClickable(false);
         etComment = findViewById(R.id.et_organizer_comment);
         btnPostComment = findViewById(R.id.btn_post_organizer_comment);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
@@ -106,21 +107,6 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         loadOrganizerProfile();
 
         if (eventId != null) {
-            geolocationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (suppressSwitchCallback) {
-                    return;
-                }
-                db.collection("events")
-                        .document(eventId)
-                        .update("geolocationRequired", isChecked)
-                        .addOnFailureListener(e -> {
-                            suppressSwitchCallback = true;
-                            buttonView.setChecked(!isChecked);
-                            suppressSwitchCallback = false;
-                            Toast.makeText(this, "Failed to update geolocation requirement", Toast.LENGTH_SHORT).show();
-                        });
-            });
-
             // Use addSnapshotListener for real-time updates
             eventListener = db.collection("events").document(eventId)
                     .addSnapshotListener((documentSnapshot, error) -> {
@@ -161,9 +147,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                         ? "Private"
                                         : "Public";
                                 tvEventVisibility.setText("Visibility: " + visibilityLabel);
-                                suppressSwitchCallback = true;
                                 geolocationSwitch.setChecked(event.isGeolocationRequired());
-                                suppressSwitchCallback = false;
                                 
                                 String description = event.getDescription() == null
                                         ? ""

@@ -294,6 +294,30 @@
                     android:text="Private" />
             </RadioGroup>
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Geolocation Requirement"
+                android:textColor="@color/text_muted"
+                android:textSize="14sp" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_geolocation_required"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Require entrants to share their location when joining"
+                android:textColor="@color/text_dark" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="This can only be set during event creation."
+                android:textColor="@color/text_muted"
+                android:textSize="12sp" />
+
             <!-- Buttons row -->
             <LinearLayout
                 android:layout_width="match_parent"

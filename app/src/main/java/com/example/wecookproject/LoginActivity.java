@@ -6,12 +6,14 @@ import android.provider.Settings;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.Source;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -71,7 +73,7 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
-            db.collection("users").document(androidId).get().addOnCompleteListener(userTask -> {
+            db.collection("users").document(androidId).get(Source.SERVER).addOnCompleteListener(userTask -> {
                 isDbQueryReady = true;
                 if (userTask.isSuccessful()) {
                     userDocument = userTask.getResult();
@@ -82,7 +84,12 @@ public class LoginActivity extends AppCompatActivity {
                     }
                 } else {
                     userDocument = null;
-                    Log.e("LOGIN_INFO", "Error checking user document", userTask.getException());
+                    Log.e("LOGIN_INFO", "Error checking user document from server", userTask.getException());
+                    Toast.makeText(
+                            this,
+                            "Unable to reach Firebase. Check Firestore rules/project config.",
+                            Toast.LENGTH_LONG
+                    ).show();
                 }
 
                 if (isLoginClicked) {
@@ -181,7 +188,14 @@ public class LoginActivity extends AppCompatActivity {
                         startActivity(new Intent(LoginActivity.this, UserEventActivity.class));
                     }
                 })
-                .addOnFailureListener(e -> Log.e("LOGIN_INFO", "Failed to grant missing role", e));
+                .addOnFailureListener(e -> {
+                    Log.e("LOGIN_INFO", "Failed to grant missing role", e);
+                    Toast.makeText(
+                            this,
+                            "Login failed: unable to update your Firebase user record.",
+                            Toast.LENGTH_LONG
+                    ).show();
+                });
     }
 
     private String getSelectedRoleKey() {
@@ -194,7 +208,5 @@ public class LoginActivity extends AppCompatActivity {
         return null;
     }
 }
-
-
 
 

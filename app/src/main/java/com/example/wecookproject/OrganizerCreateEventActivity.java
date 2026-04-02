@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.wecookproject.model.Event;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -53,6 +54,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private TextInputEditText etMaxWaitlist;
     private TextInputEditText etEventDescription;
     private RadioGroup rgEventVisibility;
+    private SwitchMaterial switchGeolocationRequired;
     private ImageView ivPosterPreview;
     private TextView tvPosterUploadTitle;
     private TextView tvPosterUploadSubtitle;
@@ -79,6 +81,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etMaxWaitlist = findViewById(R.id.et_max_waitlist);
         etEventDescription = findViewById(R.id.et_event_description);
         rgEventVisibility = findViewById(R.id.rg_event_visibility);
+        switchGeolocationRequired = findViewById(R.id.switch_geolocation_required);
         ivPosterPreview = findViewById(R.id.iv_poster_preview);
         tvPosterUploadTitle = findViewById(R.id.tv_poster_upload_title);
         tvPosterUploadSubtitle = findViewById(R.id.tv_poster_upload_subtitle);
@@ -124,6 +127,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         String capacityStr = getTrimmedText(etCapacity);
         String maxWaitlistStr = getTrimmedText(etMaxWaitlist);
         String eventDescription = getTrimmedText(etEventDescription);
+        boolean geolocationRequired = switchGeolocationRequired.isChecked();
 
         if (eventName.isEmpty() || startDateStr.isEmpty() || endDateStr.isEmpty()
                 || eventTimeStr.isEmpty() || capacityStr.isEmpty()
@@ -213,7 +217,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 eventTime,
                 maxWaitlist,
                 0,
-                false,
+                geolocationRequired,
                 "Location TBD",
                 eventDescription
         );

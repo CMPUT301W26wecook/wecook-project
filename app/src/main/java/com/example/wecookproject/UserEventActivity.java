@@ -42,6 +42,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.GeoPoint;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.Source;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
@@ -160,7 +161,7 @@ public class UserEventActivity extends AppCompatActivity {
         db.collection("users")
                 .document(entrantId)
                 .collection("eventHistory")
-                .get()
+                .get(Source.SERVER)
                 .addOnSuccessListener(historySnapshots -> {
                     Map<String, String> historyStatuses = new HashMap<>();
                     Set<String> historyEventIds = new HashSet<>();
@@ -177,8 +178,30 @@ public class UserEventActivity extends AppCompatActivity {
                     loadEvents(historyStatuses, historyEventIds);
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show();
-                    loadEvents(new HashMap<>(), new HashSet<>());
+                    Toast.makeText(this, "Failed to load history from server. Loading cached history.", Toast.LENGTH_SHORT).show();
+                    db.collection("users")
+                            .document(entrantId)
+                            .collection("eventHistory")
+                            .get(Source.CACHE)
+                            .addOnSuccessListener(cacheSnapshots -> {
+                                Map<String, String> historyStatuses = new HashMap<>();
+                                Set<String> historyEventIds = new HashSet<>();
+                                for (QueryDocumentSnapshot historyDocument : cacheSnapshots) {
+                                    String eventId = historyDocument.getString("eventId");
+                                    String status = historyDocument.getString("status");
+                                    if (eventId != null) {
+                                        historyEventIds.add(eventId);
+                                        if (status != null) {
+                                            historyStatuses.put(eventId, status);
+                                        }
+                                    }
+                                }
+                                loadEvents(historyStatuses, historyEventIds);
+                            })
+                            .addOnFailureListener(cacheError -> {
+                                Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show();
+                                loadEvents(new HashMap<>(), new HashSet<>(), Source.SERVER);
+                            });
                 });
     }
 
@@ -189,8 +212,12 @@ public class UserEventActivity extends AppCompatActivity {
      * @param historyEventIds set of eventIds present in entrant history
      */
     private void loadEvents(Map<String, String> historyStatuses, Set<String> historyEventIds) {
+        loadEvents(historyStatuses, historyEventIds, Source.SERVER);
+    }
+
+    private void loadEvents(Map<String, String> historyStatuses, Set<String> historyEventIds, Source source) {
         db.collection("events")
-                .get()
+                .get(source)
                 .addOnSuccessListener(eventSnapshots -> {
                     eventList.clear();
                     for (QueryDocumentSnapshot document : eventSnapshots) {
@@ -238,7 +265,14 @@ public class UserEventActivity extends AppCompatActivity {
                     eventAdapter.notifyDataSetChanged();
                     updateEmptyState();
                 })
-                .addOnFailureListener(e -> Toast.makeText(this, "Failed to load events", Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e -> {
+                    if (source == Source.SERVER) {
+                        Toast.makeText(this, "Failed to load events from server. Showing cached events.", Toast.LENGTH_SHORT).show();
+                        loadEvents(historyStatuses, historyEventIds, Source.CACHE);
+                        return;
+                    }
+                    Toast.makeText(this, "Failed to load events", Toast.LENGTH_SHORT).show();
+                });
     }
 
     /**
