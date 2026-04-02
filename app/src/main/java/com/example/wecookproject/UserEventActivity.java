@@ -420,7 +420,7 @@ public class UserEventActivity extends AppCompatActivity {
             fusedLocationClient.getLastLocation()
                     .addOnSuccessListener(location -> {
                         if (location != null) {
-                            joinWaitingList(eventRecord, dialog, location);
+                            joinWaitingList(eventRecord, dialog, TestingLocationPool.createRandomCountryLocation(this));
                             return;
                         }
 
@@ -432,7 +432,7 @@ public class UserEventActivity extends AppCompatActivity {
                                             Toast.makeText(this, "Unable to read location. Please enable location and try again.", Toast.LENGTH_SHORT).show();
                                             return;
                                         }
-                                        joinWaitingList(eventRecord, dialog, currentLocation);
+                                        joinWaitingList(eventRecord, dialog, TestingLocationPool.createRandomCountryLocation(this));
                                     })
                                     .addOnFailureListener(e ->
                                             Toast.makeText(this, "Unable to read location. Please try again.", Toast.LENGTH_SHORT).show());
@@ -642,7 +642,6 @@ public class UserEventActivity extends AppCompatActivity {
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
             GeoPoint existingEntrantLocation = snapshot.getGeoPoint("waitlistEntrantLocations." + entrantId);
-
             if (addEntrant) {
                 if (geolocationRequired && entrantLocation == null && existingEntrantLocation == null) {
                     throw new IllegalStateException("Location is required to join this waitlist");
