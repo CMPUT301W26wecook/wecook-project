@@ -317,7 +317,16 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
 
             if (geoPoint != null) {
                 String suffix = entrantId.length() > 6 ? entrantId.substring(entrantId.length() - 6) : entrantId;
-                markers.add(new MarkerData(geoPoint.getLatitude(), geoPoint.getLongitude(), "Entrant " + suffix));
+                String cityCountry = TestingLocationPool.cityCountryLabel(
+                        this,
+                        geoPoint.getLatitude(),
+                        geoPoint.getLongitude()
+                );
+                markers.add(new MarkerData(
+                        geoPoint.getLatitude(),
+                        geoPoint.getLongitude(),
+                        "Entrant " + suffix + ": " + cityCountry
+                ));
             }
         }
         return markers;
