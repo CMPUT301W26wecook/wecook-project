@@ -7,8 +7,10 @@ import com.google.firebase.Timestamp;
 
 import org.junit.Test;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Arrays;
+import java.util.Locale;
 
 public class UserEventUiUtilsTest {
 
@@ -30,7 +32,9 @@ public class UserEventUiUtilsTest {
 
         String formatted = UserEventUiUtils.formatDateRange(start, end);
 
-        assertEquals("2024-04-01 00:00 - 2024-05-01 00:00", formatted);
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        String expected = formatter.format(start.toDate()) + " - " + formatter.format(end.toDate());
+        assertEquals(expected, formatted);
     }
 
     @Test
@@ -44,6 +48,7 @@ public class UserEventUiUtilsTest {
                 null,
                 5,
                 "entrant-1",
+                null,
                 null,
                 null,
                 true,

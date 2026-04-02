@@ -26,6 +26,7 @@ public class UserEventRecordTest {
                 "entrant-1",
                 null,
                 null,
+                null,
                 true,
                 Arrays.asList("entrant-1", "entrant-2"),
                 UserEventRecord.STATUS_WAITLISTED
@@ -47,6 +48,7 @@ public class UserEventRecordTest {
                 null,
                 3,
                 "entrant-1",
+                null,
                 null,
                 null,
                 false,
@@ -73,6 +75,7 @@ public class UserEventRecordTest {
                 "entrant-1",
                 Timestamp.now(),
                 Timestamp.now(),
+                null,
                 true,
                 Collections.emptyList(),
                 UserEventRecord.STATUS_INVITED

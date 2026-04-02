@@ -9,11 +9,14 @@ import com.google.firebase.firestore.DocumentSnapshot;
 public class UserHistoryItem {
     private final String eventId;
     private final String eventName;
-    private final String location;
+    private final String organizerId;
+    private final String organizerName;
     private final String posterUrl;
     private final String status;
+    private final Timestamp eventTime;
     private final Timestamp registrationStartDate;
     private final Timestamp registrationEndDate;
+    private final boolean deleted;
 
     /**
      * Creates a history item.
@@ -28,18 +31,24 @@ public class UserHistoryItem {
      */
     public UserHistoryItem(String eventId,
                            String eventName,
-                           String location,
+                           String organizerId,
+                           String organizerName,
                            String posterUrl,
                            String status,
+                           Timestamp eventTime,
                            Timestamp registrationStartDate,
-                           Timestamp registrationEndDate) {
+                           Timestamp registrationEndDate,
+                           boolean deleted) {
         this.eventId = eventId;
         this.eventName = eventName;
-        this.location = location;
+        this.organizerId = organizerId;
+        this.organizerName = organizerName;
         this.posterUrl = posterUrl;
         this.status = status;
+        this.eventTime = eventTime;
         this.registrationStartDate = registrationStartDate;
         this.registrationEndDate = registrationEndDate;
+        this.deleted = deleted;
     }
 
     /**
@@ -52,11 +61,14 @@ public class UserHistoryItem {
         return new UserHistoryItem(
                 value(snapshot.getString("eventId"), snapshot.getId()),
                 value(snapshot.getString("eventName"), "Unnamed Event"),
-                value(snapshot.getString("location"), "Location TBD"),
+                value(snapshot.getString("organizerId"), ""),
+                value(snapshot.getString("organizerName"), "Organizer"),
                 posterPath(snapshot),
                 value(snapshot.getString("status"), UserEventRecord.STATUS_WAITLISTED),
+                snapshot.getTimestamp("eventTime"),
                 snapshot.getTimestamp("registrationStartDate"),
-                snapshot.getTimestamp("registrationEndDate")
+                snapshot.getTimestamp("registrationEndDate"),
+                Boolean.TRUE.equals(snapshot.getBoolean("eventDeleted"))
         );
     }
 
@@ -103,8 +115,15 @@ public class UserHistoryItem {
     /**
      * @return event location label
      */
-    public String getLocation() {
-        return location;
+    public String getOrganizerId() {
+        return organizerId;
+    }
+
+    /**
+     * @return organizer display name
+     */
+    public String getOrganizerName() {
+        return organizerName;
     }
 
     /**
@@ -130,6 +149,13 @@ public class UserHistoryItem {
     }
 
     /**
+     * @return stored event time, or {@code null}
+     */
+    public Timestamp getEventTime() {
+        return eventTime;
+    }
+
+    /**
      * @return registration start timestamp, or {@code null}
      */
     public Timestamp getRegistrationStartDate() {
@@ -141,5 +167,32 @@ public class UserHistoryItem {
      */
     public Timestamp getRegistrationEndDate() {
         return registrationEndDate;
+    }
+
+    /**
+     * @return true when the source event no longer exists
+     */
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    /**
+     * Returns a copy with enriched organizer display data and deletion state.
+     */
+    public UserHistoryItem withResolvedState(String resolvedOrganizerName,
+                                            Timestamp resolvedEventTime,
+                                            boolean eventDeleted) {
+        return new UserHistoryItem(
+                eventId,
+                eventName,
+                organizerId,
+                value(resolvedOrganizerName, organizerName),
+                posterUrl,
+                status,
+                resolvedEventTime != null ? resolvedEventTime : eventTime,
+                registrationStartDate,
+                registrationEndDate,
+                eventDeleted
+        );
     }
 }
