@@ -45,7 +45,7 @@ public final class FreeImageHostUploader {
     }
 
     /**
-     * Uploads the given image URI to Freeimage.host and returns the hosted direct image URL.
+     * Uploads the given image URI to Freeimage.host and returns hosted poster metadata.
      *
      * @param context Android context used to open the image stream
      * @param db Firestore instance used to read the API key
@@ -55,7 +55,7 @@ public final class FreeImageHostUploader {
     public static void uploadPoster(Context context,
                                     FirebaseFirestore db,
                                     Uri imageUri,
-                                    Callback callback) {
+                                    UploadCallback callback) {
         if (imageUri == null) {
             callback.onFailure("Select a poster first");
             return;
@@ -78,7 +78,7 @@ public final class FreeImageHostUploader {
     private static void uploadPosterInternal(Context context,
                                              Uri imageUri,
                                              String apiKey,
-                                             Callback callback) {
+                                             UploadCallback callback) {
         HttpURLConnection connection = null;
         try {
             byte[] imageBytes = readImageBytes(context.getContentResolver(), imageUri);
@@ -103,12 +103,12 @@ public final class FreeImageHostUploader {
             int responseCode = connection.getResponseCode();
             String responseBody = readResponseBody(connection, responseCode);
             int apiStatusCode = parseApiStatusCode(responseBody);
-            String imageUrl = parseImageUrl(responseBody);
+            UploadResult uploadResult = parseUploadResult(responseBody);
+            String imageUrl = uploadResult.getImageUrl();
             if (responseCode >= 200 && responseCode < 300
                     && (apiStatusCode == 0 || apiStatusCode == 200)
                     && !TextUtils.isEmpty(imageUrl)) {
-                String httpsUrl = imageUrl.replace("http://", "https://");
-                postSuccess(callback, httpsUrl);
+                postSuccess(callback, uploadResult.withHttpsUrls());
                 return;
             }
 
@@ -178,22 +178,92 @@ public final class FreeImageHostUploader {
         }
     }
 
-    private static String parseImageUrl(String responseBody) {
+    private static UploadResult parseUploadResult(String responseBody) {
         try {
             JSONObject jsonObject = new JSONObject(responseBody);
             JSONObject imageObject = jsonObject.optJSONObject("image");
             if (imageObject == null) {
-                return null;
+                return UploadResult.empty();
             }
 
             String directUrl = imageObject.optString("url", "");
-            if (!TextUtils.isEmpty(directUrl)) {
-                return directUrl;
-            }
-            return imageObject.optString("display_url", "");
+            String imageUrl = !TextUtils.isEmpty(directUrl)
+                    ? directUrl
+                    : imageObject.optString("display_url", "");
+
+            String deleteUrl = firstNonBlank(
+                    imageObject.optString("delete_url", ""),
+                    imageObject.optString("url_delete", ""),
+                    jsonObject.optString("delete_url", ""),
+                    jsonObject.optString("url_delete", "")
+            );
+
+            String viewerUrl = firstNonBlank(
+                    imageObject.optString("url_viewer", ""),
+                    jsonObject.optString("url_viewer", "")
+            );
+
+            return new UploadResult(imageUrl, deleteUrl, viewerUrl);
         } catch (JSONException ignored) {
-            return null;
+            return UploadResult.empty();
         }
+    }
+
+    /**
+     * Deletes a previously uploaded poster using a hosted deletion URL when available.
+     *
+     * @param deleteUrl hosted deletion URL
+     * @param callback completion callback
+     */
+    public static void deletePoster(String deleteUrl, DeletionCallback callback) {
+        if (TextUtils.isEmpty(deleteUrl)) {
+            postDeletionSuccess(callback);
+            return;
+        }
+
+        EXECUTOR.execute(() -> deletePosterInternal(deleteUrl.trim(), callback));
+    }
+
+    private static void deletePosterInternal(String deleteUrl, DeletionCallback callback) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(deleteUrl).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setDoInput(true);
+            connection.setConnectTimeout(20000);
+            connection.setReadTimeout(30000);
+            connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("Accept", "application/json,text/html,*/*");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode >= 200 && responseCode < 400) {
+                postDeletionSuccess(callback);
+                return;
+            }
+
+            postDeletionFailure(callback, "Failed to delete poster");
+        } catch (IOException e) {
+            String message = e.getMessage();
+            postDeletionFailure(callback, TextUtils.isEmpty(message)
+                    ? "Failed to delete poster"
+                    : "Failed to delete poster: " + message);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private static String parseFailureMessage(String responseBody) {
@@ -222,27 +292,101 @@ public final class FreeImageHostUploader {
         }
     }
 
-    private static void postSuccess(Callback callback, String imageUrl) {
-        MAIN_HANDLER.post(() -> callback.onSuccess(imageUrl));
+    private static void postSuccess(UploadCallback callback, UploadResult uploadResult) {
+        MAIN_HANDLER.post(() -> callback.onSuccess(uploadResult));
     }
 
-    private static void postFailure(Callback callback, String message) {
+    private static void postFailure(UploadCallback callback, String message) {
         MAIN_HANDLER.post(() -> callback.onFailure(message));
+    }
+
+    private static void postDeletionSuccess(DeletionCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        MAIN_HANDLER.post(callback::onSuccess);
+    }
+
+    private static void postDeletionFailure(DeletionCallback callback, String message) {
+        if (callback == null) {
+            return;
+        }
+        MAIN_HANDLER.post(() -> callback.onFailure(message));
+    }
+
+    /**
+     * Immutable upload result containing hosted poster metadata.
+     */
+    public static final class UploadResult {
+        private final String imageUrl;
+        private final String deleteUrl;
+        private final String viewerUrl;
+
+        private UploadResult(String imageUrl, String deleteUrl, String viewerUrl) {
+            this.imageUrl = imageUrl;
+            this.deleteUrl = deleteUrl;
+            this.viewerUrl = viewerUrl;
+        }
+
+        public static UploadResult empty() {
+            return new UploadResult("", "", "");
+        }
+
+        public String getImageUrl() {
+            return imageUrl;
+        }
+
+        public String getDeleteUrl() {
+            return deleteUrl;
+        }
+
+        public String getViewerUrl() {
+            return viewerUrl;
+        }
+
+        public UploadResult withHttpsUrls() {
+            return new UploadResult(
+                    toHttps(imageUrl),
+                    toHttps(deleteUrl),
+                    toHttps(viewerUrl)
+            );
+        }
+
+        private static String toHttps(String value) {
+            return TextUtils.isEmpty(value) ? "" : value.replace("http://", "https://");
+        }
     }
 
     /**
      * Callback used to report poster upload completion.
      */
-    public interface Callback {
+    public interface UploadCallback {
         /**
          * Called when poster upload succeeds.
          *
-         * @param imageUrl hosted poster url
+         * @param uploadResult hosted poster metadata
          */
-        void onSuccess(String imageUrl);
+        void onSuccess(UploadResult uploadResult);
 
         /**
          * Called when poster upload fails.
+         *
+         * @param message user-displayable failure message
+         */
+        void onFailure(String message);
+    }
+
+    /**
+     * Callback used to report poster deletion completion.
+     */
+    public interface DeletionCallback {
+        /**
+         * Called when poster deletion succeeds or is unnecessary.
+         */
+        void onSuccess();
+
+        /**
+         * Called when hosted poster deletion fails.
          *
          * @param message user-displayable failure message
          */

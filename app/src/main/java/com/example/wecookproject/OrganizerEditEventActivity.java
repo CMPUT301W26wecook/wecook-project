@@ -70,9 +70,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private ImageView ivPosterPreview;
     private TextView tvPosterUploadTitle;
     private TextView tvPosterUploadSubtitle;
+    private TextView btnRemovePoster;
     private String originalPosterUrl;
     private String originalVisibilityTag = Event.VISIBILITY_PUBLIC;
     private Uri selectedPosterUri;
+    private boolean removeExistingPoster;
     private ActivityResultLauncher<String> posterPickerLauncher;
 
     /**
@@ -111,6 +113,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         ivPosterPreview = findViewById(R.id.iv_poster_preview);
         tvPosterUploadTitle = findViewById(R.id.tv_poster_upload_title);
         tvPosterUploadSubtitle = findViewById(R.id.tv_poster_upload_subtitle);
+        btnRemovePoster = findViewById(R.id.btn_remove_poster);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
 
         posterPickerLauncher = registerForActivityResult(
@@ -131,6 +134,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         bindPosterPickerLaunch(tvPosterUploadTitle);
         bindPosterPickerLaunch(tvPosterUploadSubtitle);
         bindPosterPickerLaunch(findViewById(R.id.tv_poster_upload_formats));
+        btnRemovePoster.setOnClickListener(v -> removePoster());
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setOnItemSelectedListener(item -> {
@@ -295,6 +299,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             return;
         }
 
+        if (removeExistingPoster) {
+            updates.put("posterPath", null);
+            updates.put("posterDeleteUrl", null);
+        }
+
         if (updates.isEmpty() && selectedPosterUri == null) {
             Toast.makeText(this, "Enter at least one valid field to update", Toast.LENGTH_SHORT).show();
             return;
@@ -302,11 +311,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
 
         if (selectedPosterUri != null) {
             Toast.makeText(this, "Uploading poster...", Toast.LENGTH_SHORT).show();
-            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.Callback() {
+            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.UploadCallback() {
                 @Override
-                public void onSuccess(String imageUrl) {
-                    updates.put("posterPath", imageUrl);
-                    applyUpdates(updates, selectedVisibilityTag, imageUrl);
+                public void onSuccess(FreeImageHostUploader.UploadResult uploadResult) {
+                    updates.put("posterPath", uploadResult.getImageUrl());
+                    updates.put("posterDeleteUrl", uploadResult.getDeleteUrl());
+                    applyUpdates(updates, selectedVisibilityTag, uploadResult.getImageUrl());
                 }
 
                 @Override
@@ -461,10 +471,29 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         selectedPosterUri = imageUri;
+        removeExistingPoster = false;
         ivPosterPreview.setPadding(0, 0, 0, 0);
         ivPosterPreview.setImageURI(imageUri);
         tvPosterUploadTitle.setText("New poster selected");
         tvPosterUploadSubtitle.setText("This image will be uploaded when you update the event");
+        btnRemovePoster.setVisibility(TextView.VISIBLE);
+    }
+
+    private void removePoster() {
+        if (selectedPosterUri != null) {
+            selectedPosterUri = null;
+            if (!TextUtils.isEmpty(originalPosterUrl) && !removeExistingPoster) {
+                showExistingPosterPreview();
+            } else {
+                showEmptyPosterPreview();
+            }
+            return;
+        }
+
+        if (!TextUtils.isEmpty(originalPosterUrl) && !removeExistingPoster) {
+            removeExistingPoster = true;
+            showEmptyPosterPreview();
+        }
     }
 
     private void bindPosterPickerLaunch(View view) {
@@ -517,10 +546,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                         originalPosterUrl = documentSnapshot.getString("posterUrl");
                     }
                     if (!TextUtils.isEmpty(originalPosterUrl)) {
-                        ivPosterPreview.setPadding(0, 0, 0, 0);
-                        PosterLoader.loadInto(ivPosterPreview, originalPosterUrl);
-                        tvPosterUploadTitle.setText("Current event poster");
-                        tvPosterUploadSubtitle.setText("Tap to choose a replacement image");
+                        showExistingPosterPreview();
+                    } else {
+                        showEmptyPosterPreview();
                     }
 
                     String visibilityTag = documentSnapshot.getString("visibilityTag");
@@ -537,6 +565,28 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                             : R.id.rb_visibility_public;
                     rgEventVisibility.check(visibilityId);
                 });
+    }
+
+    private void showExistingPosterPreview() {
+        removeExistingPoster = false;
+        ivPosterPreview.setPadding(0, 0, 0, 0);
+        PosterLoader.loadInto(ivPosterPreview, originalPosterUrl);
+        tvPosterUploadTitle.setText("Current event poster");
+        tvPosterUploadSubtitle.setText("Tap to choose a replacement image");
+        btnRemovePoster.setVisibility(TextView.VISIBLE);
+    }
+
+    private void showEmptyPosterPreview() {
+        ivPosterPreview.setPadding(getPosterPlaceholderPadding(), getPosterPlaceholderPadding(),
+                getPosterPlaceholderPadding(), getPosterPlaceholderPadding());
+        ivPosterPreview.setImageResource(android.R.drawable.ic_menu_gallery);
+        tvPosterUploadTitle.setText("Upload your event poster");
+        tvPosterUploadSubtitle.setText("Tap to choose a new image");
+        btnRemovePoster.setVisibility(TextView.GONE);
+    }
+
+    private int getPosterPlaceholderPadding() {
+        return (int) (18 * getResources().getDisplayMetrics().density);
     }
 
     /**

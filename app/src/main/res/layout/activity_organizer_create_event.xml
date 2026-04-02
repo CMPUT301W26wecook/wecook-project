@@ -158,6 +158,18 @@
                 </LinearLayout>
             </FrameLayout>
 
+            <TextView
+                android:id="@+id/btn_remove_poster"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="8dp"
+                android:text="Remove poster"
+                android:textColor="@color/error_red"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <!-- Event Name -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_event_name"
