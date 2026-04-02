@@ -20,9 +20,9 @@ import com.google.firebase.firestore.FirebaseFirestore;
  */
 public class LoginActivity extends AppCompatActivity {
     private boolean isDbQueryReady = false;
-    private boolean isUserExists = false;
     private boolean isLoginClicked = false;
     private String clickedRole = "";
+    private DocumentSnapshot userDocument;
 
     /**
      * Initializes login controls and starts prefetching login context.
@@ -70,16 +70,14 @@ public class LoginActivity extends AppCompatActivity {
             db.collection("users").document(androidId).get().addOnCompleteListener(userTask -> {
                 isDbQueryReady = true;
                 if (userTask.isSuccessful()) {
-                    DocumentSnapshot document = userTask.getResult();
-                    if (document.exists()) {
-                        isUserExists = true;
+                    userDocument = userTask.getResult();
+                    if (userDocument != null && userDocument.exists()) {
                         Log.d("LOGIN_INFO", "User exists, routing to MainActivity.");
                     } else {
-                        isUserExists = false;
                         Log.d("LOGIN_INFO", "User does not exist, routing to SignupDetailsActivity.");
                     }
                 } else {
-                    isUserExists = false;
+                    userDocument = null;
                     Log.e("LOGIN_INFO", "Error checking user document", userTask.getException());
                 }
 
@@ -115,7 +113,7 @@ public class LoginActivity extends AppCompatActivity {
         if (clickedRole.equals("ADMIN")) {
             jumpIntent = new Intent(LoginActivity.this, AdminLoginActivity.class);
         }
-        else if (isUserExists) {
+        else if (hasSelectedRole()) {
             if ("ORGANIZER".equals(clickedRole)) {
                 jumpIntent = new Intent(LoginActivity.this, OrganizerHomeActivity.class);
             } else {
@@ -127,8 +125,20 @@ public class LoginActivity extends AppCompatActivity {
         }
         startActivity(jumpIntent);
     }
-}
 
+    private boolean hasSelectedRole() {
+        if (userDocument == null || !userDocument.exists()) {
+            return false;
+        }
+        if ("ORGANIZER".equals(clickedRole)) {
+            return UserDocumentUtils.hasRole(userDocument, UserDocumentUtils.ROLE_ORGANIZER);
+        }
+        if ("ENTRANT".equals(clickedRole)) {
+            return UserDocumentUtils.hasRole(userDocument, UserDocumentUtils.ROLE_ENTRANT);
+        }
+        return false;
+    }
+}
 
 
 

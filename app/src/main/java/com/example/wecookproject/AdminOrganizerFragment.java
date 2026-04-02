@@ -14,11 +14,14 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.wecookproject.model.User;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Fragment for the Administrator to browse and manage the list of all Organizers in the system.
@@ -70,12 +73,7 @@ public class AdminOrganizerFragment extends Fragment {
              */
             @Override
             public void onDelete(User user, int position) {
-                db.collection("users").document(user.getAndroidId())
-                        .delete()
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "Organizer account deleted", Toast.LENGTH_SHORT).show();
-                        })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting organizer", Toast.LENGTH_SHORT).show());
+                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ORGANIZER, "Organizer account deleted");
             }
         });
 
@@ -84,10 +82,9 @@ public class AdminOrganizerFragment extends Fragment {
             for (int i = 0; i < organizerList.size(); i++) {
                 if (selected.get(i)) {
                     User user = organizerList.get(i);
-                    db.collection("users").document(user.getAndroidId()).delete();
+                    removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ORGANIZER, "Selected organizers deleted");
                 }
             }
-            Toast.makeText(getContext(), "Selected organizers deleted", Toast.LENGTH_SHORT).show();
         });
 
         return view;
@@ -98,7 +95,6 @@ public class AdminOrganizerFragment extends Fragment {
      */
     private void loadOrganizersFromFirestore() {
         db.collection("users")
-                .whereEqualTo("role", "organizer")
                 .addSnapshotListener((value, error) -> {
                     if (error != null) {
                         Log.w("AdminOrganizerFragment", "Listen failed.", error);
@@ -109,6 +105,9 @@ public class AdminOrganizerFragment extends Fragment {
                     adapter.getSelectedList().clear();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
+                            if (!UserDocumentUtils.hasRole(doc, UserDocumentUtils.ROLE_ORGANIZER)) {
+                                continue;
+                            }
                             User user = doc.toObject(User.class);
                             organizerList.add(user);
                             adapter.getSelectedList().add(false);
@@ -116,5 +115,43 @@ public class AdminOrganizerFragment extends Fragment {
                     }
                     adapter.notifyDataSetChanged();
                 });
+    }
+
+    private void removeRoleFromUser(String userId, String role, String successMessage) {
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        return;
+                    }
+
+                    if (UserDocumentUtils.getRoleCount(snapshot) <= 1) {
+                        db.collection("users")
+                                .document(userId)
+                                .delete()
+                                .addOnSuccessListener(unused ->
+                                        Toast.makeText(getContext(), successMessage, Toast.LENGTH_SHORT).show())
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(getContext(), "Error deleting organizer", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("roles." + role, FieldValue.delete());
+                    if (UserDocumentUtils.ROLE_ORGANIZER.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))
+                            && UserDocumentUtils.hasRole(snapshot, UserDocumentUtils.ROLE_ENTRANT)) {
+                        updates.put("role", UserDocumentUtils.ROLE_ENTRANT);
+                    }
+                    db.collection("users")
+                            .document(userId)
+                            .update(updates)
+                            .addOnSuccessListener(unused ->
+                                    Toast.makeText(getContext(), successMessage, Toast.LENGTH_SHORT).show())
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(getContext(), "Error deleting organizer", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(getContext(), "Error deleting organizer", Toast.LENGTH_SHORT).show());
     }
 }

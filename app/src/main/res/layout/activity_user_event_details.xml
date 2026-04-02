@@ -142,6 +142,15 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tv_detail_organizer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Organizer: Loading..."
+                android:textColor="@color/text_muted"
+                android:textSize="14sp" />
+
+            <TextView
                 android:id="@+id/tv_detail_status_chip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

@@ -74,6 +74,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     private TextView tvEventName;
     private TextView tvDateRange;
     private TextView tvWaitlist;
+    private TextView tvOrganizer;
     private TextView tvStatus;
     private TextView tvDescription;
     private EditText etComment;
@@ -124,6 +125,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         tvEventName = findViewById(R.id.tv_detail_event_name);
         tvDateRange = findViewById(R.id.tv_detail_date_range);
         tvWaitlist = findViewById(R.id.tv_detail_waitlist);
+        tvOrganizer = findViewById(R.id.tv_detail_organizer);
         tvStatus = findViewById(R.id.tv_detail_status_chip);
         tvDescription = findViewById(R.id.tv_detail_description);
         etComment = findViewById(R.id.et_event_comment);
@@ -222,10 +224,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                 .document(entrantId)
                 .get()
                 .addOnSuccessListener(snapshot -> {
-                    String firstName = getSafeTrimmedString(snapshot, "firstName");
-                    String lastName = getSafeTrimmedString(snapshot, "lastName");
-                    String fullName = (firstName + " " + lastName).trim();
-                    entrantDisplayName = fullName.isEmpty() ? entrantId : fullName;
+                    entrantDisplayName = UserDocumentUtils.buildDisplayName(snapshot, entrantId);
                 })
                 .addOnFailureListener(e -> entrantDisplayName = entrantId);
     }
@@ -262,8 +261,10 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         tvEventName.setText(currentEvent.getEventName());
         tvDateRange.setText(UserEventUiUtils.formatDateRange(currentEvent.getRegistrationStartDate(), currentEvent.getRegistrationEndDate()));
         tvWaitlist.setText(UserEventUiUtils.formatWaitlistSummary(currentEvent));
+        tvOrganizer.setText("Organizer: Loading...");
         tvDescription.setText(UserEventUiUtils.buildDescription(currentEvent));
         PosterLoader.loadInto(ivPoster, currentEvent.getPosterPath());
+        loadOrganizerName(currentEvent.getOrganizerId());
 
         if (currentEvent.getEffectiveStatus().isEmpty()) {
             tvStatus.setVisibility(View.GONE);
@@ -273,6 +274,23 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         }
 
         configureActionButtons();
+    }
+
+    private void loadOrganizerName(String organizerId) {
+        if (tvOrganizer == null) {
+            return;
+        }
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            tvOrganizer.setText("Organizer: Organizer");
+            return;
+        }
+        db.collection("users")
+                .document(organizerId)
+                .get()
+                .addOnSuccessListener(snapshot ->
+                        tvOrganizer.setText("Organizer: "
+                                + UserDocumentUtils.buildDisplayName(snapshot, "Organizer")))
+                .addOnFailureListener(e -> tvOrganizer.setText("Organizer: Organizer"));
     }
 
     /**

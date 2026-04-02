@@ -80,6 +80,24 @@ public final class UserInputValidator {
         return errors;
     }
 
+    public static Map<String, String> validateOrganizerProfile(String firstName,
+                                                               String lastName,
+                                                               String birthday,
+                                                               String addressLine1,
+                                                               String city,
+                                                               String postalCode,
+                                                               String country) {
+        LinkedHashMap<String, String> errors = new LinkedHashMap<>();
+        requireNonBlank(errors, FIELD_FIRST_NAME, firstName, "First name is required");
+        requireNonBlank(errors, FIELD_LAST_NAME, lastName, "Last name is required");
+        validateBirthday(errors, birthday, true);
+        requireNonBlank(errors, FIELD_ADDRESS_LINE_1, addressLine1, "Address is required");
+        requireNonBlank(errors, FIELD_CITY, city, "City is required");
+        validatePostalCode(errors, postalCode, true);
+        validateCountry(errors, country);
+        return errors;
+    }
+
     private static void requireNonBlank(Map<String, String> errors,
                                         String field,
                                         String value,

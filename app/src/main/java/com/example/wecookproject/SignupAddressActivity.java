@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -87,7 +88,9 @@ public class SignupAddressActivity extends AppCompatActivity {
         String email = intentFromDetails.getStringExtra("email");
         String phoneNumber = intentFromDetails.getStringExtra("phoneNumber");
         String clickedRole = intentFromDetails.getStringExtra("clickedRole");
-        String role = "ORGANIZER".equals(clickedRole) ? "organizer" : "entrant";
+        String role = "ORGANIZER".equals(clickedRole)
+                ? UserDocumentUtils.ROLE_ORGANIZER
+                : UserDocumentUtils.ROLE_ENTRANT;
 
         clearError(addressLine1Layout);
         clearError(cityLayout);
@@ -133,12 +136,14 @@ public class SignupAddressActivity extends AppCompatActivity {
         userData.put("city", city);
         userData.put("postalCode", postalCode);
         userData.put("country", country);
-        userData.put("role", role);
         userData.put("notificationsEnabled", true);
         userData.put("profileCompleted", true);
+        Map<String, Object> roles = new HashMap<>();
+        roles.put(role, true);
+        userData.put("roles", roles);
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();
-        db.collection("users").document(androidId).set(userData)
+        db.collection("users").document(androidId).set(userData, SetOptions.merge())
             .addOnSuccessListener(aVoid -> routeAfterSuccessfulSignup(clickedRole))
             .addOnFailureListener(e ->
                     Toast.makeText(this, "Failed to save profile. " + e.getMessage(), Toast.LENGTH_SHORT).show());
