@@ -19,6 +19,7 @@ import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -392,7 +393,7 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void removeEntrantRole() {
-        db.collection("users")
+        deleteEntrantHistory(() -> db.collection("users")
                 .document(androidId)
                 .get()
                 .addOnSuccessListener(snapshot -> {
@@ -432,7 +433,7 @@ public class UserProfileActivity extends AppCompatActivity {
                                     Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show());
                 })
                 .addOnFailureListener(e ->
-                        Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show());
+                        Toast.makeText(UserProfileActivity.this, "Failed to delete account", Toast.LENGTH_SHORT).show()));
     }
 
     private void routeToLogin() {
@@ -440,6 +441,28 @@ public class UserProfileActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+
+    private void deleteEntrantHistory(Runnable onSuccess) {
+        db.collection("users")
+                .document(androidId)
+                .collection("eventHistory")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot.isEmpty()) {
+                        onSuccess.run();
+                        return;
+                    }
+
+                    WriteBatch batch = db.batch();
+                    querySnapshot.getDocuments().forEach(document -> batch.delete(document.getReference()));
+                    batch.commit()
+                            .addOnSuccessListener(unused -> onSuccess.run())
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(UserProfileActivity.this, "Failed to delete event history", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(UserProfileActivity.this, "Failed to delete event history", Toast.LENGTH_SHORT).show());
     }
 
     /**

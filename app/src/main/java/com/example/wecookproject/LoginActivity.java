@@ -11,6 +11,10 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Entry point for role-based login routing.
@@ -120,10 +124,21 @@ public class LoginActivity extends AppCompatActivity {
                 jumpIntent = new Intent(LoginActivity.this, UserEventActivity.class);
             }
         } else {
+            if (userDocument != null && userDocument.exists()) {
+                grantSelectedRoleAndRoute();
+                return;
+            }
             jumpIntent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
             jumpIntent.putExtra("clickedRole", clickedRole);
+            startActivity(jumpIntent);
         }
-        startActivity(jumpIntent);
+        if (!"ADMIN".equals(clickedRole) && hasSelectedRole()) {
+            startActivity(jumpIntent);
+            return;
+        }
+        if ("ADMIN".equals(clickedRole)) {
+            startActivity(jumpIntent);
+        }
     }
 
     private boolean hasSelectedRole() {
@@ -138,8 +153,47 @@ public class LoginActivity extends AppCompatActivity {
         }
         return false;
     }
-}
 
+    private void grantSelectedRoleAndRoute() {
+        String roleKey = getSelectedRoleKey();
+        if (roleKey == null) {
+            return;
+        }
+
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        Map<String, Object> updates = new HashMap<>();
+        Map<String, Object> roles = new HashMap<>();
+        roles.put(roleKey, true);
+        updates.put("roles", roles);
+        if (userDocument != null && userDocument.exists()
+                && UserDocumentUtils.getSafeTrimmedString(userDocument, "role").isEmpty()) {
+            updates.put("role", roleKey);
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(androidId)
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(unused -> {
+                    if (UserDocumentUtils.ROLE_ORGANIZER.equals(roleKey)) {
+                        startActivity(new Intent(LoginActivity.this, OrganizerHomeActivity.class));
+                    } else {
+                        startActivity(new Intent(LoginActivity.this, UserEventActivity.class));
+                    }
+                })
+                .addOnFailureListener(e -> Log.e("LOGIN_INFO", "Failed to grant missing role", e));
+    }
+
+    private String getSelectedRoleKey() {
+        if ("ORGANIZER".equals(clickedRole)) {
+            return UserDocumentUtils.ROLE_ORGANIZER;
+        }
+        if ("ENTRANT".equals(clickedRole)) {
+            return UserDocumentUtils.ROLE_ENTRANT;
+        }
+        return null;
+    }
+}
 
 
 
