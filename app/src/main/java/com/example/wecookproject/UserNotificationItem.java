@@ -19,6 +19,8 @@ public class UserNotificationItem {
     private final String status;
     private final String type;
     private final String actionTarget;
+    private final String senderId;
+    private final String recipientId;
     private final Date createdAt;
     private final Date readAt;
 
@@ -30,6 +32,8 @@ public class UserNotificationItem {
                                 String status,
                                 String type,
                                 String actionTarget,
+                                String senderId,
+                                String recipientId,
                                 Date createdAt,
                                 Date readAt) {
         this.id = id;
@@ -40,6 +44,8 @@ public class UserNotificationItem {
         this.status = status;
         this.type = type;
         this.actionTarget = actionTarget;
+        this.senderId = senderId;
+        this.recipientId = recipientId;
         this.createdAt = createdAt;
         this.readAt = readAt;
     }
@@ -56,6 +62,8 @@ public class UserNotificationItem {
                 value(snapshot.getString("status"), NotificationHelper.STATUS_UNREAD),
                 value(snapshot.getString("type"), NotificationHelper.TYPE_MANUAL_WAITLIST_UPDATE),
                 value(snapshot.getString("actionTarget"), value(snapshot.getString("eventId"), "")),
+                value(snapshot.getString("senderId"), "Unknown Sender"),
+                value(snapshot.getString("recipientId"), "Unknown Recipient"),
                 created == null ? null : created.toDate(),
                 read == null ? null : read.toDate()
         );
@@ -87,6 +95,14 @@ public class UserNotificationItem {
 
     public String getActionTarget() {
         return actionTarget;
+    }
+
+    public String getSenderId() {
+        return senderId;
+    }
+
+    public String getRecipientId() {
+        return recipientId;
     }
 
     public String getFormattedTime() {
