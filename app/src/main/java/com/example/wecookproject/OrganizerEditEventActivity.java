@@ -70,9 +70,12 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
     private ImageView ivPosterPreview;
     private TextView tvPosterUploadTitle;
     private TextView tvPosterUploadSubtitle;
+    private TextView btnRemovePoster;
     private String originalPosterUrl;
+    private String originalPosterDeleteUrl;
     private String originalVisibilityTag = Event.VISIBILITY_PUBLIC;
     private Uri selectedPosterUri;
+    private boolean removeExistingPoster;
     private ActivityResultLauncher<String> posterPickerLauncher;
 
     /**
@@ -111,6 +114,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         ivPosterPreview = findViewById(R.id.iv_poster_preview);
         tvPosterUploadTitle = findViewById(R.id.tv_poster_upload_title);
         tvPosterUploadSubtitle = findViewById(R.id.tv_poster_upload_subtitle);
+        btnRemovePoster = findViewById(R.id.btn_remove_poster);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
 
         posterPickerLauncher = registerForActivityResult(
@@ -131,6 +135,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         bindPosterPickerLaunch(tvPosterUploadTitle);
         bindPosterPickerLaunch(tvPosterUploadSubtitle);
         bindPosterPickerLaunch(findViewById(R.id.tv_poster_upload_formats));
+        btnRemovePoster.setOnClickListener(v -> removePoster());
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setOnItemSelectedListener(item -> {
@@ -295,6 +300,11 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             return;
         }
 
+        if (removeExistingPoster) {
+            updates.put("posterPath", null);
+            updates.put("posterDeleteUrl", null);
+        }
+
         if (updates.isEmpty() && selectedPosterUri == null) {
             Toast.makeText(this, "Enter at least one valid field to update", Toast.LENGTH_SHORT).show();
             return;
@@ -302,11 +312,19 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
 
         if (selectedPosterUri != null) {
             Toast.makeText(this, "Uploading poster...", Toast.LENGTH_SHORT).show();
-            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.Callback() {
+            String previousPosterDeleteUrl = originalPosterDeleteUrl;
+            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.UploadCallback() {
                 @Override
-                public void onSuccess(String imageUrl) {
-                    updates.put("posterPath", imageUrl);
-                    applyUpdates(updates, selectedVisibilityTag, imageUrl);
+                public void onSuccess(FreeImageHostUploader.UploadResult uploadResult) {
+                    updates.put("posterPath", uploadResult.getImageUrl());
+                    updates.put("posterDeleteUrl", uploadResult.getDeleteUrl());
+                    applyUpdates(
+                            updates,
+                            selectedVisibilityTag,
+                            uploadResult.getImageUrl(),
+                            uploadResult.getDeleteUrl(),
+                            previousPosterDeleteUrl
+                    );
                 }
 
                 @Override
@@ -317,21 +335,43 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             return;
         }
 
-        applyUpdates(updates, selectedVisibilityTag, null);
+        applyUpdates(
+                updates,
+                selectedVisibilityTag,
+                null,
+                null,
+                removeExistingPoster ? originalPosterDeleteUrl : null
+        );
     }
 
-    private void applyUpdates(Map<String, Object> updates, String selectedVisibilityTag, String newPosterUrl) {
+    private void applyUpdates(Map<String, Object> updates,
+                              String selectedVisibilityTag,
+                              String newPosterUrl,
+                              String newPosterDeleteUrl,
+                              String posterDeleteUrlToCleanup) {
         boolean changedToPrivate = Event.VISIBILITY_PRIVATE.equals(selectedVisibilityTag)
                 && !Event.VISIBILITY_PRIVATE.equals(originalVisibilityTag);
         if (changedToPrivate) {
-            updateEventAndClearWaitlist(updates, selectedVisibilityTag, newPosterUrl);
+            updateEventAndClearWaitlist(
+                    updates,
+                    selectedVisibilityTag,
+                    newPosterUrl,
+                    newPosterDeleteUrl,
+                    posterDeleteUrlToCleanup
+            );
             return;
         }
 
         db.collection("events")
                 .document(eventId)
                 .update(updates)
-                .addOnSuccessListener(unused -> onEventUpdateSuccess(selectedVisibilityTag, newPosterUrl))
+                .addOnSuccessListener(unused ->
+                        onEventUpdateSuccess(
+                                selectedVisibilityTag,
+                                newPosterUrl,
+                                newPosterDeleteUrl,
+                                posterDeleteUrlToCleanup
+                        ))
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to update event", Toast.LENGTH_SHORT).show());
     }
@@ -345,7 +385,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
      */
     private void updateEventAndClearWaitlist(Map<String, Object> baseUpdates,
                                              String selectedVisibilityTag,
-                                             String newPosterUrl) {
+                                             String newPosterUrl,
+                                             String newPosterDeleteUrl,
+                                             String posterDeleteUrlToCleanup) {
         db.runTransaction(transaction -> {
             com.google.firebase.firestore.DocumentReference eventRef = db.collection("events").document(eventId);
             com.google.firebase.firestore.DocumentSnapshot eventSnapshot = transaction.get(eventRef);
@@ -363,7 +405,13 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             transaction.update(eventRef, updates);
             return removedEntrantIds;
         }).addOnSuccessListener(removedEntrantIds ->
-                clearWaitlistHistoryEntries(removedEntrantIds, selectedVisibilityTag, newPosterUrl))
+                clearWaitlistHistoryEntries(
+                        removedEntrantIds,
+                        selectedVisibilityTag,
+                        newPosterUrl,
+                        newPosterDeleteUrl,
+                        posterDeleteUrlToCleanup
+                ))
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to update event", Toast.LENGTH_SHORT).show());
     }
@@ -377,9 +425,16 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
      */
     private void clearWaitlistHistoryEntries(List<String> entrantIds,
                                              String selectedVisibilityTag,
-                                             String newPosterUrl) {
+                                             String newPosterUrl,
+                                             String newPosterDeleteUrl,
+                                             String posterDeleteUrlToCleanup) {
         if (entrantIds == null || entrantIds.isEmpty()) {
-            onEventUpdateSuccess(selectedVisibilityTag, newPosterUrl);
+            onEventUpdateSuccess(
+                    selectedVisibilityTag,
+                    newPosterUrl,
+                    newPosterDeleteUrl,
+                    posterDeleteUrlToCleanup
+            );
             return;
         }
 
@@ -395,11 +450,24 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         if (historyRefs.isEmpty()) {
-            onEventUpdateSuccess(selectedVisibilityTag, newPosterUrl);
+            onEventUpdateSuccess(
+                    selectedVisibilityTag,
+                    newPosterUrl,
+                    newPosterDeleteUrl,
+                    posterDeleteUrlToCleanup
+            );
             return;
         }
 
-        commitHistoryDeleteBatches(historyRefs, 0, batchLimit, selectedVisibilityTag, newPosterUrl);
+        commitHistoryDeleteBatches(
+                historyRefs,
+                0,
+                batchLimit,
+                selectedVisibilityTag,
+                newPosterUrl,
+                newPosterDeleteUrl,
+                posterDeleteUrlToCleanup
+        );
     }
 
     /**
@@ -409,7 +477,9 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                                             int startIndex,
                                             int batchLimit,
                                             String selectedVisibilityTag,
-                                            String newPosterUrl) {
+                                            String newPosterUrl,
+                                            String newPosterDeleteUrl,
+                                            String posterDeleteUrlToCleanup) {
         int endIndex = Math.min(startIndex + batchLimit, historyRefs.size());
         WriteBatch batch = db.batch();
         for (int i = startIndex; i < endIndex; i++) {
@@ -419,9 +489,22 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         batch.commit()
                 .addOnSuccessListener(unused -> {
                     if (endIndex < historyRefs.size()) {
-                        commitHistoryDeleteBatches(historyRefs, endIndex, batchLimit, selectedVisibilityTag, newPosterUrl);
+                        commitHistoryDeleteBatches(
+                                historyRefs,
+                                endIndex,
+                                batchLimit,
+                                selectedVisibilityTag,
+                                newPosterUrl,
+                                newPosterDeleteUrl,
+                                posterDeleteUrlToCleanup
+                        );
                     } else {
-                        onEventUpdateSuccess(selectedVisibilityTag, newPosterUrl);
+                        onEventUpdateSuccess(
+                                selectedVisibilityTag,
+                                newPosterUrl,
+                                newPosterDeleteUrl,
+                                posterDeleteUrlToCleanup
+                        );
                     }
                 })
                 .addOnFailureListener(e ->
@@ -433,15 +516,44 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
      *
      * @param selectedVisibilityTag current visibility tag
      * @param newPosterUrl uploaded poster url if one was selected
+     * @param newPosterDeleteUrl uploaded poster delete URL if one was selected
+     * @param posterDeleteUrlToCleanup hosted poster delete URL to best-effort remove
      */
-    private void onEventUpdateSuccess(String selectedVisibilityTag, String newPosterUrl) {
+    private void onEventUpdateSuccess(String selectedVisibilityTag,
+                                      String newPosterUrl,
+                                      String newPosterDeleteUrl,
+                                      String posterDeleteUrlToCleanup) {
         if (!TextUtils.isEmpty(newPosterUrl)) {
             originalPosterUrl = newPosterUrl;
+            originalPosterDeleteUrl = newPosterDeleteUrl;
             selectedPosterUri = null;
+            removeExistingPoster = false;
+        } else if (removeExistingPoster) {
+            originalPosterUrl = null;
+            originalPosterDeleteUrl = null;
+            removeExistingPoster = false;
         }
         originalVisibilityTag = selectedVisibilityTag;
+        cleanupHostedPoster(posterDeleteUrlToCleanup);
         Toast.makeText(this, "Event updated", Toast.LENGTH_SHORT).show();
         finish();
+    }
+
+    private void cleanupHostedPoster(String deleteUrl) {
+        if (TextUtils.isEmpty(deleteUrl)) {
+            return;
+        }
+
+        FreeImageHostUploader.deletePoster(deleteUrl, new FreeImageHostUploader.DeletionCallback() {
+            @Override
+            public void onSuccess() {
+            }
+
+            @Override
+            public void onFailure(String message) {
+                Toast.makeText(OrganizerEditEventActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     /**
@@ -461,10 +573,29 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
         }
 
         selectedPosterUri = imageUri;
+        removeExistingPoster = false;
         ivPosterPreview.setPadding(0, 0, 0, 0);
         ivPosterPreview.setImageURI(imageUri);
         tvPosterUploadTitle.setText("New poster selected");
         tvPosterUploadSubtitle.setText("This image will be uploaded when you update the event");
+        btnRemovePoster.setVisibility(View.VISIBLE);
+    }
+
+    private void removePoster() {
+        if (selectedPosterUri != null) {
+            selectedPosterUri = null;
+            if (!TextUtils.isEmpty(originalPosterUrl) && !removeExistingPoster) {
+                showExistingPosterPreview();
+            } else {
+                showEmptyPosterPreview();
+            }
+            return;
+        }
+
+        if (!TextUtils.isEmpty(originalPosterUrl) && !removeExistingPoster) {
+            removeExistingPoster = true;
+            showEmptyPosterPreview();
+        }
     }
 
     private void bindPosterPickerLaunch(View view) {
@@ -513,14 +644,14 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                         etEventDescription.setText(existingDescription);
                     }
                     originalPosterUrl = documentSnapshot.getString("posterPath");
+                    originalPosterDeleteUrl = documentSnapshot.getString("posterDeleteUrl");
                     if (TextUtils.isEmpty(originalPosterUrl)) {
                         originalPosterUrl = documentSnapshot.getString("posterUrl");
                     }
                     if (!TextUtils.isEmpty(originalPosterUrl)) {
-                        ivPosterPreview.setPadding(0, 0, 0, 0);
-                        PosterLoader.loadInto(ivPosterPreview, originalPosterUrl);
-                        tvPosterUploadTitle.setText("Current event poster");
-                        tvPosterUploadSubtitle.setText("Tap to choose a replacement image");
+                        showExistingPosterPreview();
+                    } else {
+                        showEmptyPosterPreview();
                     }
 
                     String visibilityTag = documentSnapshot.getString("visibilityTag");
@@ -537,6 +668,28 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
                             : R.id.rb_visibility_public;
                     rgEventVisibility.check(visibilityId);
                 });
+    }
+
+    private void showExistingPosterPreview() {
+        removeExistingPoster = false;
+        ivPosterPreview.setPadding(0, 0, 0, 0);
+        PosterLoader.loadInto(ivPosterPreview, originalPosterUrl);
+        tvPosterUploadTitle.setText("Current event poster");
+        tvPosterUploadSubtitle.setText("Tap to choose a replacement image");
+        btnRemovePoster.setVisibility(TextView.VISIBLE);
+    }
+
+    private void showEmptyPosterPreview() {
+        ivPosterPreview.setPadding(getPosterPlaceholderPadding(), getPosterPlaceholderPadding(),
+                getPosterPlaceholderPadding(), getPosterPlaceholderPadding());
+        ivPosterPreview.setImageResource(android.R.drawable.ic_menu_gallery);
+        tvPosterUploadTitle.setText("Upload your event poster");
+        tvPosterUploadSubtitle.setText("Tap to choose a new image");
+        btnRemovePoster.setVisibility(TextView.GONE);
+    }
+
+    private int getPosterPlaceholderPadding() {
+        return (int) (18 * getResources().getDisplayMetrics().density);
     }
 
     /**

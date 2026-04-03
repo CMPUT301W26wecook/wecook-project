@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -58,6 +59,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private ImageView ivPosterPreview;
     private TextView tvPosterUploadTitle;
     private TextView tvPosterUploadSubtitle;
+    private TextView btnRemovePoster;
     private Uri selectedPosterUri;
     private ActivityResultLauncher<String> posterPickerLauncher;
 
@@ -85,6 +87,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         ivPosterPreview = findViewById(R.id.iv_poster_preview);
         tvPosterUploadTitle = findViewById(R.id.tv_poster_upload_title);
         tvPosterUploadSubtitle = findViewById(R.id.tv_poster_upload_subtitle);
+        btnRemovePoster = findViewById(R.id.btn_remove_poster);
         FrameLayout flPosterUpload = findViewById(R.id.fl_poster_upload);
 
         posterPickerLauncher = registerForActivityResult(
@@ -99,6 +102,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etEventTime.setOnClickListener(v ->
                 showDatePicker(etEventTime, "Event Time"));
         flPosterUpload.setOnClickListener(v -> posterPickerLauncher.launch("image/*"));
+        btnRemovePoster.setOnClickListener(v -> clearSelectedPoster());
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_create_events);
@@ -236,10 +240,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         if (selectedPosterUri != null) {
             Toast.makeText(this, "Uploading poster...", Toast.LENGTH_SHORT).show();
-            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.Callback() {
+            FreeImageHostUploader.uploadPoster(this, db, selectedPosterUri, new FreeImageHostUploader.UploadCallback() {
                 @Override
-                public void onSuccess(String imageUrl) {
-                    newEvent.setPosterPath(imageUrl);
+                public void onSuccess(FreeImageHostUploader.UploadResult uploadResult) {
+                    newEvent.setPosterPath(uploadResult.getImageUrl());
+                    newEvent.setPosterDeleteUrl(uploadResult.getDeleteUrl());
                     saveEvent(newEvent);
                 }
 
@@ -284,6 +289,21 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         ivPosterPreview.setImageURI(imageUri);
         tvPosterUploadTitle.setText("Poster ready to upload");
         tvPosterUploadSubtitle.setText("This image will be uploaded when you create the event");
+        btnRemovePoster.setVisibility(View.VISIBLE);
+    }
+
+    private void clearSelectedPoster() {
+        selectedPosterUri = null;
+        int padding = getPosterPlaceholderPadding();
+        ivPosterPreview.setPadding(padding, padding, padding, padding);
+        ivPosterPreview.setImageResource(android.R.drawable.ic_menu_gallery);
+        tvPosterUploadTitle.setText("Upload your event poster");
+        tvPosterUploadSubtitle.setText("Tap to choose an image");
+        btnRemovePoster.setVisibility(TextView.GONE);
+    }
+
+    private int getPosterPlaceholderPadding() {
+        return (int) (18 * getResources().getDisplayMetrics().density);
     }
 
     private boolean isValidPosterMimeType(String mimeType) {

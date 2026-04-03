@@ -9,4 +9,5 @@
     <color name="text_muted">#6C757D</color>
     <color name="outline_gray">#DEE2E6</color>
     <color name="purple_700">#7B1FA2</color>
+    <color name="error_red">#DC3545</color>
 </resources>
