@@ -27,9 +27,12 @@ import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Activity intended to show organizers a map-oriented view related to an event. Within the app it
@@ -219,7 +222,74 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
             return;
         }
 
-        List<MarkerData> markers = extractMarkers(snapshot.get("waitlistEntrantLocations"));
+        Object rawLocations = snapshot.get("waitlistEntrantLocations");
+        Set<String> entrantIds = extractEntrantIds(rawLocations);
+        fetchEntrantDisplayNames(entrantIds, entrantNames -> {
+            List<MarkerData> markers = extractMarkers(rawLocations, entrantNames);
+            renderMarkersOrEmptyState(snapshot, markers);
+        });
+    }
+
+    /**
+     * Extracts map markers from raw Firestore location payload.
+     *
+     * @param rawLocations raw waitlistEntrantLocations object
+     * @return marker data list
+     */
+    private List<MarkerData> extractMarkers(Object rawLocations, Map<String, String> entrantNames) {
+        List<MarkerData> markers = new ArrayList<>();
+        if (!(rawLocations instanceof Map<?, ?>)) {
+            return markers;
+        }
+
+        Map<?, ?> locationsByEntrantId = (Map<?, ?>) rawLocations;
+        for (Map.Entry<?, ?> entry : locationsByEntrantId.entrySet()) {
+            String entrantId = Objects.toString(entry.getKey(), "");
+            String entrantLabel = resolveEntrantLabel(entrantId, entrantNames);
+            Object value = entry.getValue();
+
+            if (value instanceof GeoPoint) {
+                addMarker(markers, entrantLabel, "1st location", (GeoPoint) value);
+                continue;
+            }
+
+            if (!(value instanceof Map<?, ?>)) {
+                continue;
+            }
+
+            Map<?, ?> nestedMap = (Map<?, ?>) value;
+            GeoPoint point = tryParseGeoPoint(nestedMap);
+            if (point != null) {
+                addMarker(markers, entrantLabel, "1st location", point);
+                continue;
+            }
+
+            for (Map.Entry<?, ?> nestedEntry : nestedMap.entrySet()) {
+                String label = Objects.toString(nestedEntry.getKey(), "").trim();
+                GeoPoint nestedPoint = tryParseGeoPoint(nestedEntry.getValue());
+                if (nestedPoint == null) {
+                    continue;
+                }
+                addMarker(markers, entrantLabel, label.isEmpty() ? "location" : label, nestedPoint);
+            }
+        }
+        return markers;
+    }
+
+    private void addMarker(List<MarkerData> markers, String entrantLabel, String label, GeoPoint geoPoint) {
+        String cityCountry = TestingLocationPool.cityCountryLabel(
+                this,
+                geoPoint.getLatitude(),
+                geoPoint.getLongitude()
+        );
+        markers.add(new MarkerData(
+                geoPoint.getLatitude(),
+                geoPoint.getLongitude(),
+                entrantLabel + " - " + label + ": " + cityCountry
+        ));
+    }
+
+    private void renderMarkersOrEmptyState(DocumentSnapshot snapshot, List<MarkerData> markers) {
         if (markers.isEmpty()) {
             int waitlistCount = getListSize(snapshot.get("waitlistEntrantIds"));
             int selectedCount = getListSize(snapshot.get("selectedEntrantIds"));
@@ -268,54 +338,84 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
         Toast.makeText(this, "Loaded " + markers.size() + " entrant location pin(s)", Toast.LENGTH_SHORT).show();
     }
 
-    /**
-     * Extracts map markers from raw Firestore location payload.
-     *
-     * @param rawLocations raw waitlistEntrantLocations object
-     * @return marker data list
-     */
-    private List<MarkerData> extractMarkers(Object rawLocations) {
-        List<MarkerData> markers = new ArrayList<>();
+    private Set<String> extractEntrantIds(Object rawLocations) {
+        Set<String> entrantIds = new HashSet<>();
         if (!(rawLocations instanceof Map<?, ?>)) {
-            return markers;
+            return entrantIds;
         }
-
         Map<?, ?> locationsByEntrantId = (Map<?, ?>) rawLocations;
         for (Map.Entry<?, ?> entry : locationsByEntrantId.entrySet()) {
-            String entrantId = Objects.toString(entry.getKey(), "");
-            Object value = entry.getValue();
-            GeoPoint geoPoint = null;
-
-            if (value instanceof GeoPoint) {
-                geoPoint = (GeoPoint) value;
-            } else if (value instanceof Map<?, ?>) {
-                Map<?, ?> nestedMap = (Map<?, ?>) value;
-                Object latObj = nestedMap.get("lat");
-                Object lngObj = nestedMap.get("lng");
-                if (!(latObj instanceof Number) || !(lngObj instanceof Number)) {
-                    latObj = nestedMap.get("latitude");
-                    lngObj = nestedMap.get("longitude");
-                }
-                if (latObj instanceof Number && lngObj instanceof Number) {
-                    geoPoint = new GeoPoint(((Number) latObj).doubleValue(), ((Number) lngObj).doubleValue());
-                }
-            }
-
-            if (geoPoint != null) {
-                String suffix = entrantId.length() > 6 ? entrantId.substring(entrantId.length() - 6) : entrantId;
-                String cityCountry = TestingLocationPool.cityCountryLabel(
-                        this,
-                        geoPoint.getLatitude(),
-                        geoPoint.getLongitude()
-                );
-                markers.add(new MarkerData(
-                        geoPoint.getLatitude(),
-                        geoPoint.getLongitude(),
-                        "Entrant " + suffix + ": " + cityCountry
-                ));
+            String entrantId = Objects.toString(entry.getKey(), "").trim();
+            if (!entrantId.isEmpty()) {
+                entrantIds.add(entrantId);
             }
         }
-        return markers;
+        return entrantIds;
+    }
+
+    private String resolveEntrantLabel(String entrantId, Map<String, String> entrantNames) {
+        String name = entrantNames.get(entrantId);
+        if (name != null && !name.trim().isEmpty()) {
+            return name.trim();
+        }
+        if (entrantId == null || entrantId.trim().isEmpty()) {
+            return "Unknown entrant";
+        }
+        String suffix = entrantId.length() > 6 ? entrantId.substring(entrantId.length() - 6) : entrantId;
+        return "Entrant " + suffix;
+    }
+
+    private void fetchEntrantDisplayNames(Set<String> entrantIds, EntrantNamesCallback callback) {
+        if (entrantIds == null || entrantIds.isEmpty()) {
+            callback.onResolved(new HashMap<>());
+            return;
+        }
+
+        Map<String, String> namesById = new HashMap<>();
+        final int[] remaining = {entrantIds.size()};
+        for (String entrantId : entrantIds) {
+            db.collection("users").document(entrantId).get()
+                    .addOnSuccessListener(userSnapshot -> {
+                        String displayName = UserDocumentUtils.buildDisplayName(userSnapshot, "");
+                        if (!displayName.trim().isEmpty()) {
+                            namesById.put(entrantId, displayName);
+                        }
+                        remaining[0]--;
+                        if (remaining[0] == 0) {
+                            callback.onResolved(namesById);
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        remaining[0]--;
+                        if (remaining[0] == 0) {
+                            callback.onResolved(namesById);
+                        }
+                    });
+        }
+    }
+
+    private interface EntrantNamesCallback {
+        void onResolved(Map<String, String> entrantNames);
+    }
+
+    private GeoPoint tryParseGeoPoint(Object value) {
+        if (value instanceof GeoPoint) {
+            return (GeoPoint) value;
+        }
+        if (!(value instanceof Map<?, ?>)) {
+            return null;
+        }
+        Map<?, ?> map = (Map<?, ?>) value;
+        Object latObj = map.get("lat");
+        Object lngObj = map.get("lng");
+        if (!(latObj instanceof Number) || !(lngObj instanceof Number)) {
+            latObj = map.get("latitude");
+            lngObj = map.get("longitude");
+        }
+        if (latObj instanceof Number && lngObj instanceof Number) {
+            return new GeoPoint(((Number) latObj).doubleValue(), ((Number) lngObj).doubleValue());
+        }
+        return null;
     }
 
     private int getListSize(Object value) {
