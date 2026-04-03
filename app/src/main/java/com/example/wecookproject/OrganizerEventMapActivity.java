@@ -283,39 +283,68 @@ public class OrganizerEventMapActivity extends AppCompatActivity {
         Map<?, ?> locationsByEntrantId = (Map<?, ?>) rawLocations;
         for (Map.Entry<?, ?> entry : locationsByEntrantId.entrySet()) {
             String entrantId = Objects.toString(entry.getKey(), "");
+            String suffix = entrantId.length() > 6 ? entrantId.substring(entrantId.length() - 6) : entrantId;
             Object value = entry.getValue();
-            GeoPoint geoPoint = null;
 
             if (value instanceof GeoPoint) {
-                geoPoint = (GeoPoint) value;
-            } else if (value instanceof Map<?, ?>) {
-                Map<?, ?> nestedMap = (Map<?, ?>) value;
-                Object latObj = nestedMap.get("lat");
-                Object lngObj = nestedMap.get("lng");
-                if (!(latObj instanceof Number) || !(lngObj instanceof Number)) {
-                    latObj = nestedMap.get("latitude");
-                    lngObj = nestedMap.get("longitude");
-                }
-                if (latObj instanceof Number && lngObj instanceof Number) {
-                    geoPoint = new GeoPoint(((Number) latObj).doubleValue(), ((Number) lngObj).doubleValue());
-                }
+                addMarker(markers, suffix, "1st location", (GeoPoint) value);
+                continue;
             }
 
-            if (geoPoint != null) {
-                String suffix = entrantId.length() > 6 ? entrantId.substring(entrantId.length() - 6) : entrantId;
-                String cityCountry = TestingLocationPool.cityCountryLabel(
-                        this,
-                        geoPoint.getLatitude(),
-                        geoPoint.getLongitude()
-                );
-                markers.add(new MarkerData(
-                        geoPoint.getLatitude(),
-                        geoPoint.getLongitude(),
-                        "Entrant " + suffix + ": " + cityCountry
-                ));
+            if (!(value instanceof Map<?, ?>)) {
+                continue;
+            }
+
+            Map<?, ?> nestedMap = (Map<?, ?>) value;
+            GeoPoint point = tryParseGeoPoint(nestedMap);
+            if (point != null) {
+                addMarker(markers, suffix, "1st location", point);
+                continue;
+            }
+
+            for (Map.Entry<?, ?> nestedEntry : nestedMap.entrySet()) {
+                String label = Objects.toString(nestedEntry.getKey(), "").trim();
+                GeoPoint nestedPoint = tryParseGeoPoint(nestedEntry.getValue());
+                if (nestedPoint == null) {
+                    continue;
+                }
+                addMarker(markers, suffix, label.isEmpty() ? "location" : label, nestedPoint);
             }
         }
         return markers;
+    }
+
+    private void addMarker(List<MarkerData> markers, String suffix, String label, GeoPoint geoPoint) {
+        String cityCountry = TestingLocationPool.cityCountryLabel(
+                this,
+                geoPoint.getLatitude(),
+                geoPoint.getLongitude()
+        );
+        markers.add(new MarkerData(
+                geoPoint.getLatitude(),
+                geoPoint.getLongitude(),
+                "Entrant " + suffix + " - " + label + ": " + cityCountry
+        ));
+    }
+
+    private GeoPoint tryParseGeoPoint(Object value) {
+        if (value instanceof GeoPoint) {
+            return (GeoPoint) value;
+        }
+        if (!(value instanceof Map<?, ?>)) {
+            return null;
+        }
+        Map<?, ?> map = (Map<?, ?>) value;
+        Object latObj = map.get("lat");
+        Object lngObj = map.get("lng");
+        if (!(latObj instanceof Number) || !(lngObj instanceof Number)) {
+            latObj = map.get("latitude");
+            lngObj = map.get("longitude");
+        }
+        if (latObj instanceof Number && lngObj instanceof Number) {
+            return new GeoPoint(((Number) latObj).doubleValue(), ((Number) lngObj).doubleValue());
+        }
+        return null;
     }
 
     private int getListSize(Object value) {
