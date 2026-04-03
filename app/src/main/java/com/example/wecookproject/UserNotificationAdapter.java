@@ -43,9 +43,20 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         holder.tvMessage.setText(item.getMessage());
         holder.tvTimestamp.setText(item.getFormattedTime());
         holder.tvType.setText(formatType(item.getType()));
-        holder.tvStatus.setText(item.isUnread() ? "Unread" : "Read");
-        holder.btnRead.setEnabled(item.isUnread());
-        holder.btnRead.setAlpha(item.isUnread() ? 1f : 0.5f);
+        holder.tvStatus.setText(formatStatus(item));
+
+        boolean actionEnabled;
+        String actionText;
+        if (item.requiresConfirmation()) {
+            actionEnabled = !item.isConfirmed();
+            actionText = item.isConfirmed() ? "Confirmed" : "Confirm";
+        } else {
+            actionEnabled = item.isUnread();
+            actionText = "Read";
+        }
+        holder.btnRead.setText(actionText);
+        holder.btnRead.setEnabled(actionEnabled);
+        holder.btnRead.setAlpha(actionEnabled ? 1f : 0.5f);
 
         holder.itemView.setOnClickListener(v -> actionListener.onNotificationOpened(item));
         holder.btnRead.setOnClickListener(v -> actionListener.onMarkReadClicked(item));
@@ -91,5 +102,15 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
             return "Replacement";
         }
         return "Update";
+    }
+
+    private static String formatStatus(UserNotificationItem item) {
+        if (item.isConfirmed()) {
+            return "Confirmed";
+        }
+        if (item.isUnread()) {
+            return "Unread";
+        }
+        return "Read";
     }
 }

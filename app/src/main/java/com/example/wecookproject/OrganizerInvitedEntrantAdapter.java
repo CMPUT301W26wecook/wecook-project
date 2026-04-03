@@ -18,6 +18,7 @@ import java.util.List;
 public class OrganizerInvitedEntrantAdapter extends RecyclerView.Adapter<OrganizerInvitedEntrantAdapter.InvitedViewHolder> {
     public static final String STATUS_ACCEPTED = "accepted";
     public static final String STATUS_CANCELLED = "cancelled";
+    public static final String STATUS_CONFIRMED = "confirmed";
     public static final String STATUS_PENDING = "pending";
 
     private final List<OrganizerInvitedEntrantItem> items = new ArrayList<>();
@@ -49,6 +50,10 @@ public class OrganizerInvitedEntrantAdapter extends RecyclerView.Adapter<Organiz
         if (STATUS_ACCEPTED.equals(item.getStatus())) {
             holder.status.setVisibility(View.VISIBLE);
             holder.status.setText("Accepted");
+            holder.status.setBackgroundResource(R.drawable.bg_status_accepted);
+        } else if (STATUS_CONFIRMED.equals(item.getStatus())) {
+            holder.status.setVisibility(View.VISIBLE);
+            holder.status.setText("Confirmed");
             holder.status.setBackgroundResource(R.drawable.bg_status_accepted);
         } else if (STATUS_CANCELLED.equals(item.getStatus())) {
             holder.status.setVisibility(View.VISIBLE);
