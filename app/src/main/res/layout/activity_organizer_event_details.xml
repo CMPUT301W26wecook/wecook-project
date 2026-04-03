@@ -265,6 +265,18 @@
                 </LinearLayout>
 
                 <Button
+                    android:id="@+id/btn_view_enrolled_entrants"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="#65559F"
+                    android:minHeight="48dp"
+                    android:text="View Enrolled Entrants"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <Button
                     android:id="@+id/btn_registration_map"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

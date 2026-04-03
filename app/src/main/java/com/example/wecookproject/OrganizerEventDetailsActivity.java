@@ -205,6 +205,16 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                  Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
              }
         });
+
+        findViewById(R.id.btn_view_enrolled_entrants).setOnClickListener(v -> {
+            if (eventId != null) {
+                Intent intent = new Intent(this, OrganizerEnrolledEntrantsActivity.class);
+                intent.putExtra("eventId", eventId);
+                startActivity(intent);
+            } else {
+                Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
+            }
+        });
         
         findViewById(R.id.btn_registration_map).setOnClickListener(v -> {
              if (eventId != null) {

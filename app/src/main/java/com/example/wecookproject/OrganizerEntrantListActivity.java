@@ -64,6 +64,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private boolean waitlistLoaded = false;
     private boolean isPrivateEvent = false;
     private Button inviteSelectedButton;
+    private Button sendNotificationButton;
     private String organizerId;
 
 
@@ -91,7 +92,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
 
         entrantsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new OrganizerWaitlistAdapter(this::deleteEntrant);
-        adapter.setOnSelectionChangedListener(selectedCount -> updateInviteButtonVisibility());
+        adapter.setOnSelectionChangedListener(selectedCount -> onWaitlistSelectionChanged());
         entrantsRecyclerView.setAdapter(adapter);
         backButton.setOnClickListener(v -> finish());
 
@@ -182,10 +183,17 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private void setupActionButtons() {
         actionButtons.setVisibility(View.VISIBLE);
 
-
-        findViewById(R.id.btn_send_notification_to_all).setOnClickListener(v -> {
+        sendNotificationButton = findViewById(R.id.btn_send_notification_to_all);
+        sendNotificationButton.setOnClickListener(v -> {
             Intent intent = new Intent(this, OrganizerNotificationActivity.class);
             intent.putExtra("eventId", eventId);
+            List<String> checked = adapter.getSelectedEntrantIds();
+            if (!checked.isEmpty()) {
+                intent.putStringArrayListExtra(
+                        OrganizerNotificationActivity.EXTRA_EXPLICIT_RECIPIENT_IDS,
+                        new ArrayList<>(checked)
+                );
+            }
             startActivity(intent);
         });
         findViewById(R.id.btn_view_lottery_winners).setOnClickListener(v -> {
@@ -333,7 +341,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     waitlistLoaded = true;
                     findViewById(R.id.btn_lottery_draw).setEnabled(true);
                     findViewById(R.id.btn_redraw_entrants).setEnabled(true);
-                    updateInviteButtonVisibility();
+                    onWaitlistSelectionChanged();
                     loadEntrantProfiles(entrantIds);
                 })
                 .addOnFailureListener(e -> {
@@ -412,8 +420,26 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         }
 
         adapter.submitList(filteredEntrants);
-        updateInviteButtonVisibility();
+        onWaitlistSelectionChanged();
         showEmptyState(filteredEntrants.isEmpty());
+    }
+
+    private void onWaitlistSelectionChanged() {
+        updateInviteButtonVisibility();
+        updateSendNotificationButtonLabel();
+    }
+
+    private void updateSendNotificationButtonLabel() {
+        if (sendNotificationButton == null) {
+            return;
+        }
+        int n = adapter.getSelectedEntrantIds().size();
+        if (n == 0) {
+            sendNotificationButton.setText(R.string.organizer_send_notification_all);
+        } else {
+            sendNotificationButton.setText(getResources().getQuantityString(
+                    R.plurals.organizer_send_notification_selected, n, n));
+        }
     }
 
     private void updateInviteButtonVisibility() {
@@ -432,7 +458,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         List<String> selected = adapter.getSelectedEntrantIds();
         if (selected.isEmpty()) {
             Toast.makeText(this, "Select at least one entrant", Toast.LENGTH_SHORT).show();
-            updateInviteButtonVisibility();
+            onWaitlistSelectionChanged();
             return;
         }
 
@@ -460,7 +486,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     removeEntrantsFromVisibleWaitlist(selected);
                     persistInvitedHistory(selected);
                     Toast.makeText(this, "Invitation sent to selected entrants", Toast.LENGTH_SHORT).show();
-                    updateInviteButtonVisibility();
+                    onWaitlistSelectionChanged();
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to send invitations", Toast.LENGTH_SHORT).show());

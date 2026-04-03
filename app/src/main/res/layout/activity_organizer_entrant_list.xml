@@ -71,7 +71,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="Send Notification to all" />
+                android:text="@string/organizer_send_notification_all" />
 
             <Button
                 android:id="@+id/btn_view_lottery_winners"
