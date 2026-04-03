@@ -159,6 +159,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     List<String> invitedIds = readStringList(eventDoc, "selectedEntrantIds");
                     List<String> acceptedIds = readStringList(eventDoc, "acceptedEntrantIds");
                     List<String> cancelledIds = readStringList(eventDoc, "declinedEntrantIds");
+                    List<String> confirmedIds = readStringList(eventDoc, "confirmedEntrantIds");
                     List<String> waitlistIds = readStringList(eventDoc, "waitlistEntrantIds");
 
                     Set<String> allInvitedIds = new LinkedHashSet<>();
@@ -191,14 +192,14 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                                                 .document(eventId)
                                                 .get()
                                                 .addOnSuccessListener(historyDoc -> {
-                                                    loaded.add(toInvitedItem(entrantId, userDoc, historyDoc, invitedIds, acceptedIds, cancelledIds));
+                                                    loaded.add(toInvitedItem(entrantId, userDoc, historyDoc, invitedIds, acceptedIds, cancelledIds, confirmedIds));
                                                     pending[0]--;
                                                     if (pending[0] == 0) {
                                                         onInvitedLoaded(loaded);
                                                     }
                                                 })
                                                 .addOnFailureListener(e -> {
-                                                    loaded.add(toInvitedItem(entrantId, userDoc, null, invitedIds, acceptedIds, cancelledIds));
+                                                    loaded.add(toInvitedItem(entrantId, userDoc, null, invitedIds, acceptedIds, cancelledIds, confirmedIds));
                                                     pending[0]--;
                                                     if (pending[0] == 0) {
                                                         onInvitedLoaded(loaded);
@@ -224,7 +225,8 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                                                       DocumentSnapshot historyDoc,
                                                       List<String> invitedIds,
                                                       List<String> acceptedIds,
-                                                      List<String> cancelledIds) {
+                                                      List<String> cancelledIds,
+                                                      List<String> confirmedIds) {
         String firstName = safe(userDoc.getString("firstName"));
         String lastName = safe(userDoc.getString("lastName"));
         String phoneNumber = safe(userDoc.getString("phoneNumber"));
@@ -238,6 +240,8 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         String status = OrganizerInvitedEntrantAdapter.STATUS_PENDING;
         if ("accepted".equals(historyStatus) || acceptedIds.contains(entrantId)) {
             status = OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED;
+        } else if (confirmedIds.contains(entrantId)) {
+            status = OrganizerInvitedEntrantAdapter.STATUS_CONFIRMED;
         } else if ("invited".equals(historyStatus) || invitedIds.contains(entrantId)) {
             status = OrganizerInvitedEntrantAdapter.STATUS_PENDING;
         } else if ("rejected".equals(historyStatus) || cancelledIds.contains(entrantId)) {
@@ -259,7 +263,9 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         List<OrganizerInvitedEntrantItem> filtered = new ArrayList<>();
         for (OrganizerInvitedEntrantItem item : allEntrants) {
             boolean statusMatch = "all".equals(filterMode)
-                    || ("accepted".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED.equals(item.getStatus()))
+                    || ("accepted".equals(filterMode)
+                        && (OrganizerInvitedEntrantAdapter.STATUS_ACCEPTED.equals(item.getStatus())
+                        || OrganizerInvitedEntrantAdapter.STATUS_CONFIRMED.equals(item.getStatus())))
                     || ("cancelled".equals(filterMode) && OrganizerInvitedEntrantAdapter.STATUS_CANCELLED.equals(item.getStatus()));
             boolean textMatch = normalized.isEmpty()
                     || item.getDisplayName().toLowerCase(Locale.ROOT).contains(normalized)
