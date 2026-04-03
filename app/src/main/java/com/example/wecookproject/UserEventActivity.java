@@ -73,6 +73,7 @@ public class UserEventActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
     private AlertDialog pendingJoinDialog;
+    private boolean loginSelectionPopupChecked = false;
 
     /**
      * Initializes list UI, permissions launcher, and data loading.
@@ -111,6 +112,7 @@ public class UserEventActivity extends AppCompatActivity {
 
         setupBottomNav();
         loadEventsAndHistory();
+        maybeShowSelectionConfirmationPopup();
     }
 
     /**
@@ -299,6 +301,69 @@ public class UserEventActivity extends AppCompatActivity {
             tvEmptyState.setVisibility(View.GONE);
             rvEvents.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void maybeShowSelectionConfirmationPopup() {
+        if (loginSelectionPopupChecked || entrantId == null || entrantId.trim().isEmpty()) {
+            return;
+        }
+        loginSelectionPopupChecked = true;
+
+        db.collection("users")
+                .document(entrantId)
+                .collection("notifications")
+                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(20)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    DocumentSnapshot candidate = null;
+                    for (QueryDocumentSnapshot snapshot : querySnapshot) {
+                        String type = snapshot.getString("type");
+                        if (!isSelectionNotificationType(type)) {
+                            continue;
+                        }
+
+                        String status = snapshot.getString("status");
+                        boolean alreadyConfirmed = NotificationHelper.STATUS_CONFIRMED.equalsIgnoreCase(status)
+                                || snapshot.getTimestamp("confirmedAt") != null;
+                        if (!alreadyConfirmed) {
+                            candidate = snapshot;
+                            break;
+                        }
+                    }
+
+                    if (candidate != null) {
+                        showSelectionConfirmationPopup(candidate);
+                    }
+                });
+    }
+
+    private boolean isSelectionNotificationType(String type) {
+        return NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)
+                || NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)
+                || NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type);
+    }
+
+    private void showSelectionConfirmationPopup(DocumentSnapshot notificationSnapshot) {
+        String notificationId = notificationSnapshot.getId();
+        String eventName = notificationSnapshot.getString("eventName");
+        String message = notificationSnapshot.getString("message");
+        String safeEventName = (eventName == null || eventName.trim().isEmpty()) ? "this event" : eventName.trim();
+        String safeMessage = (message == null || message.trim().isEmpty())
+                ? "Congratulations on being selected to this event! Hope you have fun!!"
+                : message.trim();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Selection Notice")
+                .setMessage(safeMessage + "\n\nEvent: " + safeEventName + "\n\nConfirm now?")
+                .setPositiveButton("Confirm", (dialog, which) ->
+                        NotificationHelper.markAsConfirmed(db, entrantId, notificationId)
+                                .addOnSuccessListener(unused ->
+                                        Toast.makeText(this, "Selection confirmed", Toast.LENGTH_SHORT).show())
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(this, "Failed to confirm selection", Toast.LENGTH_SHORT).show()))
+                .setNegativeButton("Later", null)
+                .show();
     }
 
     /**
