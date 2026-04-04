@@ -19,19 +19,19 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * Activity for organizers to access the notification-sending screen from the organizer workflow.
- * Within the app it acts as the UI controller for notification composition/navigation, connected to
- * the organizer bottom-navigation structure.
- *
- * Outstanding issues:
- * - It is more of a placeholder than a fully implemented feature, as the actual notification-sending logic 
- *   is not yet implemented and the screen primarily serves as a navigation stub. The functionality will be 
- *   implemented in part 4.
+ * Activity for organizers to compose and send in-app notifications for an event. Recipients are
+ * chosen via the spinner, or restricted to an explicit list when opened from the waitlist with
+ * entrants selected.
  */
 public class OrganizerNotificationActivity extends AppCompatActivity {
+    /** When non-empty, send only to these user IDs (must still belong to the event). */
+    public static final String EXTRA_EXPLICIT_RECIPIENT_IDS = "explicitRecipientIds";
+
     private FirebaseFirestore db;
     private String eventId;
     private String eventName = "Event Notification";
@@ -43,6 +43,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
     private Button btnSendNotification;
     private Spinner recipientSpinner;
     private String organizerId;
+    private ArrayList<String> explicitRecipientIds;
 
     private static final String RECIPIENT_WAITLIST = "All waitlist";
     private static final String RECIPIENT_SELECTED = "Selected entrants only";
@@ -60,6 +61,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
         db = FirebaseFirestore.getInstance();
         eventId = getIntent().getStringExtra("eventId");
         organizerId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        explicitRecipientIds = getIntent().getStringArrayListExtra(EXTRA_EXPLICIT_RECIPIENT_IDS);
 
         tvEventName = findViewById(R.id.tv_notification_event_name);
         tvEventLocation = findViewById(R.id.tv_notification_location);
@@ -74,6 +76,9 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
         );
         recipientAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         recipientSpinner.setAdapter(recipientAdapter);
+        if (explicitRecipientIds != null && !explicitRecipientIds.isEmpty()) {
+            recipientSpinner.setEnabled(false);
+        }
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setOnItemSelectedListener(item -> {
@@ -156,10 +161,18 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                         return;
                     }
 
-                    List<String> recipients = getRecipientsForSelection(eventSnapshot);
+                    List<String> recipients = resolveRecipients(eventSnapshot);
                     if (recipients.isEmpty()) {
                         btnSendNotification.setEnabled(true);
-                        Toast.makeText(this, "No matching recipients for this notification", Toast.LENGTH_SHORT).show();
+                        if (explicitRecipientIds != null && !explicitRecipientIds.isEmpty()) {
+                            Toast.makeText(
+                                    this,
+                                    "No selected entrants are still eligible for this event",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        } else {
+                            Toast.makeText(this, "No matching recipients for this notification", Toast.LENGTH_SHORT).show();
+                        }
                         return;
                     }
 
@@ -167,7 +180,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     btnSendNotification.setEnabled(true);
-                    Toast.makeText(this, "Failed to load waitlist recipients", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Failed to load event recipients", Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -227,6 +240,30 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
         );
     }
 
+    private List<String> resolveRecipients(DocumentSnapshot eventSnapshot) {
+        if (explicitRecipientIds != null && !explicitRecipientIds.isEmpty()) {
+            Set<String> allowed = new LinkedHashSet<>();
+            allowed.addAll(FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds"));
+            allowed.addAll(FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds"));
+            allowed.addAll(FirestoreFieldUtils.getStringList(eventSnapshot, "acceptedEntrantIds"));
+
+            List<String> ordered = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
+            for (String rawId : explicitRecipientIds) {
+                if (rawId == null) {
+                    continue;
+                }
+                String id = rawId.trim();
+                if (id.isEmpty() || !allowed.contains(id) || !seen.add(id)) {
+                    continue;
+                }
+                ordered.add(id);
+            }
+            return ordered;
+        }
+        return getRecipientsForSelection(eventSnapshot);
+    }
+
     private List<String> getRecipientsForSelection(DocumentSnapshot eventSnapshot) {
         List<String> recipients;
         String selectedOption = recipientSpinner.getSelectedItem() == null
@@ -241,6 +278,6 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
             recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds");
         }
 
-        return new ArrayList<>(new java.util.LinkedHashSet<>(recipients));
+        return new ArrayList<>(new LinkedHashSet<>(recipients));
     }
 }

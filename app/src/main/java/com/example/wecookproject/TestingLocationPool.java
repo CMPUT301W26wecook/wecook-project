@@ -30,7 +30,8 @@ public final class TestingLocationPool {
         if (Geocoder.isPresent() && context != null) {
             for (int i = 0; i < COUNTRY_LOOKUP_ATTEMPTS; i++) {
                 String code = ISO_COUNTRY_CODES[RANDOM.nextInt(ISO_COUNTRY_CODES.length)];
-                String countryName = new Locale("", code).getDisplayCountry(Locale.ENGLISH);
+                String countryName = new Locale.Builder().setRegion(code).build()
+                        .getDisplayCountry(Locale.ENGLISH);
                 LatLng center = resolveCountryCenter(context, countryName);
                 if (center == null) {
                     continue;
@@ -61,7 +62,7 @@ public final class TestingLocationPool {
         }
         try {
             Geocoder geocoder = new Geocoder(context, Locale.ENGLISH);
-            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+            List<Address> addresses = geocoderGetFromLocation(geocoder, latitude, longitude, 1);
             if (addresses != null && !addresses.isEmpty()) {
                 Address address = addresses.get(0);
                 String city = firstNonBlank(
@@ -81,6 +82,26 @@ public final class TestingLocationPool {
         return "Unknown location";
     }
 
+    /**
+     * Synchronous geocoding used by test helpers. The blocking {@link Geocoder#getFromLocation}
+     * overload remains the practical choice here; the API 33+ listener-based API would require
+     * a full async refactor of callers to avoid main-thread deadlock when blocking for results.
+     */
+    @SuppressWarnings("deprecation")
+    private static List<Address> geocoderGetFromLocation(Geocoder geocoder,
+                                                         double latitude,
+                                                         double longitude,
+                                                         int maxResults) throws IOException {
+        return geocoder.getFromLocation(latitude, longitude, maxResults);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static List<Address> geocoderGetFromLocationName(Geocoder geocoder,
+                                                             String locationName,
+                                                             int maxResults) throws IOException {
+        return geocoder.getFromLocationName(locationName, maxResults);
+    }
+
     private static LatLng resolveCountryCenter(Context context, String countryName) {
         LatLng cached = COUNTRY_CENTER_CACHE.get(countryName);
         if (cached != null) {
@@ -88,7 +109,7 @@ public final class TestingLocationPool {
         }
         try {
             Geocoder geocoder = new Geocoder(context, Locale.ENGLISH);
-            List<Address> addresses = geocoder.getFromLocationName(countryName, 1);
+            List<Address> addresses = geocoderGetFromLocationName(geocoder, countryName, 1);
             if (addresses == null || addresses.isEmpty()) {
                 return null;
             }
