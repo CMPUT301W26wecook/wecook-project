@@ -64,14 +64,14 @@ public class SignupDetailsActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows entrant-only fields and hides them for organizer signup.
+     * Shows entrant-only fields and hides them for organizer/admin signup.
      *
      * @param emailLayout email container
      * @param phoneNumberLayout phone number container
      */
     private void configureEntrantOnlyFields(TextInputLayout emailLayout, TextInputLayout phoneNumberLayout) {
         String clickedRole = getIntent().getStringExtra("clickedRole");
-        if ("ORGANIZER".equals(clickedRole)) {
+        if ("ORGANIZER".equals(clickedRole) || "ADMIN".equals(clickedRole)) {
             emailLayout.setVisibility(View.GONE);
             phoneNumberLayout.setVisibility(View.GONE);
         }
@@ -168,7 +168,8 @@ public class SignupDetailsActivity extends AppCompatActivity {
         String phoneNumber = phoneNumberInput.getText().toString().trim();
 
         String clickedRole = getIntent().getStringExtra("clickedRole");
-        boolean organizer = "ORGANIZER".equals(clickedRole);
+        boolean isLimitedProfile = "ORGANIZER".equals(clickedRole) || "ADMIN".equals(clickedRole);
+        
         clearError(firstNameLayout);
         clearError(lastNameLayout);
         clearError(birthdayLayout);
@@ -176,7 +177,7 @@ public class SignupDetailsActivity extends AppCompatActivity {
         clearError(phoneNumberLayout);
 
         Map<String, String> errors = UserInputValidator.validateSignupDetails(
-                organizer,
+                isLimitedProfile,
                 firstName,
                 lastName,
                 birthday,

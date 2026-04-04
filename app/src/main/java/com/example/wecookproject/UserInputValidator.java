@@ -31,7 +31,7 @@ public final class UserInputValidator {
     private UserInputValidator() {
     }
 
-    public static Map<String, String> validateSignupDetails(boolean organizer,
+    public static Map<String, String> validateSignupDetails(boolean limitedProfile,
                                                             String firstName,
                                                             String lastName,
                                                             String birthday,
@@ -39,12 +39,12 @@ public final class UserInputValidator {
                                                             String phoneNumber) {
         LinkedHashMap<String, String> errors = new LinkedHashMap<>();
         requireNonBlank(errors, FIELD_FIRST_NAME, firstName, "First name is required");
-        if (organizer) {
+        if (limitedProfile) {
             requireNonBlank(errors, FIELD_LAST_NAME, lastName, "Last name is required");
         }
         validateBirthday(errors, birthday, true);
         validateEmail(errors, email, false);
-        if (!organizer) {
+        if (!limitedProfile) {
             validatePhoneNumber(errors, phoneNumber, true);
         }
         return errors;
