@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -72,6 +73,7 @@ public class UserEventActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
     private AlertDialog pendingJoinDialog;
+    private boolean loginSelectionPopupChecked = false;
 
     /**
      * Initializes list UI, permissions launcher, and data loading.
@@ -110,6 +112,7 @@ public class UserEventActivity extends AppCompatActivity {
 
         setupBottomNav();
         loadEventsAndHistory();
+        maybeShowSelectionConfirmationPopup();
     }
 
     /**
@@ -298,6 +301,69 @@ public class UserEventActivity extends AppCompatActivity {
             tvEmptyState.setVisibility(View.GONE);
             rvEvents.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void maybeShowSelectionConfirmationPopup() {
+        if (loginSelectionPopupChecked || entrantId == null || entrantId.trim().isEmpty()) {
+            return;
+        }
+        loginSelectionPopupChecked = true;
+
+        db.collection("users")
+                .document(entrantId)
+                .collection("notifications")
+                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(20)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    DocumentSnapshot candidate = null;
+                    for (QueryDocumentSnapshot snapshot : querySnapshot) {
+                        String type = snapshot.getString("type");
+                        if (!isSelectionNotificationType(type)) {
+                            continue;
+                        }
+
+                        String status = snapshot.getString("status");
+                        boolean alreadyConfirmed = NotificationHelper.STATUS_CONFIRMED.equalsIgnoreCase(status)
+                                || snapshot.getTimestamp("confirmedAt") != null;
+                        if (!alreadyConfirmed) {
+                            candidate = snapshot;
+                            break;
+                        }
+                    }
+
+                    if (candidate != null) {
+                        showSelectionConfirmationPopup(candidate);
+                    }
+                });
+    }
+
+    private boolean isSelectionNotificationType(String type) {
+        return NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)
+                || NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)
+                || NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type);
+    }
+
+    private void showSelectionConfirmationPopup(DocumentSnapshot notificationSnapshot) {
+        String notificationId = notificationSnapshot.getId();
+        String eventName = notificationSnapshot.getString("eventName");
+        String message = notificationSnapshot.getString("message");
+        String safeEventName = (eventName == null || eventName.trim().isEmpty()) ? "this event" : eventName.trim();
+        String safeMessage = (message == null || message.trim().isEmpty())
+                ? "Congratulations on being selected to this event! Hope you have fun!!"
+                : message.trim();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Selection Notice")
+                .setMessage(safeMessage + "\n\nEvent: " + safeEventName + "\n\nConfirm now?")
+                .setPositiveButton("Confirm", (dialog, which) ->
+                        NotificationHelper.markAsConfirmed(db, entrantId, notificationId)
+                                .addOnSuccessListener(unused ->
+                                        Toast.makeText(this, "Selection confirmed", Toast.LENGTH_SHORT).show())
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(this, "Failed to confirm selection", Toast.LENGTH_SHORT).show()))
+                .setNegativeButton("Later", null)
+                .show();
     }
 
     /**
@@ -695,9 +761,9 @@ public class UserEventActivity extends AppCompatActivity {
             int maxWaitlist = maxWaitlistValue == null ? 0 : maxWaitlistValue.intValue();
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
-            GeoPoint existingEntrantLocation = snapshot.getGeoPoint("waitlistEntrantLocations." + entrantId);
+            Object existingEntrantLocation = snapshot.get("waitlistEntrantLocations." + entrantId);
             if (addEntrant) {
-                if (geolocationRequired && entrantLocation == null && existingEntrantLocation == null) {
+                if (geolocationRequired && entrantLocation == null && !hasStoredEntrantLocation(existingEntrantLocation)) {
                     throw new IllegalStateException("Location is required to join this waitlist");
                 }
                 if (waitlistEntrants.contains(entrantId)) {
@@ -712,20 +778,14 @@ public class UserEventActivity extends AppCompatActivity {
             }
 
             boolean shouldStoreLocation = addEntrant && entrantLocation != null;
-            boolean shouldDeleteStoredLocation = !addEntrant
-                    && (deleteHistory || UserEventRecord.STATUS_REJECTED.equals(newStatus));
 
             if (shouldStoreLocation) {
+                Map<String, Object> locationHistory = buildEntrantLocationHistory(existingEntrantLocation, entrantLocation);
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
                         "currentWaitlistCount", waitlistEntrants.size(),
                         "waitlistEntrantLocations." + entrantId,
-                        new GeoPoint(entrantLocation.getLatitude(), entrantLocation.getLongitude()));
-            } else if (shouldDeleteStoredLocation) {
-                transaction.update(eventReference,
-                        "waitlistEntrantIds", waitlistEntrants,
-                        "currentWaitlistCount", waitlistEntrants.size(),
-                        "waitlistEntrantLocations." + entrantId, FieldValue.delete());
+                        locationHistory);
             } else {
                 transaction.update(eventReference,
                         "waitlistEntrantIds", waitlistEntrants,
@@ -753,6 +813,110 @@ public class UserEventActivity extends AppCompatActivity {
             }
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         });
+    }
+
+    private boolean hasStoredEntrantLocation(Object existingEntrantLocation) {
+        if (existingEntrantLocation instanceof GeoPoint) {
+            return true;
+        }
+        if (existingEntrantLocation instanceof Map<?, ?>) {
+            Map<?, ?> map = (Map<?, ?>) existingEntrantLocation;
+            return !map.isEmpty();
+        }
+        return false;
+    }
+
+    private Map<String, Object> buildEntrantLocationHistory(Object existingEntrantLocation, Location newLocation) {
+        Map<String, Object> history = new HashMap<>();
+        if (existingEntrantLocation instanceof GeoPoint) {
+            history.put("1st location", existingEntrantLocation);
+        } else if (existingEntrantLocation instanceof Map<?, ?>) {
+            Map<?, ?> raw = (Map<?, ?>) existingEntrantLocation;
+            if (isLegacyPointMap(raw)) {
+                GeoPoint legacyPoint = mapToGeoPoint(raw);
+                if (legacyPoint != null) {
+                    history.put("1st location", legacyPoint);
+                }
+            } else {
+                for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                    String key = entry.getKey() == null ? "" : entry.getKey().toString().trim();
+                    if (!key.isEmpty()) {
+                        history.put(key, entry.getValue());
+                    }
+                }
+            }
+        }
+
+        int next = maxOrdinal(history.keySet()) + 1;
+        history.put(formatOrdinal(next) + " location", new GeoPoint(newLocation.getLatitude(), newLocation.getLongitude()));
+        return history;
+    }
+
+    private boolean isLegacyPointMap(Map<?, ?> raw) {
+        return (raw.containsKey("lat") && raw.containsKey("lng"))
+                || (raw.containsKey("latitude") && raw.containsKey("longitude"));
+    }
+
+    private GeoPoint mapToGeoPoint(Map<?, ?> raw) {
+        Object lat = raw.get("lat");
+        Object lng = raw.get("lng");
+        if (!(lat instanceof Number) || !(lng instanceof Number)) {
+            lat = raw.get("latitude");
+            lng = raw.get("longitude");
+        }
+        if (lat instanceof Number && lng instanceof Number) {
+            return new GeoPoint(((Number) lat).doubleValue(), ((Number) lng).doubleValue());
+        }
+        return null;
+    }
+
+    private int maxOrdinal(Set<String> keys) {
+        int max = 0;
+        for (String key : keys) {
+            if (key == null) {
+                continue;
+            }
+            String normalized = key.trim().toLowerCase(Locale.ROOT);
+            int spaceIndex = normalized.indexOf(' ');
+            String firstToken = spaceIndex >= 0 ? normalized.substring(0, spaceIndex) : normalized;
+            int number = parseLeadingInt(firstToken);
+            if (number > max) {
+                max = number;
+            }
+        }
+        return max;
+    }
+
+    private int parseLeadingInt(String value) {
+        int end = 0;
+        while (end < value.length() && Character.isDigit(value.charAt(end))) {
+            end++;
+        }
+        if (end == 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.substring(0, end));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private String formatOrdinal(int number) {
+        int mod100 = number % 100;
+        if (mod100 >= 11 && mod100 <= 13) {
+            return number + "th";
+        }
+        switch (number % 10) {
+            case 1:
+                return number + "st";
+            case 2:
+                return number + "nd";
+            case 3:
+                return number + "rd";
+            default:
+                return number + "th";
+        }
     }
 
     /**

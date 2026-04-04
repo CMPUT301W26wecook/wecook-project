@@ -10,17 +10,12 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * RecyclerView adapter for rendering user history entries.
  */
 public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.UserHistoryViewHolder> {
-    private final SimpleDateFormat eventTimeFormat =
-            new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.CANADA);
-
     /**
      * Listener for user interactions on history rows.
      */
@@ -92,7 +87,7 @@ public class UserHistoryAdapter extends RecyclerView.Adapter<UserHistoryAdapter.
         if (item.getEventTime() == null) {
             return "Event time TBD";
         }
-        return eventTimeFormat.format(item.getEventTime().toDate());
+        return UserEventUiUtils.formatEventTimestamp(item.getEventTime());
     }
 
     /**

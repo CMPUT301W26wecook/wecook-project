@@ -26,6 +26,7 @@ public class Event {
     private String visibilityTag = VISIBILITY_PUBLIC;
 
     private String posterUrl;
+    private String posterDeleteUrl;
     private String qrCodePath;
     private List<String> waitlistEntrantIds = new ArrayList<>();
     private List<String> selectedEntrantIds = new ArrayList<>();
@@ -57,6 +58,32 @@ public class Event {
                  Date eventTime,
                  int maxWaitlist, int currentWaitlistCount,
                  boolean geolocationRequired, String location, String description) {
+        this(eventId, organizerId, eventName, registrationStartDate, registrationEndDate, eventTime,
+                maxWaitlist, currentWaitlistCount, geolocationRequired, location, description, null, null);
+    }
+
+    /**
+     * Creates an event model with poster hosting metadata.
+     *
+     * @param eventId event identifier
+     * @param organizerId organizer identifier
+     * @param eventName event name
+     * @param registrationStartDate registration start date
+     * @param registrationEndDate registration end date
+     * @param eventTime scheduled event time
+     * @param maxWaitlist waitlist capacity
+     * @param currentWaitlistCount current waitlist size
+     * @param geolocationRequired geolocation requirement flag
+     * @param location event location label
+     * @param description event description
+     * @param posterPath poster path/url
+     * @param posterDeleteUrl hosted poster deletion URL
+     */
+    public Event(String eventId, String organizerId, String eventName, Date registrationStartDate, Date registrationEndDate,
+                 Date eventTime,
+                 int maxWaitlist, int currentWaitlistCount,
+                 boolean geolocationRequired, String location, String description,
+                 String posterPath, String posterDeleteUrl) {
         this.eventId = eventId;
         this.organizerId = organizerId;
         this.eventName = eventName;
@@ -68,6 +95,8 @@ public class Event {
         this.geolocationRequired = geolocationRequired;
         this.location = location;
         this.description = description;
+        this.posterUrl = posterPath;
+        this.posterDeleteUrl = posterDeleteUrl;
     }
 
     /**
@@ -89,6 +118,32 @@ public class Event {
                  boolean geolocationRequired, String location, String description) {
         this(eventId, organizerId, eventName, registrationStartDate, registrationEndDate, null,
                 maxWaitlist, currentWaitlistCount, geolocationRequired, location, description);
+    }
+
+    /**
+     * Backward-compatible constructor for call sites that do not yet pass event time but do pass
+     * poster hosting metadata.
+     *
+     * @param eventId event identifier
+     * @param organizerId organizer identifier
+     * @param eventName event name
+     * @param registrationStartDate registration start date
+     * @param registrationEndDate registration end date
+     * @param maxWaitlist waitlist capacity
+     * @param currentWaitlistCount current waitlist size
+     * @param geolocationRequired geolocation requirement flag
+     * @param location event location label
+     * @param description event description
+     * @param posterPath poster path/url
+     * @param posterDeleteUrl hosted poster deletion URL
+     */
+    public Event(String eventId, String organizerId, String eventName, Date registrationStartDate, Date registrationEndDate,
+                 int maxWaitlist, int currentWaitlistCount,
+                 boolean geolocationRequired, String location, String description,
+                 String posterPath, String posterDeleteUrl) {
+        this(eventId, organizerId, eventName, registrationStartDate, registrationEndDate, null,
+                maxWaitlist, currentWaitlistCount, geolocationRequired, location, description,
+                posterPath, posterDeleteUrl);
     }
 
     /**
@@ -296,6 +351,20 @@ public class Event {
      */
     public void setPosterPath(String posterPath) {
         this.posterUrl = posterPath;
+    }
+
+    /**
+     * @return hosted poster deletion URL, or {@code null}
+     */
+    public String getPosterDeleteUrl() {
+        return posterDeleteUrl;
+    }
+
+    /**
+     * @param posterDeleteUrl hosted poster deletion URL
+     */
+    public void setPosterDeleteUrl(String posterDeleteUrl) {
+        this.posterDeleteUrl = posterDeleteUrl;
     }
 
     /**

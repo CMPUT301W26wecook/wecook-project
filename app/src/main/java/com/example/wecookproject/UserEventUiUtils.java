@@ -11,12 +11,14 @@ import com.google.firebase.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 
 /**
  * Utility helpers for user-event UI rendering.
  */
 public final class UserEventUiUtils {
-    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
+    private static final String DATE_TIME_WITH_ZONE_PATTERN = "yyyy-MM-dd HH:mm z";
+    private static final String EVENT_TIME_WITH_ZONE_PATTERN = "MMM d, yyyy h:mm a z";
     public static final String STATUS_OPEN = "open";
     public static final String STATUS_FULL = "full";
 
@@ -52,25 +54,86 @@ public final class UserEventUiUtils {
         }
 
         if (startDate == null) {
-            return "Until " + formatTimestamp(endDate);
+            return "Until " + formatRegistrationTimestamp(endDate);
         }
 
         if (endDate == null) {
-            return "Starts " + formatTimestamp(startDate);
+            return "Starts " + formatRegistrationTimestamp(startDate);
         }
 
-        return formatTimestamp(startDate) + " - " + formatTimestamp(endDate);
+        return formatRegistrationTimestamp(startDate) + " - " + formatRegistrationTimestamp(endDate);
     }
 
     /**
-     * Formats one timestamp using app locale.
+     * Formats one registration timestamp using the device locale and time zone.
      *
      * @param timestamp timestamp to format
      * @return formatted date string
      */
-    private static String formatTimestamp(Timestamp timestamp) {
-        Date date = timestamp.toDate();
-        return new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault()).format(date);
+    public static String formatRegistrationTimestamp(Timestamp timestamp) {
+        return formatTimestamp(timestamp, DATE_TIME_WITH_ZONE_PATTERN);
+    }
+
+    /**
+     * Formats one registration date using the device locale and time zone.
+     *
+     * @param date date to format
+     * @return formatted registration string
+     */
+    public static String formatRegistrationDate(Date date) {
+        return formatDate(date, DATE_TIME_WITH_ZONE_PATTERN);
+    }
+
+    /**
+     * Formats one event timestamp using the device locale and time zone.
+     *
+     * @param timestamp timestamp to format
+     * @return formatted event-time string
+     */
+    public static String formatEventTimestamp(Timestamp timestamp) {
+        return formatTimestamp(timestamp, EVENT_TIME_WITH_ZONE_PATTERN);
+    }
+
+    /**
+     * Formats one event date using the device locale and time zone.
+     *
+     * @param date date to format
+     * @return formatted event-time string
+     */
+    public static String formatEventDate(Date date) {
+        return formatDate(date, EVENT_TIME_WITH_ZONE_PATTERN);
+    }
+
+    /**
+     * Formats one timestamp using the device locale and time zone.
+     *
+     * @param timestamp timestamp to format
+     * @param pattern date-time pattern to apply
+     * @return formatted date string
+     */
+    private static String formatTimestamp(Timestamp timestamp, String pattern) {
+        if (timestamp == null) {
+            return "";
+        }
+
+        return formatDate(timestamp.toDate(), pattern);
+    }
+
+    /**
+     * Formats one java.util.Date using the device locale and time zone.
+     *
+     * @param date date to format
+     * @param pattern date-time pattern to apply
+     * @return formatted date string
+     */
+    private static String formatDate(Date date, String pattern) {
+        if (date == null) {
+            return "";
+        }
+
+        SimpleDateFormat formatter = new SimpleDateFormat(pattern, Locale.getDefault());
+        formatter.setTimeZone(TimeZone.getDefault());
+        return formatter.format(date);
     }
 
     /**
@@ -98,7 +161,7 @@ public final class UserEventUiUtils {
         if (eventTime == null) {
             return description;
         }
-        return "Event time: " + formatTimestamp(eventTime) + "\n\n" + description;
+        return "Event time: " + formatEventTimestamp(eventTime) + "\n\n" + description;
     }
 
     /**

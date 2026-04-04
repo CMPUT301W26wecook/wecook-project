@@ -52,7 +52,11 @@ public class UserNotificationActivity extends AppCompatActivity {
 
             @Override
             public void onMarkReadClicked(UserNotificationItem item) {
-                markNotificationRead(item, false);
+                if (item != null && item.requiresConfirmation()) {
+                    confirmNotification(item, false);
+                } else {
+                    markNotificationRead(item, false);
+                }
             }
         });
         recyclerView.setAdapter(adapter);
@@ -152,6 +156,34 @@ public class UserNotificationActivity extends AppCompatActivity {
                         navigateToNotificationTarget(item);
                     } else {
                         Toast.makeText(this, "Failed to mark notification as read", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void confirmNotification(UserNotificationItem item, boolean openAfterConfirm) {
+        if (item == null) {
+            return;
+        }
+
+        if (item.isConfirmed()) {
+            if (openAfterConfirm) {
+                navigateToNotificationTarget(item);
+            }
+            return;
+        }
+
+        NotificationHelper.markAsConfirmed(db, entrantId, item.getId())
+                .addOnSuccessListener(unused -> {
+                    loadNotifications();
+                    if (openAfterConfirm) {
+                        navigateToNotificationTarget(item);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    if (openAfterConfirm) {
+                        navigateToNotificationTarget(item);
+                    } else {
+                        Toast.makeText(this, "Failed to confirm notification", Toast.LENGTH_SHORT).show();
                     }
                 });
     }

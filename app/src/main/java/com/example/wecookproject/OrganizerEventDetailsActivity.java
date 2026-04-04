@@ -36,7 +36,6 @@ import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.zxing.WriterException;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -57,14 +56,11 @@ import java.util.Map;
  *   layer.
  */
 public class OrganizerEventDetailsActivity extends AppCompatActivity {
-    private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm";
-    
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private ListenerRegistration eventListener;
     private ListenerRegistration commentsListener;
     private SwitchMaterial geolocationSwitch;
     private Event currentEvent;
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_TIME_PATTERN, Locale.getDefault());
     private String organizerId;
     private String organizerDisplayName;
     private TextView tvOrganizerLabel;
@@ -127,14 +123,17 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 // Format registration dates
                                 String registrationDateText = "TBD";
                                 if (event.getRegistrationStartDate() != null && event.getRegistrationEndDate() != null) {
-                                    registrationDateText = dateFormat.format(event.getRegistrationStartDate()) + " to " + dateFormat.format(event.getRegistrationEndDate());
+                                    registrationDateText = UserEventUiUtils.formatRegistrationDate(event.getRegistrationStartDate())
+                                            + " to "
+                                            + UserEventUiUtils.formatRegistrationDate(event.getRegistrationEndDate());
                                 } else if (event.getRegistrationStartDate() != null) {
-                                    registrationDateText = "From " + dateFormat.format(event.getRegistrationStartDate());
+                                    registrationDateText = "From " + UserEventUiUtils.formatRegistrationDate(event.getRegistrationStartDate());
                                 } else if (event.getRegistrationEndDate() != null) {
-                                    registrationDateText = "Until " + dateFormat.format(event.getRegistrationEndDate());
+                                    registrationDateText = "Until " + UserEventUiUtils.formatRegistrationDate(event.getRegistrationEndDate());
                                 }
                                 if (event.getEventTime() != null) {
-                                    registrationDateText = registrationDateText + "\nEvent time: " + dateFormat.format(event.getEventTime());
+                                    registrationDateText = registrationDateText + "\nEvent time: "
+                                            + UserEventUiUtils.formatEventDate(event.getEventTime());
                                 }
                                 tvEventDates.setText(registrationDateText);
                                 
@@ -421,7 +420,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         if (timestamp == null) {
             return "Just now";
         }
-        return new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.CANADA).format(timestamp.toDate());
+        return UserEventUiUtils.formatEventTimestamp(timestamp);
     }
 
     private String getSafeTrimmedString(DocumentSnapshot snapshot, String fieldName) {
