@@ -18,9 +18,12 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,6 +52,7 @@ import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
@@ -60,15 +64,32 @@ import java.util.Set;
  * Entrant event list screen with waitlist and invitation actions.
  */
 public class UserEventActivity extends AppCompatActivity {
+    private static final String CAPACITY_ALL = "Capacity: All";
+    private static final String CAPACITY_SMALL = "Capacity: Small";
+    private static final String CAPACITY_MEDIUM = "Capacity: Medium";
+    private static final String CAPACITY_LARGE = "Capacity: Large";
+    private static final String CAPACITY_VERY_LARGE = "Capacity: Very Large";
+
+    private static final String AVAILABILITY_ALL = "Availability: All";
+    private static final String AVAILABILITY_EARLY_MORNING = "Early Morning (06:00-09:59)";
+    private static final String AVAILABILITY_MORNING = "Morning (10:00-11:59)";
+    private static final String AVAILABILITY_AFTERNOON = "Afternoon (12:00-16:59)";
+    private static final String AVAILABILITY_EVENING = "Evening (17:00-20:59)";
+    private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
+    private final List<UserEventRecord> allEventRecords = new ArrayList<>();
 
     private RecyclerView rvEvents;
     private TextView tvEmptyState;
     private UserEventAdapter eventAdapter;
     private String entrantId;
     private BottomNavigationView bottomNav;
+    private Spinner spinnerCapacityFilter;
+    private Spinner spinnerAvailabilityFilter;
+    private String selectedCapacityLabel = CAPACITY_ALL;
+    private String selectedAvailabilityLabel = AVAILABILITY_ALL;
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -103,6 +124,8 @@ public class UserEventActivity extends AppCompatActivity {
         rvEvents = findViewById(R.id.rv_events);
         tvEmptyState = findViewById(R.id.tv_empty_state);
         bottomNav = findViewById(R.id.bottom_nav);
+        spinnerCapacityFilter = findViewById(R.id.spinner_capacity_filter);
+        spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -110,6 +133,7 @@ public class UserEventActivity extends AppCompatActivity {
         eventAdapter = new UserEventAdapter(eventList, this::showEventDetailsDialog);
         rvEvents.setAdapter(eventAdapter);
 
+        setupFilterControls();
         setupBottomNav();
         loadEventsAndHistory();
         maybeShowSelectionConfirmationPopup();
@@ -222,7 +246,7 @@ public class UserEventActivity extends AppCompatActivity {
         db.collection("events")
                 .get(source)
                 .addOnSuccessListener(eventSnapshots -> {
-                    eventList.clear();
+                    allEventRecords.clear();
                     for (QueryDocumentSnapshot document : eventSnapshots) {
                         String eventId = document.getId();
                         String visibilityTag = document.getString("visibilityTag");
@@ -262,11 +286,10 @@ public class UserEventActivity extends AppCompatActivity {
                             upsertHistoryDocument(eventRecord, UserEventRecord.STATUS_INVITED);
                         }
 
-                        eventList.add(eventRecord);
+                        allEventRecords.add(eventRecord);
                     }
 
-                    eventAdapter.notifyDataSetChanged();
-                    updateEmptyState();
+                    applyFiltersAndRender();
                 })
                 .addOnFailureListener(e -> {
                     if (source == Source.SERVER) {
@@ -301,6 +324,134 @@ public class UserEventActivity extends AppCompatActivity {
             tvEmptyState.setVisibility(View.GONE);
             rvEvents.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void setupFilterControls() {
+        ArrayAdapter<String> capacityAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                new String[]{
+                        CAPACITY_ALL,
+                        CAPACITY_SMALL,
+                        CAPACITY_MEDIUM,
+                        CAPACITY_LARGE,
+                        CAPACITY_VERY_LARGE
+                }
+        );
+        capacityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCapacityFilter.setAdapter(capacityAdapter);
+
+        ArrayAdapter<String> availabilityAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                new String[]{
+                        AVAILABILITY_ALL,
+                        AVAILABILITY_EARLY_MORNING,
+                        AVAILABILITY_MORNING,
+                        AVAILABILITY_AFTERNOON,
+                        AVAILABILITY_EVENING,
+                        AVAILABILITY_NIGHT
+                }
+        );
+        availabilityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerAvailabilityFilter.setAdapter(availabilityAdapter);
+
+        spinnerCapacityFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedCapacityLabel = (String) parent.getItemAtPosition(position);
+                applyFiltersAndRender();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
+        });
+
+        spinnerAvailabilityFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedAvailabilityLabel = (String) parent.getItemAtPosition(position);
+                applyFiltersAndRender();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
+        });
+    }
+
+    private void applyFiltersAndRender() {
+        eventList.clear();
+        for (UserEventRecord eventRecord : allEventRecords) {
+            if (!matchesCapacityFilter(eventRecord.getCapacity())) {
+                continue;
+            }
+            if (!matchesAvailabilityFilter(eventRecord.getEventTime())) {
+                continue;
+            }
+            eventList.add(eventRecord);
+        }
+        eventAdapter.notifyDataSetChanged();
+        updateEmptyState();
+    }
+
+    private boolean matchesCapacityFilter(int capacity) {
+        if (CAPACITY_ALL.equals(selectedCapacityLabel)) {
+            return true;
+        }
+        if (capacity <= 0) {
+            return false;
+        }
+        if (CAPACITY_SMALL.equals(selectedCapacityLabel)) {
+            return capacity <= 20;
+        }
+        if (CAPACITY_MEDIUM.equals(selectedCapacityLabel)) {
+            return capacity >= 21 && capacity <= 50;
+        }
+        if (CAPACITY_LARGE.equals(selectedCapacityLabel)) {
+            return capacity >= 51 && capacity <= 100;
+        }
+        if (CAPACITY_VERY_LARGE.equals(selectedCapacityLabel)) {
+            return capacity >= 101;
+        }
+        return true;
+    }
+
+    private boolean matchesAvailabilityFilter(com.google.firebase.Timestamp eventTime) {
+        if (AVAILABILITY_ALL.equals(selectedAvailabilityLabel)) {
+            return true;
+        }
+        if (eventTime == null) {
+            return false;
+        }
+
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(eventTime.toDate());
+        int minutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE);
+
+        if (AVAILABILITY_EARLY_MORNING.equals(selectedAvailabilityLabel)) {
+            return inMinuteRange(minutes, 6 * 60, 9 * 60 + 59);
+        }
+        if (AVAILABILITY_MORNING.equals(selectedAvailabilityLabel)) {
+            return inMinuteRange(minutes, 10 * 60, 11 * 60 + 59);
+        }
+        if (AVAILABILITY_AFTERNOON.equals(selectedAvailabilityLabel)) {
+            return inMinuteRange(minutes, 12 * 60, 16 * 60 + 59);
+        }
+        if (AVAILABILITY_EVENING.equals(selectedAvailabilityLabel)) {
+            return inMinuteRange(minutes, 17 * 60, 20 * 60 + 59);
+        }
+        if (AVAILABILITY_NIGHT.equals(selectedAvailabilityLabel)) {
+            return inMinuteRange(minutes, 21 * 60, 23 * 60 + 59);
+        }
+        return true;
+    }
+
+    private boolean inMinuteRange(int value, int minInclusive, int maxInclusive) {
+        return value >= minInclusive && value <= maxInclusive;
     }
 
     private void maybeShowSelectionConfirmationPopup() {

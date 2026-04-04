@@ -21,6 +21,7 @@ public class UserEventRecord {
     private final String organizerId;
     private final String description;
     private final String posterPath;
+    private final int capacity;
     private final int maxWaitlist;
     private final String entrantId;
     private final Timestamp registrationStartDate;
@@ -40,6 +41,7 @@ public class UserEventRecord {
      * @param organizerId organizer identifier
      * @param description event description
      * @param posterPath poster path/url
+     * @param capacity event capacity
      * @param maxWaitlist waitlist capacity
      * @param entrantId current entrant identifier
      * @param registrationStartDate registration start timestamp
@@ -55,6 +57,7 @@ public class UserEventRecord {
                            String organizerId,
                            String description,
                            String posterPath,
+                           int capacity,
                            int maxWaitlist,
                            String entrantId,
                            Timestamp registrationStartDate,
@@ -69,6 +72,7 @@ public class UserEventRecord {
         this.organizerId = organizerId;
         this.description = description;
         this.posterPath = posterPath;
+        this.capacity = capacity;
         this.maxWaitlist = maxWaitlist;
         this.entrantId = entrantId;
         this.registrationStartDate = registrationStartDate;
@@ -96,6 +100,8 @@ public class UserEventRecord {
 
         Long maxWaitlistValue = snapshot.getLong("maxWaitlist");
         int maxWaitlist = maxWaitlistValue == null ? 0 : maxWaitlistValue.intValue();
+        Long capacityValue = snapshot.getLong("capacity");
+        int capacity = capacityValue == null ? 0 : capacityValue.intValue();
 
         return new UserEventRecord(
                 snapshot.getId(),
@@ -104,6 +110,7 @@ public class UserEventRecord {
                 getString(snapshot, "organizerId", "Unknown Organizer"),
                 getString(snapshot, "description", "No event description available."),
                 getPosterPath(snapshot),
+                capacity,
                 maxWaitlist,
                 entrantId,
                 snapshot.getTimestamp("registrationStartDate"),
@@ -207,6 +214,13 @@ public class UserEventRecord {
      */
     public String getPosterPath() {
         return posterPath;
+    }
+
+    /**
+     * @return event capacity
+     */
+    public int getCapacity() {
+        return capacity;
     }
 
     /**
