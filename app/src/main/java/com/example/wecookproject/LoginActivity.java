@@ -6,11 +6,17 @@ import android.provider.Settings;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.Source;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Entry point for role-based login routing.
@@ -20,9 +26,9 @@ import com.google.firebase.firestore.FirebaseFirestore;
  */
 public class LoginActivity extends AppCompatActivity {
     private boolean isDbQueryReady = false;
-    private boolean isUserExists = false;
     private boolean isLoginClicked = false;
     private String clickedRole = "";
+    private DocumentSnapshot userDocument;
 
     /**
      * Initializes login controls and starts prefetching login context.
@@ -67,20 +73,23 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             FirebaseFirestore db = FirebaseFirestore.getInstance();
-            db.collection("users").document(androidId).get().addOnCompleteListener(userTask -> {
+            db.collection("users").document(androidId).get(Source.SERVER).addOnCompleteListener(userTask -> {
                 isDbQueryReady = true;
                 if (userTask.isSuccessful()) {
-                    DocumentSnapshot document = userTask.getResult();
-                    if (document.exists()) {
-                        isUserExists = true;
+                    userDocument = userTask.getResult();
+                    if (userDocument != null && userDocument.exists()) {
                         Log.d("LOGIN_INFO", "User exists, routing to MainActivity.");
                     } else {
-                        isUserExists = false;
                         Log.d("LOGIN_INFO", "User does not exist, routing to SignupDetailsActivity.");
                     }
                 } else {
-                    isUserExists = false;
-                    Log.e("LOGIN_INFO", "Error checking user document", userTask.getException());
+                    userDocument = null;
+                    Log.e("LOGIN_INFO", "Error checking user document from server", userTask.getException());
+                    Toast.makeText(
+                            this,
+                            "Unable to reach Firebase. Check Firestore rules/project config.",
+                            Toast.LENGTH_LONG
+                    ).show();
                 }
 
                 if (isLoginClicked) {
@@ -115,22 +124,89 @@ public class LoginActivity extends AppCompatActivity {
         if (clickedRole.equals("ADMIN")) {
             jumpIntent = new Intent(LoginActivity.this, AdminLoginActivity.class);
         }
-        else if (isUserExists) {
+        else if (hasSelectedRole()) {
             if ("ORGANIZER".equals(clickedRole)) {
                 jumpIntent = new Intent(LoginActivity.this, OrganizerHomeActivity.class);
             } else {
                 jumpIntent = new Intent(LoginActivity.this, UserEventActivity.class);
             }
         } else {
+            if (userDocument != null && userDocument.exists()) {
+                grantSelectedRoleAndRoute();
+                return;
+            }
             jumpIntent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
             jumpIntent.putExtra("clickedRole", clickedRole);
+            startActivity(jumpIntent);
         }
-        startActivity(jumpIntent);
+        if (!"ADMIN".equals(clickedRole) && hasSelectedRole()) {
+            startActivity(jumpIntent);
+            return;
+        }
+        if ("ADMIN".equals(clickedRole)) {
+            startActivity(jumpIntent);
+        }
+    }
+
+    private boolean hasSelectedRole() {
+        if (userDocument == null || !userDocument.exists()) {
+            return false;
+        }
+        if ("ORGANIZER".equals(clickedRole)) {
+            return UserDocumentUtils.hasRole(userDocument, UserDocumentUtils.ROLE_ORGANIZER);
+        }
+        if ("ENTRANT".equals(clickedRole)) {
+            return UserDocumentUtils.hasRole(userDocument, UserDocumentUtils.ROLE_ENTRANT);
+        }
+        return false;
+    }
+
+    private void grantSelectedRoleAndRoute() {
+        String roleKey = getSelectedRoleKey();
+        if (roleKey == null) {
+            return;
+        }
+
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        Map<String, Object> updates = new HashMap<>();
+        Map<String, Object> roles = new HashMap<>();
+        roles.put(roleKey, true);
+        updates.put("roles", roles);
+        if (userDocument != null && userDocument.exists()
+                && UserDocumentUtils.getSafeTrimmedString(userDocument, "role").isEmpty()) {
+            updates.put("role", roleKey);
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(androidId)
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(unused -> {
+                    if (UserDocumentUtils.ROLE_ORGANIZER.equals(roleKey)) {
+                        startActivity(new Intent(LoginActivity.this, OrganizerHomeActivity.class));
+                    } else {
+                        startActivity(new Intent(LoginActivity.this, UserEventActivity.class));
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("LOGIN_INFO", "Failed to grant missing role", e);
+                    Toast.makeText(
+                            this,
+                            "Login failed: unable to update your Firebase user record.",
+                            Toast.LENGTH_LONG
+                    ).show();
+                });
+    }
+
+    private String getSelectedRoleKey() {
+        if ("ORGANIZER".equals(clickedRole)) {
+            return UserDocumentUtils.ROLE_ORGANIZER;
+        }
+        if ("ENTRANT".equals(clickedRole)) {
+            return UserDocumentUtils.ROLE_ENTRANT;
+        }
+        return null;
     }
 }
-
-
-
-
 
 

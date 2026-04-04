@@ -23,6 +23,7 @@ public class UserNotificationItem {
     private final String recipientId;
     private final Date createdAt;
     private final Date readAt;
+    private final Date confirmedAt;
 
     public UserNotificationItem(String id,
                                 String eventId,
@@ -35,7 +36,8 @@ public class UserNotificationItem {
                                 String senderId,
                                 String recipientId,
                                 Date createdAt,
-                                Date readAt) {
+                                Date readAt,
+                                Date confirmedAt) {
         this.id = id;
         this.eventId = eventId;
         this.eventName = eventName;
@@ -48,11 +50,13 @@ public class UserNotificationItem {
         this.recipientId = recipientId;
         this.createdAt = createdAt;
         this.readAt = readAt;
+        this.confirmedAt = confirmedAt;
     }
 
     public static UserNotificationItem fromSnapshot(DocumentSnapshot snapshot) {
         Timestamp created = snapshot.getTimestamp("createdAt");
         Timestamp read = snapshot.getTimestamp("readAt");
+        Timestamp confirmed = snapshot.getTimestamp("confirmedAt");
         return new UserNotificationItem(
                 snapshot.getId(),
                 value(snapshot.getString("eventId"), ""),
@@ -65,7 +69,8 @@ public class UserNotificationItem {
                 value(snapshot.getString("senderId"), "Unknown Sender"),
                 value(snapshot.getString("recipientId"), "Unknown Recipient"),
                 created == null ? null : created.toDate(),
-                read == null ? null : read.toDate()
+                read == null ? null : read.toDate(),
+                confirmed == null ? null : confirmed.toDate()
         );
     }
 
@@ -122,6 +127,16 @@ public class UserNotificationItem {
 
     public Date getReadAt() {
         return readAt;
+    }
+
+    public boolean isConfirmed() {
+        return NotificationHelper.STATUS_CONFIRMED.equalsIgnoreCase(status) || confirmedAt != null;
+    }
+
+    public boolean requiresConfirmation() {
+        return NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)
+                || NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)
+                || NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type);
     }
 
     private static String value(String input, String fallback) {

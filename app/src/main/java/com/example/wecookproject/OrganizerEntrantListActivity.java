@@ -44,6 +44,8 @@ import java.util.Map;
  *   layer.
  */
 public class OrganizerEntrantListActivity extends AppCompatActivity {
+    private static final String SELECTED_NOTIFICATION_MESSAGE =
+            "Congratulations on being selected to this event! Hope you have fun!!";
     private final List<OrganizerWaitlistItem> waitlistEntrants = new ArrayList<>();
     private final List<OrganizerWaitlistItem> searchableEntrants = new ArrayList<>();
 
@@ -326,6 +328,12 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     Object rawLotteryCount = documentSnapshot.get("lotteryCount");
                     if (rawLotteryCount instanceof Number) {
                         lotteryCount = ((Number) rawLotteryCount).intValue();
+                    } else if (rawLotteryCount instanceof String) {
+                        try {
+                            lotteryCount = Integer.parseInt(((String) rawLotteryCount).trim());
+                        } catch (NumberFormatException ignored) {
+                            lotteryCount = 0;
+                        }
                     } else {
                         lotteryCount = 0;
                     }
@@ -494,7 +502,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     invitedEntrants,
                     eventName == null || eventName.trim().isEmpty() ? "Event Invitation" : eventName,
                     eventLocation == null ? "" : eventLocation,
-                    "You have been invited to this private event. Open Events to accept or decline.",
+                    SELECTED_NOTIFICATION_MESSAGE,
                     NotificationHelper.TYPE_PRIVATE_INVITE
             );
         });
@@ -538,16 +546,28 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             return;
         }
 
-        int lotteryCount;
+        int requestedDrawCount;
         try {
-            lotteryCount = Integer.parseInt(input);
+            requestedDrawCount = Integer.parseInt(input);
         } catch (NumberFormatException e) {
             Toast.makeText(this, "Invalid lottery number", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (lotteryCount <= 0) {
+        if (requestedDrawCount <= 0) {
             Toast.makeText(this, "Lottery number must be greater than 0", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int configuredMaxLotteryCount = lotteryCount;
+        if (configuredMaxLotteryCount <= 0) {
+            // Backward-compatible behavior: if event max is not configured yet,
+            // use this draw request as the initial max and persist it.
+            configuredMaxLotteryCount = requestedDrawCount;
+        }
+
+        if (requestedDrawCount > configuredMaxLotteryCount) {
+            Toast.makeText(this, "Lottery number cannot exceed the event maximum draw count", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -559,7 +579,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             return;
         }
 
-        if (lotteryCount > eligiblePool.size()) {
+        if (requestedDrawCount > eligiblePool.size()) {
             Toast.makeText(this, "Lottery number exceeds eligible waitlist size", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -567,11 +587,14 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         List<String> shuffledEntrants = new ArrayList<>(eligiblePool);
         java.util.Collections.shuffle(shuffledEntrants);
 
-        List<String> selected = new ArrayList<>(shuffledEntrants.subList(0, lotteryCount));
+        List<String> selected = new ArrayList<>(shuffledEntrants.subList(0, requestedDrawCount));
+        List<String> notSelectedRecipients = new ArrayList<>(eligiblePool);
+        notSelectedRecipients.removeAll(selected);
         List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
         updatedWaitlist.removeAll(selected);
+        final int persistedMaxLotteryCount = configuredMaxLotteryCount;
         Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, selected);
-        updates.put("lotteryCount", lotteryCount);
+        updates.put("lotteryCount", persistedMaxLotteryCount);
         updates.put("selectedEntrantIds", selected);
         updates.put("declinedEntrantIds", FieldValue.arrayRemove(selected.toArray()));
 
@@ -611,9 +634,19 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                                     lotteryRecipients,
                                     eventSnapshot.getString("eventName"),
                                     eventSnapshot.getString("location"),
-                                    "You were selected in the lottery. Open the event to accept or decline.",
+                                    SELECTED_NOTIFICATION_MESSAGE,
                                     NotificationHelper.TYPE_LOTTERY_SELECTED
                             );
+
+                            if (requestedDrawCount == persistedMaxLotteryCount && !notSelectedRecipients.isEmpty()) {
+                                sendNotifications(
+                                        notSelectedRecipients,
+                                        eventSnapshot.getString("eventName"),
+                                        eventSnapshot.getString("location"),
+                                        "You were not selected in this lottery round. If any selected entrant declines, another draw will be conducted from the remaining waitlist.",
+                                        NotificationHelper.TYPE_LOTTERY_NOT_SELECTED
+                                );
+                            }
                         }
                     });
                 })
@@ -715,7 +748,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                             entrantIds,
                             eventSnapshot.getString("eventName"),
                             eventSnapshot.getString("location"),
-                            "A replacement spot is available for you. Open the event to accept or decline.",
+                            SELECTED_NOTIFICATION_MESSAGE,
                             NotificationHelper.TYPE_REPLACEMENT_SELECTED
                     );
                 });

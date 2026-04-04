@@ -13,9 +13,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 
 
 import android.content.Intent;
@@ -441,6 +441,73 @@ public class OrganizerFlowTest {
     }
 
     /**
+     * test8a: Geolocation requirement is fixed at event creation time and cannot be changed later
+     * from organizer detail or registration-map screens.
+     */
+    @Test
+    public void test8a_GeolocationRequirementIsReadOnlyAfterEventCreation() {
+        String mockEventId = "mock-geo-readonly-" + UUID.randomUUID();
+        Event mockEvent = new Event(
+                mockEventId,
+                "org123",
+                "Read Only Geo Event",
+                parseTestDate("2026-01-01 00:00"),
+                parseTestDate("2026-02-02 00:00"),
+                100,
+                50,
+                true,
+                "Edmonton",
+                "Geolocation should remain fixed"
+        );
+
+        CountDownLatch createLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .set(mockEvent)
+                .addOnCompleteListener(task -> createLatch.countDown());
+        awaitLatch(createLatch, 10, "mock event creation");
+
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventDetailsActivity.class);
+        intent.putExtra("eventId", mockEventId);
+        ActivityScenario<OrganizerEventDetailsActivity> detailsScenario =
+                ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+
+        onView(withId(R.id.switch_geolocation)).check(matches(isDisplayed()));
+        onView(withId(R.id.switch_geolocation)).check(matches(org.hamcrest.Matchers.not(isAssignableFrom(Button.class))));
+
+        detailsScenario.close();
+
+        Intent mapIntent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventMapActivity.class);
+        mapIntent.putExtra("eventId", mockEventId);
+        ActivityScenario<OrganizerEventMapActivity> mapScenario =
+                ActivityScenario.launch(mapIntent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.switch_geolocation)).check(matches(isDisplayed()));
+
+        mapScenario.close();
+
+        DocumentSnapshot snapshot;
+        try {
+            snapshot = Tasks.await(db.collection("events").document(mockEventId).get());
+        } catch (Exception e) {
+            throw new AssertionError("Failed to read mock event", e);
+        }
+        assertNotNull(snapshot);
+        Boolean geolocationRequired = snapshot.getBoolean("geolocationRequired");
+        assertTrue("Geolocation requirement should remain unchanged after creation", Boolean.TRUE.equals(geolocationRequired));
+
+        CountDownLatch deleteLatch = new CountDownLatch(1);
+        db.collection("events").document(mockEventId)
+                .delete()
+                .addOnCompleteListener(task -> deleteLatch.countDown());
+        awaitLatch(deleteLatch, 10, "mock event deletion");
+    }
+
+    /**
      * test8b: Organizer QR dialog link should navigate to the in-app public event landing page.
      */
     @Test
@@ -621,7 +688,7 @@ public class OrganizerFlowTest {
                 new ArrayList<>(entrants),
                 new ArrayList<>(),
                 new ArrayList<>(),
-                0
+                3
         );
 
         safeSleep(WAIT_LONG);
@@ -647,17 +714,130 @@ public class OrganizerFlowTest {
         List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
         assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
         assertEquals("Should have selected 3 winners", 3, selectedEntrants.size());
+        List<String> notSelectedEntrants = new ArrayList<>(entrants);
+        notSelectedEntrants.removeAll(selectedEntrants);
         assertEquals("Each selected entrant should receive one lottery notification",
                 3, waitForNotificationCountByType(
                         selectedEntrants,
                         NotificationHelper.TYPE_LOTTERY_SELECTED,
                         3
                 ));
+        assertEquals("Each non-selected entrant should receive one waitlist update notification once max draw count is reached",
+                2, waitForNotificationCountByType(
+                        notSelectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_NOT_SELECTED,
+                        2
+                ));
 
         scenario.close();
 
         deleteNotificationsForUsers(entrants);
         deleteEventDocument(lotteryWithEntrantsEventId);
+        deleteEntrantUsers(entrants);
+    }
+
+    @Test
+    public void test11b_LotteryBelowConfiguredMaxDoesNotNotifyNonSelectedEntrants() throws Exception {
+        String eventId = "lottery-partial-test-" + UUID.randomUUID();
+        List<String> entrants = Arrays.asList("partial1", "partial2", "partial3", "partial4", "partial5");
+        createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
+
+        createEventDocument(
+                eventId,
+                "Lottery Partial Draw Event",
+                new ArrayList<>(entrants),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                3
+        );
+
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantListActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario<OrganizerEntrantListActivity> scenario =
+                ActivityScenario.launch(intent);
+
+        waitUntilLotteryButtonEnabled(scenario);
+
+        onView(withId(R.id.et_lottery_count)).perform(replaceText("2"), closeSoftKeyboard());
+        onView(withId(R.id.btn_lottery_draw)).perform(click());
+
+        DocumentSnapshot snapshot = waitForSelectedEntrants(eventId, 2);
+        assertTrue("Event document must exist after lottery", snapshot.exists());
+
+        @SuppressWarnings("unchecked")
+        List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+        assertNotNull("Selected entrants list should not be null after lottery", selectedEntrants);
+        assertEquals("Should have selected 2 winners", 2, selectedEntrants.size());
+
+        List<String> notSelectedEntrants = new ArrayList<>(entrants);
+        notSelectedEntrants.removeAll(selectedEntrants);
+
+        assertEquals("Selected entrants should receive lottery notifications",
+                2, waitForNotificationCountByType(
+                        selectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_SELECTED,
+                        2
+                ));
+        assertEquals("Non-selected entrants should not be notified before the configured max draw count is reached",
+                0, waitForNotificationCountByType(
+                        notSelectedEntrants,
+                        NotificationHelper.TYPE_LOTTERY_NOT_SELECTED,
+                        0
+                ));
+
+        scenario.close();
+        deleteNotificationsForUsers(entrants);
+        deleteEventDocument(eventId);
+        deleteEntrantUsers(entrants);
+    }
+
+    @Test
+    public void test11c_LotteryDrawCannotExceedConfiguredMax() throws Exception {
+        String eventId = "lottery-max-validation-" + UUID.randomUUID();
+        List<String> entrants = Arrays.asList("max1", "max2", "max3", "max4", "max5");
+        createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
+
+        createEventDocument(
+                eventId,
+                "Lottery Max Validation Event",
+                new ArrayList<>(entrants),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                3
+        );
+
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantListActivity.class);
+        intent.putExtra("eventId", eventId);
+        ActivityScenario<OrganizerEntrantListActivity> scenario =
+                ActivityScenario.launch(intent);
+
+        waitUntilLotteryButtonEnabled(scenario);
+
+        onView(withId(R.id.et_lottery_count)).perform(replaceText("4"), closeSoftKeyboard());
+        onView(withId(R.id.btn_lottery_draw)).perform(click());
+
+        safeSleep(WAIT_MEDIUM);
+        DocumentSnapshot snapshot = waitForEventDocument(eventId, entrants.size());
+        assertTrue("Event document must still exist", snapshot.exists());
+
+        @SuppressWarnings("unchecked")
+        List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+        assertTrue("Selected entrants should remain empty when draw exceeds configured max",
+                selectedEntrants == null || selectedEntrants.isEmpty());
+        assertEquals("No lottery-selected notifications should be sent when draw is blocked",
+                0, countNotificationsByType(entrants, NotificationHelper.TYPE_LOTTERY_SELECTED));
+        assertEquals("No lottery-not-selected notifications should be sent when draw is blocked",
+                0, countNotificationsByType(entrants, NotificationHelper.TYPE_LOTTERY_NOT_SELECTED));
+
+        scenario.close();
+        deleteNotificationsForUsers(entrants);
+        deleteEventDocument(eventId);
         deleteEntrantUsers(entrants);
     }
 

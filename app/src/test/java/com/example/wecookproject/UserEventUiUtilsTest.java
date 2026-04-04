@@ -7,8 +7,11 @@ import com.google.firebase.Timestamp;
 
 import org.junit.Test;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class UserEventUiUtilsTest {
 
@@ -28,9 +31,39 @@ public class UserEventUiUtilsTest {
         Timestamp start = new Timestamp(new Date(1711929600000L));
         Timestamp end = new Timestamp(new Date(1714521600000L));
 
-        String formatted = UserEventUiUtils.formatDateRange(start, end);
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Edmonton"));
 
-        assertEquals("2024-04-01 00:00 - 2024-05-01 00:00", formatted);
+            String formatted = UserEventUiUtils.formatDateRange(start, end);
+
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm z", Locale.getDefault());
+            formatter.setTimeZone(TimeZone.getDefault());
+            String expected = formatter.format(start.toDate()) + " - " + formatter.format(end.toDate());
+            assertEquals(expected, formatted);
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
+    }
+
+    @Test
+    public void formatEventTimestamp_usesCurrentDeviceTimeZone() {
+        Timestamp eventTime = new Timestamp(new Date(1714586400000L));
+        TimeZone originalTimeZone = TimeZone.getDefault();
+
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Edmonton"));
+            String edmontonFormatted = UserEventUiUtils.formatEventTimestamp(eventTime);
+
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Toronto"));
+            String torontoFormatted = UserEventUiUtils.formatEventTimestamp(eventTime);
+
+            assertTrue(edmontonFormatted.endsWith("MDT"));
+            assertTrue(torontoFormatted.endsWith("EDT"));
+            assertTrue(!edmontonFormatted.equals(torontoFormatted));
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
     }
 
     @Test
@@ -44,6 +77,7 @@ public class UserEventUiUtilsTest {
                 null,
                 5,
                 "entrant-1",
+                null,
                 null,
                 null,
                 true,

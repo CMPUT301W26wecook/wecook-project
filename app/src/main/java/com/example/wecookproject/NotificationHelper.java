@@ -16,10 +16,12 @@ import java.util.Map;
 public final class NotificationHelper {
     public static final String STATUS_UNREAD = "unread";
     public static final String STATUS_READ = "read";
+    public static final String STATUS_CONFIRMED = "confirmed";
 
     public static final String TYPE_MANUAL_WAITLIST_UPDATE = "manual_waitlist_update";
     public static final String TYPE_PRIVATE_INVITE = "private_invite";
     public static final String TYPE_LOTTERY_SELECTED = "lottery_selected";
+    public static final String TYPE_LOTTERY_NOT_SELECTED = "lottery_not_selected";
     public static final String TYPE_REPLACEMENT_SELECTED = "replacement_selected";
 
     private NotificationHelper() { }
@@ -83,6 +85,26 @@ public final class NotificationHelper {
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", STATUS_READ);
+        updates.put("readAt", FieldValue.serverTimestamp());
+
+        return db.collection("users")
+                .document(recipientId)
+                .collection("notifications")
+                .document(notificationId)
+                .set(updates, SetOptions.merge());
+    }
+
+    /**
+     * Marks a recipient notification as confirmed by the entrant.
+     */
+    public static Task<Void> markAsConfirmed(FirebaseFirestore db, String recipientId, String notificationId) {
+        if (db == null || isBlank(recipientId) || isBlank(notificationId)) {
+            return Tasks.forResult(null);
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", STATUS_CONFIRMED);
+        updates.put("confirmedAt", FieldValue.serverTimestamp());
         updates.put("readAt", FieldValue.serverTimestamp());
 
         return db.collection("users")
