@@ -172,10 +172,6 @@ public class LoginActivity extends AppCompatActivity {
         Map<String, Object> roles = new HashMap<>();
         roles.put(roleKey, true);
         updates.put("roles", roles);
-        if (userDocument != null && userDocument.exists()
-                && UserDocumentUtils.getSafeTrimmedString(userDocument, "role").isEmpty()) {
-            updates.put("role", roleKey);
-        }
 
         FirebaseFirestore.getInstance()
                 .collection("users")
