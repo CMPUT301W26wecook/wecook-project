@@ -48,6 +48,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
     private static final String RECIPIENT_WAITLIST = "All waitlist";
     private static final String RECIPIENT_SELECTED = "Selected entrants only";
     private static final String RECIPIENT_ACCEPTED = "Accepted entrants";
+    private static final String RECIPIENT_CANCELLED = "Cancelled entrants";
 
     /**
      * Initializes organizer notification UI and navigation.
@@ -72,7 +73,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
         ArrayAdapter<String> recipientAdapter = new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_spinner_item,
-                new String[]{RECIPIENT_WAITLIST, RECIPIENT_SELECTED, RECIPIENT_ACCEPTED}
+                new String[]{RECIPIENT_WAITLIST, RECIPIENT_SELECTED, RECIPIENT_ACCEPTED, RECIPIENT_CANCELLED}
         );
         recipientAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         recipientSpinner.setAdapter(recipientAdapter);
@@ -141,11 +142,6 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
     }
 
     private void sendNotificationToWaitlist() {
-        String message = etMessage.getText() == null ? "" : etMessage.getText().toString().trim();
-        if (message.isEmpty()) {
-            Toast.makeText(this, "Please enter a notification message", Toast.LENGTH_SHORT).show();
-            return;
-        }
         if (eventId == null || eventId.trim().isEmpty()) {
             Toast.makeText(this, "No event selected", Toast.LENGTH_SHORT).show();
             return;
@@ -159,6 +155,28 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                         btnSendNotification.setEnabled(true);
                         Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
                         return;
+                    }
+
+                    boolean cancelledMode = isCancelledRecipientMode();
+                    String message;
+                    String notificationType;
+                    if (cancelledMode) {
+                        String nameForTemplate = eventSnapshot.getString("eventName");
+                        if (nameForTemplate == null || nameForTemplate.trim().isEmpty()) {
+                            nameForTemplate = eventName;
+                        } else {
+                            nameForTemplate = nameForTemplate.trim();
+                        }
+                        message = getString(R.string.organizer_notification_cancelled_entrant_template, nameForTemplate);
+                        notificationType = NotificationHelper.TYPE_CANCELLED_ENTRANT_OUTREACH;
+                    } else {
+                        message = etMessage.getText() == null ? "" : etMessage.getText().toString().trim();
+                        if (message.isEmpty()) {
+                            btnSendNotification.setEnabled(true);
+                            Toast.makeText(this, "Please enter a notification message", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        notificationType = NotificationHelper.TYPE_MANUAL_WAITLIST_UPDATE;
                     }
 
                     List<String> recipients = resolveRecipients(eventSnapshot);
@@ -176,7 +194,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                         return;
                     }
 
-                    deliverNotifications(recipients, message);
+                    deliverNotifications(recipients, message, notificationType);
                 })
                 .addOnFailureListener(e -> {
                     btnSendNotification.setEnabled(true);
@@ -184,10 +202,20 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                 });
     }
 
-    private void deliverNotifications(List<String> recipientIds, String message) {
+    private boolean isCancelledRecipientMode() {
+        if (explicitRecipientIds != null && !explicitRecipientIds.isEmpty()) {
+            return false;
+        }
+        String selectedOption = recipientSpinner.getSelectedItem() == null
+                ? RECIPIENT_WAITLIST
+                : recipientSpinner.getSelectedItem().toString();
+        return RECIPIENT_CANCELLED.equals(selectedOption);
+    }
+
+    private void deliverNotifications(List<String> recipientIds, String message, String notificationType) {
         List<Task<Boolean>> deliveryTasks = new ArrayList<>();
         for (String entrantId : recipientIds) {
-            deliveryTasks.add(deliverSingleNotification(entrantId, message));
+            deliveryTasks.add(deliverSingleNotification(entrantId, message, notificationType));
         }
 
         Tasks.whenAllComplete(deliveryTasks)
@@ -226,7 +254,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                 });
     }
 
-    private Task<Boolean> deliverSingleNotification(String entrantId, String message) {
+    private Task<Boolean> deliverSingleNotification(String entrantId, String message, String notificationType) {
         return NotificationHelper.sendEventNotification(
                 db,
                 entrantId,
@@ -235,7 +263,7 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
                 eventName,
                 eventLocation,
                 message,
-                NotificationHelper.TYPE_MANUAL_WAITLIST_UPDATE,
+                notificationType,
                 eventId
         );
     }
@@ -274,6 +302,8 @@ public class OrganizerNotificationActivity extends AppCompatActivity {
             recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
         } else if (RECIPIENT_ACCEPTED.equals(selectedOption)) {
             recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "acceptedEntrantIds");
+        } else if (RECIPIENT_CANCELLED.equals(selectedOption)) {
+            recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "declinedEntrantIds");
         } else {
             recipients = FirestoreFieldUtils.getStringList(eventSnapshot, "waitlistEntrantIds");
         }
