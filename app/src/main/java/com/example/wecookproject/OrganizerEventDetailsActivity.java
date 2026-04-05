@@ -138,7 +138,10 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 tvEventDates.setText(registrationDateText);
                                 
                                 updateOrganizerLabel();
-                                tvWaitlistLabel.setText("Waitlist: " + event.getCurrentWaitlistCount() + "/" + event.getMaxWaitlist());
+                                int waitlistCount = FirestoreFieldUtils
+                                        .getStringList(documentSnapshot, "waitlistEntrantIds")
+                                        .size();
+                                tvWaitlistLabel.setText("Waitlist: " + waitlistCount + "/" + event.getMaxWaitlist());
                                 List<String> acceptedEntrantIds = FirestoreFieldUtils.getStringList(documentSnapshot, "acceptedEntrantIds");
                                 int acceptedCount = acceptedEntrantIds.size();
                                 tvCapacityLabel.setText("Capacity: " + acceptedCount + "/" + event.getCapacity());
