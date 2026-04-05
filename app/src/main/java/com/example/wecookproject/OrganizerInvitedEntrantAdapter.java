@@ -69,7 +69,7 @@ public class OrganizerInvitedEntrantAdapter extends RecyclerView.Adapter<Organiz
 
         holder.menuButton.setOnClickListener(v -> {
             PopupMenu popupMenu = new PopupMenu(v.getContext(), v);
-            popupMenu.getMenu().add("Delete");
+            popupMenu.getMenu().add("Cancel");
             popupMenu.setOnMenuItemClickListener(menuItem -> {
                 if (onDeleteClickListener != null) {
                     onDeleteClickListener.onDelete(item);
@@ -91,6 +91,19 @@ public class OrganizerInvitedEntrantAdapter extends RecyclerView.Adapter<Organiz
         items.clear();
         items.addAll(newItems);
         notifyDataSetChanged();
+    }
+
+    /**
+     * Selected rows that are still invited and have not completed sign-up ({@code STATUS_PENDING}).
+     */
+    public List<String> getSelectedPendingEntrantIds() {
+        List<String> ids = new ArrayList<>();
+        for (OrganizerInvitedEntrantItem item : items) {
+            if (item.isSelected() && STATUS_PENDING.equals(item.getStatus())) {
+                ids.add(item.getEntrantId());
+            }
+        }
+        return ids;
     }
 
     public static class InvitedViewHolder extends RecyclerView.ViewHolder {

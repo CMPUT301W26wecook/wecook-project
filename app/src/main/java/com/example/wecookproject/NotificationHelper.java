@@ -23,6 +23,8 @@ public final class NotificationHelper {
     public static final String TYPE_LOTTERY_SELECTED = "lottery_selected";
     public static final String TYPE_LOTTERY_NOT_SELECTED = "lottery_not_selected";
     public static final String TYPE_REPLACEMENT_SELECTED = "replacement_selected";
+    /** Organizer outreach to entrants whose registration is cancelled (declined). */
+    public static final String TYPE_CANCELLED_ENTRANT_OUTREACH = "cancelled_entrant_outreach";
 
     private NotificationHelper() { }
 
