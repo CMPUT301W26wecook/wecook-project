@@ -1,5 +1,6 @@
 package com.example.wecookproject;
 
+import static androidx.test.espresso.Espresso.onData;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
@@ -14,10 +15,13 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
 import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withSpinnerText;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
 import static androidx.test.espresso.matcher.ViewMatchers.Visibility.VISIBLE;
 import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -29,6 +33,7 @@ import android.content.Intent;
 import android.provider.Settings;
 
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.espresso.PerformException;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -49,6 +54,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Date;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
@@ -255,6 +261,68 @@ public class UserFlowTest {
     }
 
     @Test
+    public void test13c_EligibilityFilterShowsOnlyJoinableEvents() throws Exception {
+        prepareTestUser();
+
+        String joinableEventId = "joinable-filter-" + UUID.randomUUID();
+        String fullEventId = "full-filter-" + UUID.randomUUID();
+        String waitlistedEventId = "waitlisted-filter-" + UUID.randomUUID();
+        String closedEventId = "closed-filter-" + UUID.randomUUID();
+
+        String joinableEventName = "Joinable Event " + joinableEventId;
+        String fullEventName = "Full Event " + fullEventId;
+        String waitlistedEventName = "Waitlisted Event " + waitlistedEventId;
+        String closedEventName = "Closed Event " + closedEventId;
+
+        Timestamp now = Timestamp.now();
+        Timestamp oneDayAgo = new Timestamp(new Date(now.toDate().getTime() - TimeUnit.DAYS.toMillis(1)));
+        Timestamp oneDayLater = new Timestamp(new Date(now.toDate().getTime() + TimeUnit.DAYS.toMillis(1)));
+        Timestamp twoDaysAgo = new Timestamp(new Date(now.toDate().getTime() - TimeUnit.DAYS.toMillis(2)));
+
+        createEligibilityFilterEvent(joinableEventId, joinableEventName, List.of(), 3, oneDayAgo, oneDayLater);
+        createEligibilityFilterEvent(fullEventId, fullEventName, List.of("entrant-a", "entrant-b"), 2, oneDayAgo, oneDayLater);
+        createEligibilityFilterEvent(waitlistedEventId, waitlistedEventName, List.of(androidId), 3, oneDayAgo, oneDayLater);
+        createEligibilityFilterEvent(closedEventId, closedEventName, List.of(), 3, twoDaysAgo, oneDayAgo);
+
+        ActivityScenario<UserEventActivity> scenario = ActivityScenario.launch(UserEventActivity.class);
+
+        try {
+            waitForEventInList(joinableEventName, 8000);
+            assertEventInList(fullEventName);
+            assertEventInList(waitlistedEventName);
+            assertEventInList(closedEventName);
+            onView(withId(R.id.spinner_eligibility_filter))
+                    .check(matches(withSpinnerText("Eligibility: All")));
+
+            selectSpinnerItem(R.id.spinner_eligibility_filter, "Eligibility: Joinable");
+            safeSleep(1000);
+
+            assertEventInList(joinableEventName);
+            assertEventNotInList(fullEventName);
+            assertEventNotInList(waitlistedEventName);
+            assertEventNotInList(closedEventName);
+
+            selectSpinnerItem(R.id.spinner_eligibility_filter, "Eligibility: All");
+            safeSleep(1000);
+
+            assertEventInList(joinableEventName);
+            assertEventInList(fullEventName);
+            assertEventInList(waitlistedEventName);
+            assertEventInList(closedEventName);
+        } finally {
+            scenario.close();
+            cleanupHistoryDocument(joinableEventId);
+            cleanupHistoryDocument(fullEventId);
+            cleanupHistoryDocument(waitlistedEventId);
+            cleanupHistoryDocument(closedEventId);
+            cleanupEvent(joinableEventId);
+            cleanupEvent(fullEventId);
+            cleanupEvent(waitlistedEventId);
+            cleanupEvent(closedEventId);
+        }
+    }
+
+    @Test
     public void test20_EventDetailsShowQrDisplaysPromotionalLink() throws InterruptedException {
         prepareTestUser();
         String eventId = "user-qr-" + UUID.randomUUID();
@@ -449,6 +517,38 @@ public class UserFlowTest {
         try { latch.await(3, TimeUnit.SECONDS); } catch (Exception ignored) {}
     }
 
+    private void createEligibilityFilterEvent(String eventId,
+                                              String eventName,
+                                              List<String> entrants,
+                                              int maxWaitlist,
+                                              Timestamp registrationStartDate,
+                                              Timestamp registrationEndDate) throws InterruptedException {
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("eventId", eventId);
+        eventData.put("eventName", eventName);
+        eventData.put("location", "Edmonton");
+        eventData.put("organizerId", "org-test");
+        eventData.put("description", "Eligibility filter test event");
+        eventData.put("visibilityTag", "public");
+        eventData.put("registrationStartDate", registrationStartDate);
+        eventData.put("registrationEndDate", registrationEndDate);
+        eventData.put("eventTime", new Timestamp(new Date(registrationEndDate.toDate().getTime() + TimeUnit.HOURS.toMillis(2))));
+        eventData.put("maxWaitlist", (long) maxWaitlist);
+        eventData.put("waitlistEntrantIds", new ArrayList<>(entrants));
+        eventData.put("currentWaitlistCount", (long) entrants.size());
+        eventData.put("selectedEntrantIds", new ArrayList<String>());
+        eventData.put("replacementEntrantIds", new ArrayList<String>());
+        eventData.put("acceptedEntrantIds", new ArrayList<String>());
+        eventData.put("geolocationRequired", false);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("events")
+                .document(eventId)
+                .set(eventData)
+                .addOnCompleteListener(task -> latch.countDown());
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+    }
+
     private void createEventForQrTest(String eventId) throws InterruptedException {
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("eventId", eventId);
@@ -573,6 +673,17 @@ public class UserFlowTest {
         latch.await(5, TimeUnit.SECONDS);
     }
 
+    private void cleanupHistoryDocument(String eventId) throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users")
+                .document(androidId)
+                .collection("eventHistory")
+                .document(eventId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        latch.await(5, TimeUnit.SECONDS);
+    }
+
     private void cleanupEvent(String eventId) throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(1);
         db.collection("events").document(eventId)
@@ -688,5 +799,44 @@ public class UserFlowTest {
             throw lastError;
         }
         fail("Timed out waiting for text: " + expectedText);
+    }
+
+    private void waitForEventInList(String eventName, long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        AssertionError lastError = null;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                assertEventInList(eventName);
+                return;
+            } catch (AssertionError error) {
+                lastError = error;
+                safeSleep(250);
+            }
+        }
+        if (lastError != null) {
+            throw lastError;
+        }
+        fail("Timed out waiting for event in list: " + eventName);
+    }
+
+    private void assertEventInList(String eventName) {
+        onView(withId(R.id.rv_events))
+                .perform(RecyclerViewActions.scrollTo(hasDescendant(withText(eventName))));
+        onView(withText(eventName)).check(matches(isDisplayed()));
+    }
+
+    private void assertEventNotInList(String eventName) {
+        try {
+            onView(withId(R.id.rv_events))
+                    .perform(RecyclerViewActions.scrollTo(hasDescendant(withText(eventName))));
+            fail("Expected event to be absent from list: " + eventName);
+        } catch (PerformException expected) {
+            // Expected when the adapter does not contain a matching item.
+        }
+    }
+
+    private void selectSpinnerItem(int spinnerId, String itemText) {
+        onView(withId(spinnerId)).perform(click());
+        onData(allOf(is(instanceOf(String.class)), is(itemText))).perform(click());
     }
 }

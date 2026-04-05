@@ -76,6 +76,8 @@ public class UserEventActivity extends AppCompatActivity {
     private static final String AVAILABILITY_AFTERNOON = "Afternoon (12:00-16:59)";
     private static final String AVAILABILITY_EVENING = "Evening (17:00-20:59)";
     private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
+    private static final String ELIGIBILITY_ALL = "Eligibility: All";
+    private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -88,8 +90,10 @@ public class UserEventActivity extends AppCompatActivity {
     private BottomNavigationView bottomNav;
     private Spinner spinnerCapacityFilter;
     private Spinner spinnerAvailabilityFilter;
+    private Spinner spinnerEligibilityFilter;
     private String selectedCapacityLabel = CAPACITY_ALL;
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
+    private String selectedEligibilityLabel = ELIGIBILITY_ALL;
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -126,6 +130,7 @@ public class UserEventActivity extends AppCompatActivity {
         bottomNav = findViewById(R.id.bottom_nav);
         spinnerCapacityFilter = findViewById(R.id.spinner_capacity_filter);
         spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
+        spinnerEligibilityFilter = findViewById(R.id.spinner_eligibility_filter);
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -318,12 +323,29 @@ public class UserEventActivity extends AppCompatActivity {
      */
     private void updateEmptyState() {
         if (eventList.isEmpty()) {
+            tvEmptyState.setText(resolveEmptyStateMessage());
             tvEmptyState.setVisibility(View.VISIBLE);
             rvEvents.setVisibility(View.GONE);
         } else {
             tvEmptyState.setVisibility(View.GONE);
             rvEvents.setVisibility(View.VISIBLE);
         }
+    }
+
+    private String resolveEmptyStateMessage() {
+        boolean capacityFiltered = !CAPACITY_ALL.equals(selectedCapacityLabel);
+        boolean availabilityFiltered = !AVAILABILITY_ALL.equals(selectedAvailabilityLabel);
+        boolean eligibilityFiltered = ELIGIBILITY_JOINABLE.equals(selectedEligibilityLabel);
+
+        if (eligibilityFiltered) {
+            return capacityFiltered || availabilityFiltered
+                    ? "No joinable events match the current filters."
+                    : "No joinable events right now.";
+        }
+        if (capacityFiltered || availabilityFiltered) {
+            return "No events match the current filters.";
+        }
+        return "No events available yet.";
     }
 
     private void setupFilterControls() {
@@ -356,6 +378,17 @@ public class UserEventActivity extends AppCompatActivity {
         availabilityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerAvailabilityFilter.setAdapter(availabilityAdapter);
 
+        ArrayAdapter<String> eligibilityAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                new String[]{
+                        ELIGIBILITY_ALL,
+                        ELIGIBILITY_JOINABLE
+                }
+        );
+        eligibilityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerEligibilityFilter.setAdapter(eligibilityAdapter);
+
         spinnerCapacityFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -381,10 +414,24 @@ public class UserEventActivity extends AppCompatActivity {
                 // no-op
             }
         });
+
+        spinnerEligibilityFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedEligibilityLabel = (String) parent.getItemAtPosition(position);
+                applyFiltersAndRender();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
+        });
     }
 
     private void applyFiltersAndRender() {
         eventList.clear();
+        com.google.firebase.Timestamp currentTime = com.google.firebase.Timestamp.now();
         for (UserEventRecord eventRecord : allEventRecords) {
             if (!matchesCapacityFilter(eventRecord.getCapacity())) {
                 continue;
@@ -392,10 +439,20 @@ public class UserEventActivity extends AppCompatActivity {
             if (!matchesAvailabilityFilter(eventRecord.getEventTime())) {
                 continue;
             }
+            if (!matchesEligibilityFilter(eventRecord, currentTime)) {
+                continue;
+            }
             eventList.add(eventRecord);
         }
         eventAdapter.notifyDataSetChanged();
         updateEmptyState();
+    }
+
+    private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
+        if (ELIGIBILITY_ALL.equals(selectedEligibilityLabel)) {
+            return true;
+        }
+        return eventRecord.isJoinableAt(currentTime);
     }
 
     private boolean matchesCapacityFilter(int capacity) {
