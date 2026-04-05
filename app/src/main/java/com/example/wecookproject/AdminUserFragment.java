@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -32,6 +33,7 @@ public class AdminUserFragment extends Fragment {
     private RecyclerView recyclerView;
     private ListElementAdapter<User> adapter;
     private List<User> userList;
+    private List<User> filteredUserList;
     private FirebaseFirestore db;
     private AdminViewModel viewModel;
 
@@ -57,10 +59,26 @@ public class AdminUserFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         userList = new ArrayList<>();
-        adapter = new ListElementAdapter<>(userList, viewModel);
+        filteredUserList = new ArrayList<>();
+        adapter = new ListElementAdapter<>(filteredUserList, viewModel);
         adapter.setShowDetailOption(true);
         adapter.setShowDeleteOption(true);
         recyclerView.setAdapter(adapter);
+
+        SearchView searchView = view.findViewById(R.id.sv_user_search);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                filter(query);
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                filter(newText);
+                return true;
+            }
+        });
 
         loadUsersFromFirestore();
 
@@ -95,9 +113,9 @@ public class AdminUserFragment extends Fragment {
             List<Boolean> selected = adapter.getSelectedList();
             List<String> userIdsToDelete = new ArrayList<>();
 
-            for (int i = 0; i < userList.size(); i++) {
+            for (int i = 0; i < filteredUserList.size(); i++) {
                 if (selected.get(i)) {
-                    userIdsToDelete.add(userList.get(i).getAndroidId());
+                    userIdsToDelete.add(filteredUserList.get(i).getAndroidId());
                 }
             }
 
@@ -107,6 +125,31 @@ public class AdminUserFragment extends Fragment {
         });
 
         return view;
+    }
+
+    /**
+     * Filters the entrant list based on the user's search query.
+     * It checks if the entrant name matches the search string.
+     *
+     * @param text The search query string.
+     */
+    private void filter(String text) {
+        filteredUserList.clear();
+        adapter.getSelectedList().clear();
+        if (text.isEmpty()) {
+            filteredUserList.addAll(userList);
+        } else {
+            text = text.toLowerCase();
+            for (User user : userList) {
+                if (user.getName().toLowerCase().contains(text)) {
+                    filteredUserList.add(user);
+                }
+            }
+        }
+        for (int i = 0; i < filteredUserList.size(); i++) {
+            adapter.getSelectedList().add(false);
+        }
+        adapter.notifyDataSetChanged();
     }
 
     /**
@@ -121,7 +164,6 @@ public class AdminUserFragment extends Fragment {
                     }
 
                     userList.clear();
-                    adapter.getSelectedList().clear();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
                             if (!UserDocumentUtils.hasRole(doc, UserDocumentUtils.ROLE_ENTRANT)) {
@@ -129,13 +171,27 @@ public class AdminUserFragment extends Fragment {
                             }
                             User user = doc.toObject(User.class);
                             userList.add(user);
-                            adapter.getSelectedList().add(false);
                         }
                     }
-                    adapter.notifyDataSetChanged();
+                    
+                    SearchView searchView = getView() != null ? getView().findViewById(R.id.sv_user_search) : null;
+                    if (searchView != null) {
+                        filter(searchView.getQuery().toString());
+                    } else {
+                        filter("");
+                    }
                 });
     }
 
+    /**
+     * Removes a specific role from a user document in Firestore.
+     * If the user only has the specified role, the entire document is deleted.
+     * Otherwise, only the specified role is removed from the roles map.
+     *
+     * @param userId         The unique Android ID of the user.
+     * @param role           The role string to remove (e.g., "entrant").
+     * @param successMessage Message to display in a Toast upon successful deletion.
+     */
     private void removeRoleFromUser(String userId, String role, String successMessage) {
         db.collection("users")
                 .document(userId)

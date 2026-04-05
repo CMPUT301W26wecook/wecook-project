@@ -5,18 +5,20 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -27,6 +29,7 @@ public class AdminNotificationFragment extends Fragment {
     private RecyclerView recyclerView;
     private AdminNotificationAdapter adapter;
     private List<UserNotificationItem> notificationList;
+    private List<UserNotificationItem> filteredNotificationList;
     private FirebaseFirestore db;
 
     /**
@@ -48,12 +51,50 @@ public class AdminNotificationFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         notificationList = new ArrayList<>();
-        adapter = new AdminNotificationAdapter(notificationList);
+        filteredNotificationList = new ArrayList<>();
+        adapter = new AdminNotificationAdapter(filteredNotificationList);
         recyclerView.setAdapter(adapter);
+
+        SearchView searchView = view.findViewById(R.id.sv_notification_search);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                filter(query);
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                filter(newText);
+                return true;
+            }
+        });
 
         loadAllNotifications();
 
         return view;
+    }
+
+    /**
+     * Filters the notification list based on the user's search query.
+     * It checks if either the event name or the message content matches the search string.
+     *
+     * @param text The search query string.
+     */
+    private void filter(String text) {
+        filteredNotificationList.clear();
+        if (text.isEmpty()) {
+            filteredNotificationList.addAll(notificationList);
+        } else {
+            text = text.toLowerCase();
+            for (UserNotificationItem item : notificationList) {
+                if (item.getEventName().toLowerCase().contains(text) ||
+                    item.getMessage().toLowerCase().contains(text)) {
+                    filteredNotificationList.add(item);
+                }
+            }
+        }
+        adapter.notifyDataSetChanged();
     }
 
     /**
@@ -62,20 +103,38 @@ public class AdminNotificationFragment extends Fragment {
      */
     private void loadAllNotifications() {
         db.collectionGroup("notifications")
-                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .addSnapshotListener((value, error) -> {
                     if (error != null) {
-                        Log.w("AdminNotificationFragment", "Listen failed.", error);
+                        Log.e("AdminNotificationFragment", "Listen failed.", error);
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), "Error loading notifications: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                        }
                         return;
                     }
 
                     notificationList.clear();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
-                            notificationList.add(UserNotificationItem.fromSnapshot(doc));
+                            try {
+                                notificationList.add(UserNotificationItem.fromSnapshot(doc));
+                            } catch (Exception e) {
+                                Log.e("AdminNotificationFragment", "Error parsing notification: " + doc.getId(), e);
+                            }
                         }
+
+                        // Sort newest first in memory
+                        Collections.sort(notificationList, (a, b) -> {
+                            if (a.getCreatedAt() == null || b.getCreatedAt() == null) return 0;
+                            return b.getCreatedAt().compareTo(a.getCreatedAt());
+                        });
                     }
-                    adapter.notifyDataSetChanged();
+                    
+                    SearchView searchView = getView() != null ? getView().findViewById(R.id.sv_notification_search) : null;
+                    if (searchView != null) {
+                        filter(searchView.getQuery().toString());
+                    } else {
+                        filter("");
+                    }
                 });
     }
 }

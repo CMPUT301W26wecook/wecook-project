@@ -194,6 +194,9 @@ public class AdminEventDetailFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Toggles visibility to show the comments view and starts observing real-time comment data.
+     */
     private void handleShowComments() {
         if (currentEvent == null || currentEvent.getEventId() == null) {
             Toast.makeText(getContext(), "No event selected", Toast.LENGTH_SHORT).show();
@@ -205,6 +208,11 @@ public class AdminEventDetailFragment extends Fragment {
         startObservingComments(currentEvent.getEventId());
     }
 
+    /**
+     * Subscribes to Firestore snapshot listener for the event's comments collection.
+     * 
+     * @param eventId The unique ID of the event whose comments are being observed.
+     */
     private void startObservingComments(String eventId) {
         stopObservingComments();
         commentsListener = db.collection("events")
@@ -223,6 +231,9 @@ public class AdminEventDetailFragment extends Fragment {
                 });
     }
 
+    /**
+     * Unsubscribes from the real-time Firestore comments listener if it exists.
+     */
     private void stopObservingComments() {
         if (commentsListener != null) {
             commentsListener.remove();
@@ -230,6 +241,11 @@ public class AdminEventDetailFragment extends Fragment {
         }
     }
 
+    /**
+     * Dynamically inflates and populates the comments container with views for each comment document.
+     * 
+     * @param documents List of Firestore document snapshots representing event comments.
+     */
     private void renderComments(List<DocumentSnapshot> documents) {
         commentsContainer.removeAllViews();
         if (documents.isEmpty()) {
@@ -277,6 +293,11 @@ public class AdminEventDetailFragment extends Fragment {
         }
     }
 
+    /**
+     * Deletes a specific comment from the Firestore database.
+     * 
+     * @param commentId The unique ID of the comment to be removed.
+     */
     private void deleteComment(String commentId) {
         if (currentEvent == null || currentEvent.getEventId() == null || commentId == null) return;
 
@@ -289,6 +310,9 @@ public class AdminEventDetailFragment extends Fragment {
                 .addOnFailureListener(e -> Toast.makeText(getContext(), "Failed to delete comment", Toast.LENGTH_SHORT).show());
     }
 
+    /**
+     * Validates event state and initiates the QR code display dialog logic.
+     */
     private void handleShowQrCode() {
         if (currentEvent == null) {
             Toast.makeText(getContext(), "No event selected", Toast.LENGTH_SHORT).show();
@@ -315,6 +339,11 @@ public class AdminEventDetailFragment extends Fragment {
         showQrDialog(qrPayload);
     }
 
+    /**
+     * Generates a QR code bitmap from the given payload and displays it in an AlertDialog.
+     * 
+     * @param payload The content/link to be encoded into the QR code.
+     */
     private void showQrDialog(String payload) {
         try {
             int qrSize = (int) TypedValue.applyDimension(
@@ -375,6 +404,9 @@ public class AdminEventDetailFragment extends Fragment {
         }
     }
 
+    /**
+     * Cleans up resources, specifically stopping the Firestore comments listener.
+     */
     @Override
     public void onDestroy() {
         super.onDestroy();

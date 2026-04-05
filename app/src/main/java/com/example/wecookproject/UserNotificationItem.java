@@ -110,6 +110,10 @@ public class UserNotificationItem {
         return recipientId;
     }
 
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
     public String getFormattedTime() {
         if (createdAt == null) {
             return "Unknown time";
