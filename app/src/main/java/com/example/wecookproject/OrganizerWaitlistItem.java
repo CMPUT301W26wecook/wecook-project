@@ -17,6 +17,8 @@ public class OrganizerWaitlistItem {
     private final String subtitle;
     private final String phoneNumber;
     private final String email;
+    private final boolean entrantRole;
+    private final boolean organizerRole;
 
     /**
      * Creates one organizer waitlist item.
@@ -26,7 +28,7 @@ public class OrganizerWaitlistItem {
      * @param subtitle subtitle text
      */
     public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle) {
-        this(entrantId, displayName, subtitle, "", "");
+        this(entrantId, displayName, subtitle, "", "", false, false);
     }
 
     /**
@@ -38,7 +40,7 @@ public class OrganizerWaitlistItem {
      * @param phoneNumber entrant phone number
      */
     public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle, String phoneNumber) {
-        this(entrantId, displayName, subtitle, phoneNumber, "");
+        this(entrantId, displayName, subtitle, phoneNumber, "", false, false);
     }
 
     /**
@@ -50,12 +52,20 @@ public class OrganizerWaitlistItem {
      * @param phoneNumber entrant phone number
      * @param email entrant email
      */
-    public OrganizerWaitlistItem(String entrantId, String displayName, String subtitle, String phoneNumber, String email) {
+    public OrganizerWaitlistItem(String entrantId,
+                                 String displayName,
+                                 String subtitle,
+                                 String phoneNumber,
+                                 String email,
+                                 boolean entrantRole,
+                                 boolean organizerRole) {
         this.entrantId = entrantId;
         this.displayName = displayName;
         this.subtitle = subtitle;
         this.phoneNumber = safe(phoneNumber);
         this.email = safe(email);
+        this.entrantRole = entrantRole;
+        this.organizerRole = organizerRole;
     }
 
     /**
@@ -71,6 +81,18 @@ public class OrganizerWaitlistItem {
         String city = safe(snapshot.getString("city"));
         String email = safe(snapshot.getString("email"));
         String phoneNumber = safe(snapshot.getString("phoneNumber"));
+        Object rawRoles = snapshot.get("roles");
+        boolean entrantRole = false;
+        boolean organizerRole = false;
+        if (rawRoles instanceof java.util.Map<?, ?>) {
+            java.util.Map<?, ?> rolesMap = (java.util.Map<?, ?>) rawRoles;
+            entrantRole = UserDocumentUtils.hasRole(rolesMap, UserDocumentUtils.ROLE_ENTRANT);
+            organizerRole = UserDocumentUtils.hasRole(rolesMap, UserDocumentUtils.ROLE_ORGANIZER);
+        } else {
+            String legacyRole = safe(snapshot.getString("role"));
+            entrantRole = UserDocumentUtils.ROLE_ENTRANT.equalsIgnoreCase(legacyRole);
+            organizerRole = UserDocumentUtils.ROLE_ORGANIZER.equalsIgnoreCase(legacyRole);
+        }
 
         String displayName = (firstName + " " + lastName).trim();
         if (displayName.isEmpty()) {
@@ -82,7 +104,15 @@ public class OrganizerWaitlistItem {
             subtitle = "Entrant ID: " + entrantId;
         }
 
-        return new OrganizerWaitlistItem(entrantId, displayName, subtitle, phoneNumber, email);
+        return new OrganizerWaitlistItem(
+                entrantId,
+                displayName,
+                subtitle,
+                phoneNumber,
+                email,
+                entrantRole,
+                organizerRole
+        );
     }
 
     /**
@@ -92,7 +122,7 @@ public class OrganizerWaitlistItem {
      * @return fallback item
      */
     public static OrganizerWaitlistItem fallback(String entrantId) {
-        return new OrganizerWaitlistItem(entrantId, entrantId, "Entrant profile unavailable", "", "");
+        return new OrganizerWaitlistItem(entrantId, entrantId, "Entrant profile unavailable", "", "", false, false);
     }
 
     /**
@@ -124,6 +154,14 @@ public class OrganizerWaitlistItem {
             return "?";
         }
         return displayName.trim().substring(0, 1).toUpperCase();
+    }
+
+    public boolean hasEntrantRole() {
+        return entrantRole;
+    }
+
+    public boolean hasOrganizerRole() {
+        return organizerRole;
     }
 
     /**

@@ -88,6 +88,14 @@
                 android:text="Send invitation to selected for waitlist"
                 android:visibility="gone" />
 
+            <Button
+                android:id="@+id/btn_assign_selected_coorganizer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Assign selected as co-organizers"
+                android:visibility="gone" />
+
             <EditText
                 android:id="@+id/et_lottery_count"
                 android:layout_width="match_parent"

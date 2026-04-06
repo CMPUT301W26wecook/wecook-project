@@ -15,6 +15,8 @@ public class UserEventRecord {
     public static final String STATUS_INVITED = "invited";
     public static final String STATUS_ACCEPTED = "accepted";
     public static final String STATUS_REJECTED = "rejected";
+    public static final String STATUS_CO_ORGANIZER_PENDING = "co_organizer_pending";
+    public static final String STATUS_CO_ORGANIZER = "co_organizer";
 
     private final String eventId;
     private final String eventName;
@@ -145,9 +147,17 @@ public class UserEventRecord {
      */
     public static UserEventRecord fromEventSnapshot(DocumentSnapshot snapshot, String entrantId, String historyStatus) {
         List<String> waitlistEntrants = getStringList(snapshot, "waitlistEntrantIds");
+        List<String> pendingCoOrganizers = getStringList(snapshot, "pendingCoOrganizerIds");
+        List<String> coOrganizers = getStringList(snapshot, "coOrganizerIds");
         String resolvedStatus = historyStatus;
-        if ((resolvedStatus == null || resolvedStatus.isEmpty()) && waitlistEntrants.contains(entrantId)) {
-            resolvedStatus = STATUS_WAITLISTED;
+        if (resolvedStatus == null || resolvedStatus.isEmpty()) {
+            if (coOrganizers.contains(entrantId)) {
+                resolvedStatus = STATUS_CO_ORGANIZER;
+            } else if (pendingCoOrganizers.contains(entrantId)) {
+                resolvedStatus = STATUS_CO_ORGANIZER_PENDING;
+            } else if (waitlistEntrants.contains(entrantId)) {
+                resolvedStatus = STATUS_WAITLISTED;
+            }
         }
 
         Long maxWaitlistValue = snapshot.getLong("maxWaitlist");
