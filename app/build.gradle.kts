@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.activity:activity:1.8.2")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 
     // Google Play Services location
     implementation("com.google.android.gms:play-services-location:21.3.0")

@@ -6,7 +6,7 @@ public class OrganizerInvitedEntrantItem {
     private final String phoneNumber;
     private final String email;
     private final String status;
-    private boolean selected = true;
+    private boolean selected = false;
 
     public OrganizerInvitedEntrantItem(String entrantId, String displayName, String status) {
         this(entrantId, displayName, "", "", status);

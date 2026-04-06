@@ -9,16 +9,24 @@ import com.example.wecookproject.model.User;
 
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class UserUnitTest {
+    private Map<String, Boolean> roles(String... enabledRoles) {
+        Map<String, Boolean> roles = new HashMap<>();
+        for (String role : enabledRoles) {
+            roles.put(role, true);
+        }
+        return roles;
+    }
 
     @Test
     public void testGetNameWithFirstAndLastName() {
         User user = new User(
                 "123 Main St", "", "device123", "1990-01-01",
                 "Edmonton", "Canada", "John", "Doe", "T6G 2R3",
-                true, "entrant"
+                true, roles("entrant")
         );
 
         assertEquals("John Doe", user.getName());
@@ -29,7 +37,7 @@ public class UserUnitTest {
         User user = new User(
                 "123 Main St", "", "device123", "1990-01-01",
                 "Edmonton", "Canada", null, "Doe", "T6G 2R3",
-                true, "entrant"
+                true, roles("entrant")
         );
 
         assertEquals("", user.getName());
@@ -40,7 +48,7 @@ public class UserUnitTest {
         User user = new User(
                 "123 Main St", "", "device123", "1990-01-01",
                 "Edmonton", "Canada", "John", null, "T6G 2R3",
-                true, "entrant"
+                true, roles("entrant")
         );
 
         assertEquals("John", user.getName());
@@ -51,7 +59,7 @@ public class UserUnitTest {
         User user = new User(
                 "123 Main St", "Apt 4", "device123", "1990-01-01",
                 "Edmonton", "Canada", "John", "Doe", "T6G 2R3",
-                true, "entrant"
+                true, roles("entrant")
         );
 
         user.clearProfile();
@@ -66,7 +74,7 @@ public class UserUnitTest {
         assertEquals("", user.getCountry());
         assertFalse(user.isProfileCompleted());
 
-        assertEquals("entrant", user.getRole());
+        assertEquals(Boolean.TRUE, user.getRoles().get("entrant"));
         assertEquals("device123", user.getAndroidId());
     }
 
@@ -75,7 +83,7 @@ public class UserUnitTest {
         User user = new User(
                 "123 Main St", "Apt 4", "device123", "1990-01-01",
                 "Edmonton", "Canada", "John", "Doe", "T6G 2R3",
-                true, "organizer"
+                true, roles("organizer")
         );
 
         Map<String, Object> map = user.toFirestoreMap();
@@ -90,7 +98,7 @@ public class UserUnitTest {
         assertEquals("Doe", map.get("lastName"));
         assertEquals("T6G 2R3", map.get("postalCode"));
         assertEquals(true, map.get("profileCompleted"));
-        assertEquals("organizer", map.get("role"));
+        assertEquals(roles("organizer"), map.get("roles"));
         assertEquals(12, map.size());
     }
 
@@ -104,7 +112,7 @@ public class UserUnitTest {
         assertNull(map.get("addressLine1"));
         assertEquals("device456", map.get("androidId"));
         assertNull(map.get("firstName"));
-        assertTrue(map.containsKey("role"));
+        assertTrue(map.containsKey("roles"));
     }
 
 }

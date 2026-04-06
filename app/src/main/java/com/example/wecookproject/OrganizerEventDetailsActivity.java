@@ -23,6 +23,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.example.wecookproject.model.Event;
 import com.example.wecookproject.model.EventComment;
@@ -101,12 +102,13 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         btnInviteEntrants = findViewById(R.id.btn_invite_entrants);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
         commentsContainer = findViewById(R.id.layout_comments_container);
+        TextView tvAvailability = findViewById(R.id.tv_event_availability);
 
         loadOrganizerProfile();
 
         if (eventId != null) {
             // Use addSnapshotListener for real-time updates
-            eventListener = db.collection("events").document(eventId)
+                eventListener = db.collection("events").document(eventId)
                     .addSnapshotListener((documentSnapshot, error) -> {
                         if (error != null) {
                             Toast.makeText(this, "Failed to load event details: " + error.getMessage(), Toast.LENGTH_SHORT).show();
@@ -160,6 +162,19 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                         ? ""
                                         : event.getDescription().trim();
                                 tvEventDescription.setText(description);
+
+                                // Availability label
+                                int maxWaitlist = event.getMaxWaitlist();
+                                int finalCount = acceptedCount;
+                                int capacity = event.getCapacity();
+                                boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
+                                if (available) {
+                                    tvAvailability.setText("Availability: Open");
+                                    tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
+                                } else {
+                                    tvAvailability.setText("Availability: Full");
+                                    tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                                }
                             }
                         } else {
                             // Event was deleted or doesn't exist

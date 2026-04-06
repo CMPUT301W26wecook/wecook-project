@@ -129,6 +129,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         tvOrganizer = findViewById(R.id.tv_detail_organizer);
         tvStatus = findViewById(R.id.tv_detail_status_chip);
         tvDescription = findViewById(R.id.tv_detail_description);
+        TextView tvAvailability = findViewById(R.id.tv_detail_event_availability);
         etComment = findViewById(R.id.et_event_comment);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
         commentsContainer = findViewById(R.id.layout_comments_container);
@@ -186,6 +187,39 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEvent();
+
+        // loadEvent() should contains eventId
+        TextView tvAvailability = findViewById(R.id.tv_detail_event_availability);
+
+        if (eventId != null) {
+            db.collection("events").document(eventId).get().addOnSuccessListener(documentSnapshot -> {
+                if (documentSnapshot.exists()) {
+                    com.example.wecookproject.model.Event event =
+                            documentSnapshot.toObject(com.example.wecookproject.model.Event.class);
+                    if (event == null) {
+                        return;
+                    }
+
+                    int waitlistCount = FirestoreFieldUtils
+                            .getStringList(documentSnapshot, "waitlistEntrantIds")
+                            .size();
+                    int maxWaitlist = event.getMaxWaitlist();
+                    java.util.List<String> selectedEntrants =
+                            FirestoreFieldUtils.getStringList(documentSnapshot, "selectedEntrantIds");
+                    int finalCount = selectedEntrants.size();
+                    int capacity = event.getCapacity();
+
+                    boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
+                    if (available) {
+                        tvAvailability.setText("Availability: Open");
+                        tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
+                    } else {
+                        tvAvailability.setText("Availability: Full");
+                        tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                    }
+                }
+            });
+        }
     }
 
     @Override

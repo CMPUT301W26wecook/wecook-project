@@ -5,6 +5,8 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.contrib.RecyclerViewActions.actionOnItem;
+import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
 import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
@@ -28,15 +30,19 @@ import androidx.core.widget.NestedScrollView;
 import androidx.lifecycle.Lifecycle;
 import androidx.test.espresso.UiController;
 import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.PerformException;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
 import com.example.wecookproject.model.Event;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.SetOptions;
 
 import org.junit.After;
 import org.junit.Before;
@@ -971,6 +977,113 @@ public class OrganizerFlowTest {
         deleteEntrantUsers(entrants);
     }
 
+    @Test
+    public void test12b_CancellingPendingWinnerTriggersAutomaticReplacementAndNotifiesEntrantAndOrganizer() throws Exception {
+        String organizerAndroidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID
+        );
+
+        String eventId = "replacement-auto-notify-" + UUID.randomUUID();
+        List<String> entrants = Arrays.asList("b1", "b2", "b3", "b4", "b5");
+
+        createEntrantUsers(entrants);
+        deleteNotificationsForUsers(entrants);
+
+        createOrganizerUser(organizerAndroidId, "Auto", "Organizer");
+        deleteNotificationsForUsers(List.of(organizerAndroidId));
+
+        // Start with a full roster: selected size equals lotteryCount
+        createEventDocument(
+                eventId,
+                "Auto Replacement Notify Event",
+                new ArrayList<>(Arrays.asList("b3", "b4", "b5")),
+                new ArrayList<>(Arrays.asList("b1", "b2")),
+                new ArrayList<>(),
+                2
+        );
+
+        CountDownLatch organizerPatchLatch = new CountDownLatch(1);
+        db.collection("events").document(eventId)
+                .update("organizerId", organizerAndroidId)
+                .addOnCompleteListener(task -> organizerPatchLatch.countDown());
+        awaitLatch(organizerPatchLatch, 10, "event organizer patch");
+
+        createInvitedHistory(eventId, "b1", "Auto Replacement Notify Event");
+        createInvitedHistory(eventId, "b2", "Auto Replacement Notify Event");
+
+        Intent intent = new Intent(
+                ApplicationProvider.getApplicationContext(),
+                OrganizerEntrantInvitedListActivity.class
+        );
+        intent.putExtra("eventId", eventId);
+
+        ActivityScenario<OrganizerEntrantInvitedListActivity> scenario =
+                ActivityScenario.launch(intent);
+
+        safeSleep(WAIT_MEDIUM);
+
+        onView(withId(R.id.rv_entrants))
+                .perform(RecyclerViewActions.actionOnItem(
+                        hasDescendant(withText("Entrant b1")),
+                        clickChildViewWithId(R.id.cb_invited_selected)
+                ));
+
+        safeSleep(1000);
+
+        onView(withId(R.id.btn_revoke_selected)).perform(click());
+        safeSleep(WAIT_LONG);
+
+        DocumentSnapshot snapshot = waitForReplacementEntrants(eventId, 1);
+        assertTrue("Event document must exist", snapshot.exists());
+
+        @SuppressWarnings("unchecked")
+        List<String> replacements = (List<String>) snapshot.get("replacementEntrantIds");
+        assertNotNull("Replacement list should not be null", replacements);
+        assertEquals("Exactly one replacement entrant should be selected", 1, replacements.size());
+
+        String replacementEntrant = replacements.get(0);
+        assertFalse("Replacement should not be an original selected entrant",
+                Arrays.asList("b1", "b2").contains(replacementEntrant));
+        assertTrue("Replacement should come from waitlist pool",
+                Arrays.asList("b3", "b4", "b5").contains(replacementEntrant));
+
+        @SuppressWarnings("unchecked")
+        List<String> selectedEntrants = (List<String>) snapshot.get("selectedEntrantIds");
+        assertNotNull("Selected entrants should not be null", selectedEntrants);
+        assertEquals("Exactly two winners should remain after one cancel and one replacement", 2, selectedEntrants.size());
+        assertFalse("Cancelled entrant should no longer be selected", selectedEntrants.contains("b1"));
+        assertTrue("Original remaining winner should still be selected", selectedEntrants.contains("b2"));
+        assertTrue("Replacement entrant should now be selected", selectedEntrants.contains(replacementEntrant));
+
+        assertEquals("Replacement entrant should receive one replacement notification",
+                1,
+                waitForNotificationCountByType(
+                        List.of(replacementEntrant),
+                        NotificationHelper.TYPE_REPLACEMENT_SELECTED,
+                        1
+                ));
+
+        assertEquals("Organizer should receive one roster-updated notification",
+                1,
+                waitForNotificationCountByType(
+                        List.of(organizerAndroidId),
+                        NotificationHelper.TYPE_ROSTER_UPDATED,
+                        1
+                ));
+
+        scenario.close();
+
+        deleteNotificationsForUsers(entrants);
+        deleteNotificationsForUsers(List.of(organizerAndroidId));
+        deleteHistoryDocumentForUser("b1", eventId);
+        deleteHistoryDocumentForUser("b2", eventId);
+        deleteHistoryDocumentForUser(replacementEntrant, eventId);
+        deleteEventDocument(eventId);
+        deleteEntrantUsers(entrants);
+        deleteUserDocument(organizerAndroidId);
+    }
+
 
     /**
      * Drives the full organizer signup flow launched from LoginActivity, progressing through the
@@ -1453,6 +1566,85 @@ public class OrganizerFlowTest {
                     ((NestedScrollView) parent).scrollTo(0, view.getBottom());
                 }
                 uiController.loopMainThreadUntilIdle();
+            }
+        };
+    }
+
+    private void createInvitedHistory(String eventId, String entrantId, String eventName) {
+        Map<String, Object> historyData = new HashMap<>();
+        historyData.put("eventId", eventId);
+        historyData.put("eventName", eventName);
+        historyData.put("location", "Edmonton");
+        historyData.put("organizerId", "organizer-test");
+        historyData.put("posterUrl", "");
+        historyData.put("registrationStartDate", parseTestDate("2026-03-01 00:00"));
+        historyData.put("registrationEndDate", parseTestDate("2026-03-10 00:00"));
+        historyData.put("description", "Replacement notification test");
+        historyData.put("status", UserEventRecord.STATUS_INVITED);
+        historyData.put("updatedAt", FieldValue.serverTimestamp());
+
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users")
+                .document(entrantId)
+                .collection("eventHistory")
+                .document(eventId)
+                .set(historyData, SetOptions.merge())
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 10, "invited history creation");
+    }
+
+    @SuppressWarnings("unchecked")
+    private DocumentSnapshot waitForReplacementEntrants(String eventId, int expectedCount) throws Exception {
+        for (int i = 0; i < 15; i++) {
+            DocumentSnapshot snapshot =
+                    Tasks.await(db.collection("events").document(eventId).get(), 15, TimeUnit.SECONDS);
+
+            if (snapshot != null && snapshot.exists()) {
+                List<String> replacements = (List<String>) snapshot.get("replacementEntrantIds");
+                if (replacements != null && replacements.size() == expectedCount) {
+                    return snapshot;
+                }
+            }
+
+            safeSleep(1000);
+        }
+
+        throw new AssertionError("Replacement result was not saved with " + expectedCount + " entrant(s)");
+    }
+
+    private void deleteHistoryDocumentForUser(String userId, String eventId) {
+        CountDownLatch latch = new CountDownLatch(1);
+        db.collection("users")
+                .document(userId)
+                .collection("eventHistory")
+                .document(eventId)
+                .delete()
+                .addOnCompleteListener(task -> latch.countDown());
+        awaitLatch(latch, 10, "history cleanup");
+    }
+
+    private ViewAction clickChildViewWithId(int viewId) {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return isDisplayed();
+            }
+
+            @Override
+            public String getDescription() {
+                return "Click on a child view with specified id.";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                View childView = view.findViewById(viewId);
+                if (childView == null) {
+                    throw new androidx.test.espresso.PerformException.Builder()
+                            .withActionDescription(getDescription())
+                            .withViewDescription(String.valueOf(view))
+                            .build();
+                }
+                childView.performClick();
             }
         };
     }
