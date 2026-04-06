@@ -151,6 +151,9 @@ public class UserEventActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEventsAndHistory();
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_events);
+        }
     }
 
     /**
@@ -165,7 +168,7 @@ public class UserEventActivity extends AppCompatActivity {
             if (itemId == R.id.nav_events) {
                 return true;
             } else if (itemId == R.id.nav_scan) {
-                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(UserEventActivity.this, UserScanActivity.class));
                 return true;
             } else if (itemId == R.id.nav_history) {
                 Intent intent = new Intent(UserEventActivity.this, UserHistoryActivity.class);
@@ -1341,8 +1344,9 @@ public class UserEventActivity extends AppCompatActivity {
             linkView.setTextColor(Color.BLUE);
             linkView.setPaintFlags(linkView.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
             linkView.setOnClickListener(v -> {
-                Intent openIntent = new Intent(this, PublicEventLandingActivity.class);
-                openIntent.setData(Uri.parse(payload));
+                Intent openIntent = new Intent(this, UserEventDetailsActivity.class);
+                String eventIdFromPayload = payload.substring("https://wecook.app/event/".length());
+                openIntent.putExtra("eventId", eventIdFromPayload);
                 startActivity(openIntent);
             });
             linkView.setOnLongClickListener(v -> {

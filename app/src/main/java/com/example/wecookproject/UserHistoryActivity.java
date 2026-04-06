@@ -105,7 +105,10 @@ public class UserHistoryActivity extends AppCompatActivity {
                 finish();
                 return true;
             } else if (itemId == R.id.nav_scan) {
-                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(UserHistoryActivity.this, UserScanActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                startActivity(intent);
+                finish();
                 return true;
             } else if (itemId == R.id.nav_profile) {
                 Intent intent = new Intent(UserHistoryActivity.this, UserProfileActivity.class);
@@ -126,6 +129,9 @@ public class UserHistoryActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadHistory();
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_history);
+        }
     }
 
     /**

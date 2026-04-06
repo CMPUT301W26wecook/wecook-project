@@ -148,7 +148,10 @@ public class UserProfileActivity extends AppCompatActivity {
                 finish();
                 return true;
             } else if (id == R.id.nav_scan) {
-                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(UserProfileActivity.this, UserScanActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                startActivity(intent);
+                finish();
                 return true;
             } else if (id == R.id.nav_history) {
                 Intent intent = new Intent(UserProfileActivity.this, UserHistoryActivity.class);
