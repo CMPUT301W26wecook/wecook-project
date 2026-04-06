@@ -6,4 +6,5 @@
         <item quantity="one">Send to %d selected entrant</item>
         <item quantity="other">Send to %d selected entrants</item>
     </plurals>
+    <string name="organizer_notification_cancelled_entrant_template">Regarding your cancelled registration for \"%1$s\": the organizer is reaching out. If you have questions or wish to discuss your spot, please follow up through the app.</string>
 </resources>

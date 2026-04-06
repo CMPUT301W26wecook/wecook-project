@@ -250,6 +250,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         db.collection("events").document(eventId)
                 .update(
                         "waitlistEntrantIds", updatedWaitlist,
+                        "currentWaitlistCount", updatedWaitlist.size(),
                         "selectedEntrantIds", updatedSelected,
                         "replacementEntrantIds", updatedReplacement
                 )
@@ -299,6 +300,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     isPrivateEvent = "private".equalsIgnoreCase(documentSnapshot.getString("visibilityTag"));
 
                     List<String> entrantIds = readEntrantIds(documentSnapshot);
+                    syncWaitlistCountIfNeeded(documentSnapshot, entrantIds.size());
 
                     waitlistEntrantIds.clear();
                     waitlistEntrantIds.addAll(entrantIds);
@@ -356,6 +358,14 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     Toast.makeText(this, "Failed to load waitlist", Toast.LENGTH_SHORT).show();
                     showEmptyState(true);
                 });
+    }
+
+    private void syncWaitlistCountIfNeeded(DocumentSnapshot eventSnapshot, int actualWaitlistSize) {
+        Long currentWaitlistCount = eventSnapshot.getLong("currentWaitlistCount");
+        if (currentWaitlistCount == null || currentWaitlistCount.intValue() != actualWaitlistSize) {
+            db.collection("events").document(eventId)
+                    .update("currentWaitlistCount", actualWaitlistSize);
+        }
     }
 
     /**
