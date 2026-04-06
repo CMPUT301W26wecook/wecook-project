@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 public class KeywordSearchScenarioTest {
-    private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
+    private static final double KEYWORD_SCORE_THRESHOLD = UserEventFilterLogic.KEYWORD_SCORE_THRESHOLD;
     private static final int SEMANTIC_TOP_N = 40;
     private static final double LEXICAL_WEIGHT = 0.55d;
     private static final double SEMANTIC_WEIGHT = 0.45d;
