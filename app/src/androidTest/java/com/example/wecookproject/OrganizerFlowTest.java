@@ -957,7 +957,7 @@ public class OrganizerFlowTest {
         assertTrue("Timed out reading replacement event", readLatch.await(15, TimeUnit.SECONDS));
         DocumentSnapshot snapshot = snapshotRef.get();
         assertTrue("Event document must exist", snapshot != null && snapshot.exists());
-        List<String> replacements = (List<String>) snapshot.get("replacementEntrantIds");
+        List<String> replacements = FirestoreFieldUtils.getStringList(snapshot, "replacementEntrantIds");
         assertNotNull("Replacement list should not be null", replacements);
         assertEquals("Should have exactly one replacement", 1, replacements.size());
         String chosen = replacements.get(0);

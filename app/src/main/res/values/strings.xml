@@ -2,6 +2,7 @@
     <string name="app_name">wecookproject</string>
     <string name="AdminLogin"> <u>Admin login here.</u> </string>
     <string name="organizer_send_notification_all">Send Notification to all</string>
+    <string name="export_csv">Export</string>
     <plurals name="organizer_send_notification_selected">
         <item quantity="one">Send to %d selected entrant</item>
         <item quantity="other">Send to %d selected entrants</item>
