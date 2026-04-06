@@ -13,8 +13,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.wecookproject.model.Event;
 import com.example.wecookproject.model.User;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Generic adapter for Admin lists (Users/Events). Supports checkbox selection and action menus.
@@ -48,6 +50,7 @@ public class ListElementAdapter<T> extends RecyclerView.Adapter<ListElementAdapt
     private final AdminViewModel viewModel;
     private boolean showDetailOption = true;
     private boolean showDeleteOption = true;
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
 
     /**
      * Constructs a new ListElementAdapter.
@@ -114,13 +117,23 @@ public class ListElementAdapter<T> extends RecyclerView.Adapter<ListElementAdapt
         T item = itemList.get(position);
         
         String displayName = "";
+        String detailMessage = "";
         if (item instanceof User) {
             displayName = ((User) item).getName();
         } else if (item instanceof Event) {
-            displayName = ((Event) item).getEventName();
+            Event event = (Event) item;
+            displayName = event.getEventName();
+
+            holder.tvDetailMessage.setTypeface(android.graphics.Typeface.MONOSPACE);
+            String start = event.getRegistrationStartDate() != null ? dateFormat.format(event.getRegistrationStartDate()) : "N/A";
+            String end = event.getRegistrationEndDate() != null ? dateFormat.format(event.getRegistrationEndDate()) : "N/A";
+            detailMessage = String.format("From: %s\n" +
+                                          "To:   %s", start, end);
         }
         
         holder.tvElementName.setText(displayName);
+        holder.tvDetailMessage.setText(detailMessage);
+        holder.tvDetailMessage.setVisibility(detailMessage.isEmpty() ? View.GONE : View.VISIBLE);
 
         holder.cbSelectElement.setOnCheckedChangeListener(null);
         holder.cbSelectElement.setChecked(selectedList.get(holder.getBindingAdapterPosition()));
@@ -185,6 +198,7 @@ public class ListElementAdapter<T> extends RecyclerView.Adapter<ListElementAdapt
      */
     public static class ListElementViewHolder extends RecyclerView.ViewHolder {
         TextView tvElementName;
+        TextView tvDetailMessage;
         CheckBox cbSelectElement;
         ImageButton btnElementMenu;
 
@@ -195,6 +209,7 @@ public class ListElementAdapter<T> extends RecyclerView.Adapter<ListElementAdapt
         public ListElementViewHolder(@NonNull View itemView) {
             super(itemView);
             tvElementName = itemView.findViewById(R.id.tv_element_name);
+            tvDetailMessage = itemView.findViewById(R.id.tv_element_detail);
             cbSelectElement = itemView.findViewById(R.id.cb_select_element);
             btnElementMenu = itemView.findViewById(R.id.btn_element_menu);
         }

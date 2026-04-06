@@ -88,9 +88,16 @@ public class SignupAddressActivity extends AppCompatActivity {
         String email = intentFromDetails.getStringExtra("email");
         String phoneNumber = intentFromDetails.getStringExtra("phoneNumber");
         String clickedRole = intentFromDetails.getStringExtra("clickedRole");
-        String role = "ORGANIZER".equals(clickedRole)
-                ? UserDocumentUtils.ROLE_ORGANIZER
-                : UserDocumentUtils.ROLE_ENTRANT;
+        
+        String role;
+        boolean isLimitedProfile = "ORGANIZER".equals(clickedRole) || "ADMIN".equals(clickedRole);
+        if ("ADMIN".equals(clickedRole)) {
+            role = UserDocumentUtils.ROLE_ADMIN;
+        } else if ("ORGANIZER".equals(clickedRole)) {
+            role = UserDocumentUtils.ROLE_ORGANIZER;
+        } else {
+            role = UserDocumentUtils.ROLE_ENTRANT;
+        }
 
         clearError(addressLine1Layout);
         clearError(cityLayout);
@@ -98,7 +105,7 @@ public class SignupAddressActivity extends AppCompatActivity {
         clearError(countryLayout);
 
         Map<String, String> detailErrors = UserInputValidator.validateSignupDetails(
-                "ORGANIZER".equals(clickedRole),
+                isLimitedProfile,
                 firstName,
                 lastName,
                 birthday,
@@ -156,7 +163,9 @@ public class SignupAddressActivity extends AppCompatActivity {
      */
     private void routeAfterSuccessfulSignup(String clickedRole) {
         Intent intent;
-        if ("ORGANIZER".equals(clickedRole)) {
+        if ("ADMIN".equals(clickedRole)) {
+            intent = new Intent(SignupAddressActivity.this, AdminMainActivity.class);
+        } else if ("ORGANIZER".equals(clickedRole)) {
             intent = new Intent(SignupAddressActivity.this, OrganizerHomeActivity.class);
         } else {
             intent = new Intent(SignupAddressActivity.this, UserEventActivity.class);
