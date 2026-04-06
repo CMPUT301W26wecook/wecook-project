@@ -5,10 +5,13 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.net.Uri;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.SearchView.SearchAutoComplete;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -22,6 +25,9 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Shows the final list of entrants confirmed for an event ({@code acceptedEntrantIds}), with live
@@ -40,6 +46,8 @@ public class OrganizerEnrolledEntrantsActivity extends AppCompatActivity {
     private String lastAcceptedSignature = "";
     private String currentQuery = "";
     private int profileLoadGeneration = 0;
+    private ActivityResultLauncher<String> createCsvDocumentLauncher;
+    private String currentEventName = "event";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,10 +66,16 @@ public class OrganizerEnrolledEntrantsActivity extends AppCompatActivity {
         adapter = new OrganizerEnrolledEntrantAdapter();
         recyclerView.setAdapter(adapter);
 
+        createCsvDocumentLauncher = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("text/csv"),
+                this::writeCsvToUri
+        );
+
         setupBottomNav();
         setupSearch();
 
         findViewById(R.id.btn_back).setOnClickListener(v -> finish());
+        findViewById(R.id.btn_export_csv).setOnClickListener(v -> exportEnrolledEntrants());
 
         if (eventId == null || eventId.trim().isEmpty()) {
             Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
@@ -99,8 +113,10 @@ public class OrganizerEnrolledEntrantsActivity extends AppCompatActivity {
 
                     String eventName = snapshot.getString("eventName");
                     if (eventName != null && !eventName.trim().isEmpty()) {
-                        setTitle(eventName + " — Enrolled");
+                        currentEventName = eventName.trim();
+                        setTitle(currentEventName + " — Enrolled");
                     } else {
+                        currentEventName = "event";
                         setTitle("Enrolled entrants");
                     }
 
@@ -279,6 +295,45 @@ public class OrganizerEnrolledEntrantsActivity extends AppCompatActivity {
             emptyState.setText("No enrolled entrants match \"" + currentQuery.trim() + "\".");
         } else {
             emptyState.setText("No enrolled entrants yet.");
+        }
+    }
+
+    private void exportEnrolledEntrants() {
+        if (allEnrolled.isEmpty()) {
+            Toast.makeText(this, "No enrolled entrants to export", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String safeEventName = currentEventName == null || currentEventName.trim().isEmpty()
+                ? "event"
+                : currentEventName.trim()
+                .replaceAll("[\\\\/:*?\"<>|]", "_")
+                .replaceAll("\\s+", "_");
+
+        String fileName = safeEventName + "_enrolled_entrants.csv";
+        createCsvDocumentLauncher.launch(fileName);
+    }
+
+    private void writeCsvToUri(Uri uri) {
+        if (uri == null) {
+            Toast.makeText(this, "Export cancelled", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String csvContent = CsvExportUtils.buildEnrolledEntrantsCsv(allEnrolled);
+
+        try (OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+            if (outputStream == null) {
+                Toast.makeText(this, "Failed to open file location", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            outputStream.write(csvContent.getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+
+            Toast.makeText(this, "CSV exported successfully", Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Toast.makeText(this, "Failed to export CSV", Toast.LENGTH_SHORT).show();
         }
     }
 }

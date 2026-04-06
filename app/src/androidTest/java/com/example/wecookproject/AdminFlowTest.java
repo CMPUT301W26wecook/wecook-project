@@ -38,6 +38,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.Map;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
@@ -257,6 +259,12 @@ public class AdminFlowTest {
     private void setupTestData() {
         List<Task<Void>> tasks = new ArrayList<>();
 
+        Map<String, Boolean> organizerRole = new HashMap<>();
+        organizerRole.put("organizer", true);
+
+        Map<String, Boolean> entrantRole = new HashMap<>();
+        entrantRole.put("entrant", true);
+
         User organizer1 = new User(
                 "Org St 1",
                 "",
@@ -268,7 +276,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T6G 2R3",
                 true,
-                "organizer"
+                organizerRole
         );
         User organizer2 = new User(
                 "Org St 2",
@@ -281,7 +289,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T6G 2R3",
                 true,
-                "organizer"
+                organizerRole
         );
         User organizer3 = new User(
                 "Org St 3",
@@ -294,7 +302,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T6G 2R3",
                 true,
-                "organizer"
+                organizerRole
         );
 
         tasks.add(db.collection("users").document(ORG_1_ID).set(organizer1.toFirestoreMap()));
@@ -312,7 +320,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRole
         );
         User user2 = new User(
                 "User Ave 2",
@@ -325,7 +333,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRole
         );
         User user3 = new User(
                 "User Ave 3",
@@ -338,7 +346,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRole
         );
         User user4 = new User(
                 "User Ave 4",
@@ -351,7 +359,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRole
         );
 
         tasks.add(db.collection("users").document(USER_1_ID).set(user1.toFirestoreMap()));
@@ -511,8 +519,7 @@ public class AdminFlowTest {
     private void navigateToAdminMainMenu() {
         onView(withId(R.id.text_Admin_login)).perform(click());
         safeSleep(UI_SETTLE_MS);
-        waitUntilVisible(withId(R.id.et_username));
-        onView(withId(R.id.et_username)).perform(replaceText("admin"), closeSoftKeyboard());
+        waitUntilVisible(withId(R.id.et_password));
         onView(withId(R.id.et_password)).perform(replaceText("admin"), closeSoftKeyboard());
         onView(withId(R.id.btn_login)).perform(click());
         safeSleep(UI_SETTLE_MS);
