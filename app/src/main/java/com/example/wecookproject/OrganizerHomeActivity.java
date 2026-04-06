@@ -16,7 +16,9 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.Source;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Activity for organizers to view the list of events they manage and navigate into event-specific
@@ -79,31 +81,62 @@ public class OrganizerHomeActivity extends AppCompatActivity {
     private void loadEvents() {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         FirebaseFirestore db = FirebaseFirestore.getInstance();
+        Map<String, Event> eventsById = new LinkedHashMap<>();
 
         db.collection("events")
                 .whereEqualTo("organizerId", androidId)
                 .get(Source.SERVER)
-                .addOnSuccessListener(value -> bindEvents(value))
+                .addOnSuccessListener(value -> {
+                    mergeEvents(eventsById, value);
+                    loadCoOrganizerEvents(db, androidId, eventsById, Source.SERVER);
+                })
                 .addOnFailureListener(error -> {
                     Toast.makeText(this, "Failed to load organizer events from server. Showing cached events.", Toast.LENGTH_SHORT).show();
                     db.collection("events")
                             .whereEqualTo("organizerId", androidId)
                             .get(Source.CACHE)
-                            .addOnSuccessListener(this::bindEvents)
+                            .addOnSuccessListener(value -> {
+                                mergeEvents(eventsById, value);
+                                loadCoOrganizerEvents(db, androidId, eventsById, Source.CACHE);
+                            })
                             .addOnFailureListener(cacheError ->
                                     Toast.makeText(this, "Failed to load events: " + cacheError.getMessage(), Toast.LENGTH_SHORT).show());
                 });
     }
 
-    private void bindEvents(com.google.firebase.firestore.QuerySnapshot value) {
+    private void loadCoOrganizerEvents(FirebaseFirestore db,
+                                       String androidId,
+                                       Map<String, Event> eventsById,
+                                       Source source) {
+        db.collection("events")
+                .whereArrayContains("coOrganizerIds", androidId)
+                .get(source)
+                .addOnSuccessListener(value -> {
+                    mergeEvents(eventsById, value);
+                    bindMergedEvents(eventsById);
+                })
+                .addOnFailureListener(error -> {
+                    bindMergedEvents(eventsById);
+                    Toast.makeText(this, "Some co-organized events could not be loaded", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void mergeEvents(Map<String, Event> eventsById, com.google.firebase.firestore.QuerySnapshot value) {
         if (value == null) {
             return;
         }
-        eventList.clear();
         for (QueryDocumentSnapshot document : value) {
             Event event = document.toObject(Event.class);
-            eventList.add(event);
+            if (event.getEventId() == null || event.getEventId().trim().isEmpty()) {
+                event.setEventId(document.getId());
+            }
+            eventsById.put(document.getId(), event);
         }
+    }
+
+    private void bindMergedEvents(Map<String, Event> eventsById) {
+        eventList.clear();
+        eventList.addAll(eventsById.values());
         eventAdapter.notifyDataSetChanged();
     }
     

@@ -120,7 +120,8 @@ public class UserNotificationItem {
     public boolean requiresConfirmation() {
         return NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)
                 || NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)
-                || NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type);
+                || NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type)
+                || NotificationHelper.TYPE_CO_ORGANIZER_INVITE.equals(type);
     }
 
     private static String value(String input, String fallback) {

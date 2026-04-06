@@ -196,6 +196,14 @@ public final class UserEventUiUtils {
                 backgroundColor = Color.parseColor("#ECE3FF");
                 textColor = Color.parseColor("#5B3E96");
                 break;
+            case UserEventRecord.STATUS_CO_ORGANIZER_PENDING:
+                backgroundColor = Color.parseColor("#FFF4D6");
+                textColor = Color.parseColor("#8A6116");
+                break;
+            case UserEventRecord.STATUS_CO_ORGANIZER:
+                backgroundColor = Color.parseColor("#E4F0E8");
+                textColor = Color.parseColor("#256343");
+                break;
             case UserEventRecord.STATUS_REJECTED:
             case STATUS_FULL:
                 backgroundColor = Color.parseColor("#FDECEC");
@@ -230,6 +238,10 @@ public final class UserEventUiUtils {
                 return invitedAsPicked ? "Picked" : "Invited";
             case UserEventRecord.STATUS_ACCEPTED:
                 return "Accepted";
+            case UserEventRecord.STATUS_CO_ORGANIZER_PENDING:
+                return "Co-organizer Invite";
+            case UserEventRecord.STATUS_CO_ORGANIZER:
+                return "Co-organizer";
             case UserEventRecord.STATUS_REJECTED:
                 return "Rejected";
             case STATUS_FULL:

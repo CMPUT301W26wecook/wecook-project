@@ -23,6 +23,7 @@ public final class NotificationHelper {
     public static final String TYPE_LOTTERY_SELECTED = "lottery_selected";
     public static final String TYPE_LOTTERY_NOT_SELECTED = "lottery_not_selected";
     public static final String TYPE_REPLACEMENT_SELECTED = "replacement_selected";
+    public static final String TYPE_CO_ORGANIZER_INVITE = "co_organizer_invite";
 
     private NotificationHelper() { }
 

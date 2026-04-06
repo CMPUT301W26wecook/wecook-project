@@ -101,6 +101,9 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         if (NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type)) {
             return "Replacement";
         }
+        if (NotificationHelper.TYPE_CO_ORGANIZER_INVITE.equals(type)) {
+            return "Co-organizer";
+        }
         return "Update";
     }
 
