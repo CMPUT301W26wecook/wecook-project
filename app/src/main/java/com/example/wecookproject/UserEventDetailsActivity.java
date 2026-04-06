@@ -129,6 +129,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
         tvOrganizer = findViewById(R.id.tv_detail_organizer);
         tvStatus = findViewById(R.id.tv_detail_status_chip);
         tvDescription = findViewById(R.id.tv_detail_description);
+        TextView tvAvailability = findViewById(R.id.tv_detail_event_availability);
         etComment = findViewById(R.id.et_event_comment);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
         commentsContainer = findViewById(R.id.layout_comments_container);
@@ -186,6 +187,28 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEvent();
+        // 可用性标签逻辑
+        // loadEvent() 里要有 eventId
+        if (eventId != null) {
+            db.collection("events").document(eventId).get().addOnSuccessListener(documentSnapshot -> {
+                if (documentSnapshot.exists()) {
+                    com.example.wecookproject.model.Event event = documentSnapshot.toObject(com.example.wecookproject.model.Event.class);
+                    int waitlistCount = event.getCurrentWaitlistCount();
+                    int maxWaitlist = event.getMaxWaitlist();
+                    java.util.List<String> finalList = event.getSelectedEntrantIds();
+                    int finalCount = finalList != null ? finalList.size() : 0;
+                    int capacity = event.getCapacity();
+                    boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
+                    if (available) {
+                        tvAvailability.setText("可用性：可报名");
+                        tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                    } else {
+                        tvAvailability.setText("可用性：不可报名");
+                        tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                    }
+                }
+            });
+        }
     }
 
     @Override

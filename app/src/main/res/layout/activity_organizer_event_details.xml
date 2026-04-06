@@ -217,10 +217,19 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/tv_event_availability"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="可用性：-"
+                android:textColor="#FF9800"
+                android:textSize="15sp" />
+
+            <TextView
                 android:id="@+id/tv_event_description"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="8dp"
                 android:lineSpacingExtra="4dp"
                 android:text="Text detail of the event"
                 android:textColor="@color/text_muted"

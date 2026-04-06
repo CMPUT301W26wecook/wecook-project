@@ -99,12 +99,13 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         btnPostComment = findViewById(R.id.btn_post_organizer_comment);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
         commentsContainer = findViewById(R.id.layout_comments_container);
+        TextView tvAvailability = findViewById(R.id.tv_event_availability);
 
         loadOrganizerProfile();
 
         if (eventId != null) {
             // Use addSnapshotListener for real-time updates
-            eventListener = db.collection("events").document(eventId)
+                eventListener = db.collection("events").document(eventId)
                     .addSnapshotListener((documentSnapshot, error) -> {
                         if (error != null) {
                             Toast.makeText(this, "Failed to load event details: " + error.getMessage(), Toast.LENGTH_SHORT).show();
@@ -152,6 +153,21 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                         ? ""
                                         : event.getDescription().trim();
                                 tvEventDescription.setText(description);
+
+                                // 可用性标签逻辑
+                                int waitlistCount = event.getCurrentWaitlistCount();
+                                int maxWaitlist = event.getMaxWaitlist();
+                                List<String> acceptedEntrantIds = FirestoreFieldUtils.getStringList(documentSnapshot, "acceptedEntrantIds");
+                                int finalCount = acceptedEntrantIds != null ? acceptedEntrantIds.size() : 0;
+                                int capacity = event.getCapacity();
+                                boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
+                                if (available) {
+                                    tvAvailability.setText("可用性：可报名");
+                                    tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                                } else {
+                                    tvAvailability.setText("可用性：不可报名");
+                                    tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                                }
                             }
                         } else {
                             // Event was deleted or doesn't exist
