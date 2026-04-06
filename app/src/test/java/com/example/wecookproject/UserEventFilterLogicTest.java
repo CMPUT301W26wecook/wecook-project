@@ -39,16 +39,8 @@ public class UserEventFilterLogicTest {
 
     @Test
     public void matchesAvailabilityFilter_respectsTimeWindows() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 10);
-        cal.set(Calendar.MINUTE, 30);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        Timestamp morningTime = new Timestamp(cal.getTime());
-
-        cal.set(Calendar.HOUR_OF_DAY, 17);
-        cal.set(Calendar.MINUTE, 30);
-        Timestamp eveningTime = new Timestamp(cal.getTime());
+        Timestamp morningTime = new Timestamp(calendarAt(10, 30).getTime());
+        Timestamp eveningTime = new Timestamp(calendarAt(17, 30).getTime());
 
         assertTrue(UserEventFilterLogic.matchesAvailabilityFilter(
                 UserEventFilterLogic.AVAILABILITY_MORNING,
@@ -62,12 +54,7 @@ public class UserEventFilterLogicTest {
 
     @Test
     public void keywordAndFilterIntersection_returnsOnlyMatchingEvent() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 10);
-        cal.set(Calendar.MINUTE, 30);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        Date morningEventDate = cal.getTime();
+        Date morningEventDate = calendarAt(10, 30).getTime();
 
         Timestamp now = new Timestamp(new Date());
         List<UserEventRecord> events = Arrays.asList(
@@ -117,6 +104,18 @@ public class UserEventFilterLogicTest {
             ids.add(item.getId());
         }
         return ids;
+    }
+
+    private Calendar calendarAt(int hour, int minute) {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.YEAR, 2025);
+        cal.set(Calendar.MONTH, Calendar.JANUARY);
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        cal.set(Calendar.HOUR_OF_DAY, hour);
+        cal.set(Calendar.MINUTE, minute);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal;
     }
 
     private UserEventRecord record(String id,
