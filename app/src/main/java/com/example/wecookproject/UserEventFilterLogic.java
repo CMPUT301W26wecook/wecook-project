@@ -24,6 +24,8 @@ public final class UserEventFilterLogic {
     public static final String ELIGIBILITY_ALL = "Eligibility: All";
     public static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
 
+    public static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
+
     private UserEventFilterLogic() {
     }
 

@@ -85,7 +85,7 @@ public class UserEventActivity extends AppCompatActivity {
     private static final String AVAILABILITY_NIGHT = UserEventFilterLogic.AVAILABILITY_NIGHT;
     private static final String ELIGIBILITY_ALL = UserEventFilterLogic.ELIGIBILITY_ALL;
     private static final String ELIGIBILITY_JOINABLE = UserEventFilterLogic.ELIGIBILITY_JOINABLE;
-    private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
+    private static final double KEYWORD_SCORE_THRESHOLD = UserEventFilterLogic.KEYWORD_SCORE_THRESHOLD;
     private static final int SEMANTIC_TOP_N = 40;
     private static final double LEXICAL_WEIGHT = 0.55d;
     private static final double SEMANTIC_WEIGHT = 0.45d;

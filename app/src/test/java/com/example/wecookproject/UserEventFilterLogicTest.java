@@ -10,13 +10,13 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
 public class UserEventFilterLogicTest {
-    private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
 
     @Test
     public void resolveEmptyStateMessage_keywordAndExtraFilters_usesCombinedMessage() {
@@ -39,8 +39,16 @@ public class UserEventFilterLogicTest {
 
     @Test
     public void matchesAvailabilityFilter_respectsTimeWindows() {
-        Timestamp morningTime = new Timestamp(new Date(1735727400000L)); // 2025-01-01 10:30:00 UTC
-        Timestamp eveningTime = new Timestamp(new Date(1735752600000L)); // 2025-01-01 17:30:00 UTC
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 10);
+        cal.set(Calendar.MINUTE, 30);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        Timestamp morningTime = new Timestamp(cal.getTime());
+
+        cal.set(Calendar.HOUR_OF_DAY, 17);
+        cal.set(Calendar.MINUTE, 30);
+        Timestamp eveningTime = new Timestamp(cal.getTime());
 
         assertTrue(UserEventFilterLogic.matchesAvailabilityFilter(
                 UserEventFilterLogic.AVAILABILITY_MORNING,
@@ -54,11 +62,18 @@ public class UserEventFilterLogicTest {
 
     @Test
     public void keywordAndFilterIntersection_returnsOnlyMatchingEvent() {
-        Timestamp now = new Timestamp(new Date(1735736400000L)); // 2025-01-01 13:00:00 UTC
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 10);
+        cal.set(Calendar.MINUTE, 30);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        Date morningEventDate = cal.getTime();
+
+        Timestamp now = new Timestamp(new Date());
         List<UserEventRecord> events = Arrays.asList(
-                record("event_bbq_small_morning", "Backyard Barbecue Social", "Community bbq grill meetup", 10, new Date(1735727400000L), now),
-                record("event_bbq_large_morning", "City Barbecue Gathering", "Big barbecue event", 120, new Date(1735727400000L), now),
-                record("event_hike_small_morning", "Trail Walk Group", "Morning hiking together", 10, new Date(1735727400000L), now)
+                record("event_bbq_small_morning", "Backyard Barbecue Social", "Community bbq grill meetup", 10, morningEventDate, now),
+                record("event_bbq_large_morning", "City Barbecue Gathering", "Big barbecue event", 120, morningEventDate, now),
+                record("event_hike_small_morning", "Trail Walk Group", "Morning hiking together", 10, morningEventDate, now)
         );
 
         List<String> resultIds = applyKeywordAndFilters(
@@ -91,7 +106,7 @@ public class UserEventFilterLogicTest {
                 continue;
             }
             double score = EventSearchMatcher.score(query, event);
-            if (score >= KEYWORD_SCORE_THRESHOLD) {
+            if (score >= UserEventFilterLogic.KEYWORD_SCORE_THRESHOLD) {
                 scored.add(new ScoredRecord(event.getEventId(), score));
             }
         }
