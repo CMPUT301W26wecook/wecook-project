@@ -20,6 +20,8 @@ public class UserNotificationItemTest {
                 NotificationHelper.STATUS_UNREAD,
                 NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE,
                 "event-1",
+                "organizer-1",
+                "entrant-1",
                 new Date(),
                 null,
                 null

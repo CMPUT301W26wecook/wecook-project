@@ -12,6 +12,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -32,6 +34,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -53,12 +56,17 @@ import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Entrant event list screen with waitlist and invitation actions.
@@ -78,6 +86,11 @@ public class UserEventActivity extends AppCompatActivity {
     private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
     private static final String ELIGIBILITY_ALL = "Eligibility: All";
     private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
+    private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
+    private static final int SEMANTIC_TOP_N = 40;
+    private static final double LEXICAL_WEIGHT = 0.55d;
+    private static final double SEMANTIC_WEIGHT = 0.45d;
+    private static final long KEYWORD_SEARCH_DEBOUNCE_MS = 300L;
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -91,9 +104,16 @@ public class UserEventActivity extends AppCompatActivity {
     private Spinner spinnerCapacityFilter;
     private Spinner spinnerAvailabilityFilter;
     private Spinner spinnerEligibilityFilter;
+    private SearchView searchEventKeyword;
     private String selectedCapacityLabel = CAPACITY_ALL;
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
     private String selectedEligibilityLabel = ELIGIBILITY_ALL;
+    private String keywordQuery = "";
+    private Runnable pendingKeywordSearch;
+    private OnDeviceSemanticSearchEngine semanticSearchEngine;
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
+    private int keywordSearchGeneration = 0;
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -131,6 +151,9 @@ public class UserEventActivity extends AppCompatActivity {
         spinnerCapacityFilter = findViewById(R.id.spinner_capacity_filter);
         spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
         spinnerEligibilityFilter = findViewById(R.id.spinner_eligibility_filter);
+        searchEventKeyword = findViewById(R.id.search_event_keyword);
+        semanticSearchEngine = new OnDeviceSemanticSearchEngine(getApplicationContext());
+        searchExecutor.execute(() -> semanticSearchEngine.warmup());
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -151,6 +174,26 @@ public class UserEventActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEventsAndHistory();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (pendingKeywordSearch != null) {
+            mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+            pendingKeywordSearch = null;
+        }
+        searchExecutor.shutdownNow();
+        try {
+            if (!searchExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                searchExecutor.shutdownNow();
+            }
+        } catch (InterruptedException ie) {
+            searchExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        } finally {
+            semanticSearchEngine.close();
+        }
     }
 
     /**
@@ -342,11 +385,22 @@ public class UserEventActivity extends AppCompatActivity {
         boolean capacityFiltered = !CAPACITY_ALL.equals(selectedCapacityLabel);
         boolean availabilityFiltered = !AVAILABILITY_ALL.equals(selectedAvailabilityLabel);
         boolean eligibilityFiltered = ELIGIBILITY_JOINABLE.equals(selectedEligibilityLabel);
+        boolean searchingByKeyword = keywordQuery != null && !keywordQuery.trim().isEmpty();
 
         if (eligibilityFiltered) {
+            if (searchingByKeyword) {
+                return capacityFiltered || availabilityFiltered
+                        ? "No joinable events match your keyword and filters."
+                        : "No joinable events match your keyword.";
+            }
             return capacityFiltered || availabilityFiltered
                     ? "No joinable events match the current filters."
                     : "No joinable events right now.";
+        }
+        if (searchingByKeyword) {
+            return capacityFiltered || availabilityFiltered
+                    ? "No events match your keyword and filters."
+                    : "No events match your keyword.";
         }
         if (capacityFiltered || availabilityFiltered) {
             return "No events match the current filters.";
@@ -433,11 +487,41 @@ public class UserEventActivity extends AppCompatActivity {
                 // no-op
             }
         });
+
+        searchEventKeyword.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                if (pendingKeywordSearch != null) {
+                    mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+                    pendingKeywordSearch = null;
+                }
+                keywordQuery = query == null ? "" : query.trim();
+                applyFiltersAndRender();
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                keywordQuery = newText == null ? "" : newText.trim();
+                if (pendingKeywordSearch != null) {
+                    mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+                }
+                pendingKeywordSearch = () -> {
+                    pendingKeywordSearch = null;
+                    applyFiltersAndRender();
+                };
+                mainThreadHandler.postDelayed(pendingKeywordSearch, KEYWORD_SEARCH_DEBOUNCE_MS);
+                return true;
+            }
+        });
     }
 
     private void applyFiltersAndRender() {
+        keywordSearchGeneration++;
         eventList.clear();
         com.google.firebase.Timestamp currentTime = com.google.firebase.Timestamp.now();
+        boolean isKeywordSearchEnabled = keywordQuery != null && !keywordQuery.trim().isEmpty();
+        List<ScoredEventRecord> scoredRecords = new ArrayList<>();
         for (UserEventRecord eventRecord : allEventRecords) {
             if (!matchesCapacityFilter(eventRecord.getCapacity())) {
                 continue;
@@ -448,10 +532,103 @@ public class UserEventActivity extends AppCompatActivity {
             if (!matchesEligibilityFilter(eventRecord, currentTime)) {
                 continue;
             }
-            eventList.add(eventRecord);
+
+            if (!isKeywordSearchEnabled) {
+                eventList.add(eventRecord);
+                continue;
+            }
+
+            double score = EventSearchMatcher.score(keywordQuery, eventRecord);
+            if (score < KEYWORD_SCORE_THRESHOLD) {
+                continue;
+            }
+            scoredRecords.add(new ScoredEventRecord(eventRecord, score));
         }
+
+        if (isKeywordSearchEnabled) {
+            Collections.sort(scoredRecords, Comparator.comparingDouble(ScoredEventRecord::getScore).reversed());
+            for (ScoredEventRecord scoredRecord : scoredRecords) {
+                eventList.add(scoredRecord.getEventRecord());
+            }
+            requestSemanticRerank(scoredRecords, keywordQuery, keywordSearchGeneration);
+        }
+
         eventAdapter.notifyDataSetChanged();
         updateEmptyState();
+    }
+
+    private void requestSemanticRerank(List<ScoredEventRecord> lexicalScores,
+                                       String query,
+                                       int generation) {
+        if (lexicalScores.isEmpty()) {
+            return;
+        }
+
+        List<ScoredEventRecord> semanticWindow = SemanticRankingUtils.topN(lexicalScores, SEMANTIC_TOP_N);
+        List<OnDeviceSemanticSearchEngine.EventCandidate> candidates = new ArrayList<>();
+        Map<String, UserEventRecord> semanticRecordsById = new HashMap<>();
+        List<SemanticRankingUtils.ScoredId> lexicalWindowForBlend = new ArrayList<>();
+        for (ScoredEventRecord item : semanticWindow) {
+            candidates.add(new OnDeviceSemanticSearchEngine.EventCandidate(
+                    item.getEventRecord().getEventId(),
+                    EventSearchMatcher.buildSearchDocument(item.getEventRecord())
+            ));
+            semanticRecordsById.put(item.getEventRecord().getEventId(), item.getEventRecord());
+            lexicalWindowForBlend.add(new SemanticRankingUtils.ScoredId(item.getEventRecord().getEventId(), item.getScore()));
+        }
+
+        searchExecutor.execute(() -> {
+            Map<String, Double> semanticScores = semanticSearchEngine.score(query, candidates);
+            if (semanticScores.isEmpty()) {
+                return;
+            }
+
+            List<SemanticRankingUtils.ScoredId> blendedWindow = SemanticRankingUtils.blendTopWindow(
+                    lexicalWindowForBlend,
+                    semanticScores,
+                    LEXICAL_WEIGHT,
+                    SEMANTIC_WEIGHT
+            );
+
+            mainThreadHandler.post(() -> {
+                if (generation != keywordSearchGeneration) {
+                    return;
+                }
+                if (!query.equals(keywordQuery)) {
+                    return;
+                }
+                eventList.clear();
+                for (SemanticRankingUtils.ScoredId scoredItem : blendedWindow) {
+                    UserEventRecord record = semanticRecordsById.get(scoredItem.id);
+                    if (record != null) {
+                        eventList.add(record);
+                    }
+                }
+                for (int i = semanticWindow.size(); i < lexicalScores.size(); i++) {
+                    eventList.add(lexicalScores.get(i).getEventRecord());
+                }
+                eventAdapter.notifyDataSetChanged();
+                updateEmptyState();
+            });
+        });
+    }
+
+    private static final class ScoredEventRecord {
+        private final UserEventRecord eventRecord;
+        private final double score;
+
+        private ScoredEventRecord(UserEventRecord eventRecord, double score) {
+            this.eventRecord = eventRecord;
+            this.score = score;
+        }
+
+        private UserEventRecord getEventRecord() {
+            return eventRecord;
+        }
+
+        private double getScore() {
+            return score;
+        }
     }
 
     private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
