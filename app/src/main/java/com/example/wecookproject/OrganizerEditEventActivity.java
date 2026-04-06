@@ -402,6 +402,7 @@ public class OrganizerEditEventActivity extends AppCompatActivity {
             updates.put("waitlistEntrantIds", new ArrayList<String>());
             updates.put("currentWaitlistCount", 0);
             updates.put("waitlistEntrantLocations", FieldValue.delete());
+            updates.put(EntrantWaitlistManager.FIELD_PRIVATE_WAITLIST_INVITEE_IDS, new ArrayList<String>());
             transaction.update(eventRef, updates);
             return removedEntrantIds;
         }).addOnSuccessListener(removedEntrantIds ->

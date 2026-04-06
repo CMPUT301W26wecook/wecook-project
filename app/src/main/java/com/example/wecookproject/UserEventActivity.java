@@ -699,6 +699,20 @@ public class UserEventActivity extends AppCompatActivity {
             return;
         }
 
+        if (UserEventRecord.STATUS_WAITLIST_INVITED.equals(status)) {
+            btnSecondary.setVisibility(View.VISIBLE);
+            btnSecondary.setText("Reject");
+            btnSecondary.setOnClickListener(v -> rejectPrivateWaitlistInvite(eventRecord, dialog));
+            if (eventRecord.isWaitlistFull()) {
+                btnJoinWaitlist.setText("Waitlist Full");
+                btnJoinWaitlist.setEnabled(false);
+                return;
+            }
+            btnJoinWaitlist.setText("Join the Waitlist");
+            btnJoinWaitlist.setOnClickListener(v -> requestLocationAndJoinWaitlist(eventRecord, dialog));
+            return;
+        }
+
         if (eventRecord.isWaitlistFull()) {
             btnJoinWaitlist.setText("Waitlist Full");
             btnJoinWaitlist.setEnabled(false);
@@ -791,15 +805,28 @@ public class UserEventActivity extends AppCompatActivity {
      * @param entrantLocation entrant location if available
      */
     private void joinWaitingList(UserEventRecord eventRecord, AlertDialog dialog, Location entrantLocation) {
-        updateWaitlistMembership(
-                eventRecord,
-                true,
-                UserEventRecord.STATUS_WAITLISTED,
-                false,
-                "Joined waiting list successfully",
-                dialog,
-                entrantLocation
-        );
+        EntrantWaitlistManager.joinWaitlist(db, entrantId, eventRecord.getEventId(), entrantLocation)
+                .addOnSuccessListener(result -> {
+                    eventRecord.setWaitlistEntrantIds(result.getUpdatedWaitlistEntrantIds());
+                    eventRecord.setHistoryStatus(UserEventRecord.STATUS_WAITLISTED);
+                    NotificationHelper.markMatchingNotificationsAsConfirmed(
+                            db,
+                            entrantId,
+                            eventRecord.getEventId(),
+                            NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE
+                    );
+                    eventAdapter.notifyDataSetChanged();
+                    Toast.makeText(this, "Joined waiting list successfully", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                    loadEventsAndHistory();
+                })
+                .addOnFailureListener(e -> {
+                    String message = e.getMessage();
+                    if (message == null || message.trim().isEmpty()) {
+                        message = "Unable to update event status";
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                });
     }
 
     /**
@@ -818,6 +845,29 @@ public class UserEventActivity extends AppCompatActivity {
                 dialog,
                 null
         );
+    }
+
+    /**
+     * Declines a private waitlist invitation and removes private-event access.
+     */
+    private void rejectPrivateWaitlistInvite(UserEventRecord eventRecord, AlertDialog dialog) {
+        EntrantWaitlistManager.declinePrivateWaitlistInvite(db, entrantId, eventRecord.getEventId())
+                .addOnSuccessListener(unused ->
+                        NotificationHelper.markMatchingNotificationsAsDeclined(
+                                        db,
+                                        entrantId,
+                                        eventRecord.getEventId(),
+                                        NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE
+                                )
+                                .addOnCompleteListener(task -> {
+                                    eventRecord.setHistoryStatus("");
+                                    eventAdapter.notifyDataSetChanged();
+                                    Toast.makeText(this, "Private waitlist invitation declined", Toast.LENGTH_SHORT).show();
+                                    dialog.dismiss();
+                                    loadEventsAndHistory();
+                                }))
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline private waitlist invite", Toast.LENGTH_SHORT).show());
     }
 
     /**
@@ -1134,26 +1184,11 @@ public class UserEventActivity extends AppCompatActivity {
      * @param status status to persist
      */
     private void upsertHistoryDocument(UserEventRecord eventRecord, String status) {
-        Map<String, Object> historyData = new HashMap<>();
-        historyData.put("eventId", eventRecord.getEventId());
-        historyData.put("eventName", eventRecord.getEventName());
-        historyData.put("location", eventRecord.getLocation());
-        historyData.put("organizerId", eventRecord.getOrganizerId());
-        historyData.put("organizerName", "");
-        historyData.put("posterUrl", eventRecord.getPosterPath());
-        historyData.put("eventTime", eventRecord.getEventTime());
-        historyData.put("registrationStartDate", eventRecord.getRegistrationStartDate());
-        historyData.put("registrationEndDate", eventRecord.getRegistrationEndDate());
-        historyData.put("description", eventRecord.getDescription());
-        historyData.put("status", status);
-        historyData.put("eventDeleted", false);
-        historyData.put("updatedAt", FieldValue.serverTimestamp());
-
         db.collection("users")
                 .document(entrantId)
                 .collection("eventHistory")
                 .document(eventRecord.getEventId())
-                .set(historyData);
+                .set(UserEventHistoryHelper.buildHistoryData(eventRecord, status));
     }
 
     /**

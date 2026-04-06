@@ -11,6 +11,7 @@ import java.util.List;
  */
 public class UserEventRecord {
     public static final String STATUS_WAITLISTED = "waitlisted";
+    public static final String STATUS_WAITLIST_INVITED = "waitlist_invited";
     public static final String STATUS_INVITED = "invited";
     public static final String STATUS_ACCEPTED = "accepted";
     public static final String STATUS_REJECTED = "rejected";
@@ -354,7 +355,9 @@ public class UserEventRecord {
         if (currentTime == null) {
             return false;
         }
-        if (!getEffectiveStatus().isEmpty()) {
+        String effectiveStatus = getEffectiveStatus();
+        if (!effectiveStatus.isEmpty()
+                && !STATUS_WAITLIST_INVITED.equals(effectiveStatus)) {
             return false;
         }
         if (isEntrantOnWaitlist() || isWaitlistFull()) {

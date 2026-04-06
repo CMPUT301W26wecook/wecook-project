@@ -8,6 +8,7 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
 import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
+import static androidx.test.espresso.matcher.ViewMatchers.Visibility.GONE;
 import static org.hamcrest.Matchers.allOf;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -340,6 +341,23 @@ public class OrganizerFlowTest {
         createScenario.close();
     }
 
+    @Test
+    public void test6c_SelectingPrivateShowsInviteReminder() {
+        performFullSignup();
+
+        ActivityScenario<OrganizerCreateEventActivity> createScenario =
+                ActivityScenario.launch(OrganizerCreateEventActivity.class);
+
+        onView(withId(R.id.rb_visibility_private)).perform(click());
+        onView(withText("Private Event Reminder")).check(matches(isDisplayed()));
+        onView(withText("Invites are not added during event creation. Add them later from the Event Info page after the private event is created."))
+                .check(matches(isDisplayed()));
+        onView(withText("OK")).perform(click());
+        onView(withId(R.id.btn_create_event)).check(matches(isDisplayed()));
+
+        createScenario.close();
+    }
+
     /**
      * test7: Filling all mandatory Create Event fields (name, dates via text
      * input, and max waitlist) and tapping "Create Event"
@@ -612,6 +630,57 @@ public class OrganizerFlowTest {
 
         cleanupCommentsForEvent(eventId);
         deleteEventDocument(eventId);
+        deleteUserDocument(organizerAndroidId);
+    }
+
+    @Test
+    public void test8e_PrivateEventDetailsShowsInviteButtonOnlyForPrivateEvents() {
+        String organizerAndroidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        String privateEventId = "private-invite-button-" + UUID.randomUUID();
+        String publicEventId = "public-no-invite-button-" + UUID.randomUUID();
+
+        createOrganizerUser(organizerAndroidId, "Invite", "Owner");
+        createOwnedEventDocument(privateEventId, "Private Invite Event", organizerAndroidId);
+        createOwnedEventDocument(publicEventId, "Public Event", organizerAndroidId);
+
+        CountDownLatch privateLatch = new CountDownLatch(1);
+        db.collection("events").document(privateEventId)
+                .update("visibilityTag", "private")
+                .addOnCompleteListener(task -> privateLatch.countDown());
+        awaitLatch(privateLatch, 10, "private visibility update");
+
+        CountDownLatch publicLatch = new CountDownLatch(1);
+        db.collection("events").document(publicEventId)
+                .update("visibilityTag", "public")
+                .addOnCompleteListener(task -> publicLatch.countDown());
+        awaitLatch(publicLatch, 10, "public visibility update");
+
+        Intent privateIntent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventDetailsActivity.class);
+        privateIntent.putExtra("eventId", privateEventId);
+        ActivityScenario<OrganizerEventDetailsActivity> privateScenario =
+                ActivityScenario.launch(privateIntent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.btn_invite_entrants)).perform(nestedScrollTo(), click());
+        onView(withId(R.id.sv_private_invite_search)).check(matches(isDisplayed()));
+        privateScenario.close();
+
+        Intent publicIntent = new Intent(ApplicationProvider.getApplicationContext(),
+                OrganizerEventDetailsActivity.class);
+        publicIntent.putExtra("eventId", publicEventId);
+        ActivityScenario<OrganizerEventDetailsActivity> publicScenario =
+                ActivityScenario.launch(publicIntent);
+
+        safeSleep(WAIT_MEDIUM);
+        onView(withId(R.id.btn_invite_entrants))
+                .check(matches(withEffectiveVisibility(GONE)));
+
+        publicScenario.close();
+        deleteEventDocument(privateEventId);
+        deleteEventDocument(publicEventId);
         deleteUserDocument(organizerAndroidId);
     }
 

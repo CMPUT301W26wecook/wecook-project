@@ -150,6 +150,19 @@ public class UserEventRecordTest {
     }
 
     @Test
+    public void isJoinableAt_whenWaitlistInvitedStatus_returnsTrue() {
+        UserEventRecord record = createRecord(
+                UserEventRecord.STATUS_WAITLIST_INVITED,
+                Collections.emptyList(),
+                4,
+                ONE_DAY_BEFORE,
+                ONE_DAY_AFTER
+        );
+
+        assertTrue(record.isJoinableAt(NOW));
+    }
+
+    @Test
     public void isJoinableAt_whenRegistrationWindowMissingOrClosed_returnsFalse() {
         UserEventRecord missingWindowRecord = createRecord(
                 "",
