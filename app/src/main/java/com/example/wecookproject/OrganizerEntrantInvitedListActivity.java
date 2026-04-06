@@ -348,8 +348,10 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT).show();
             return;
         }
+
         List<String> entrantIds = new ArrayList<>(unique);
         Object[] idArray = entrantIds.toArray();
+
         db.collection("events").document(eventId)
                 .update(
                         "selectedEntrantIds", FieldValue.arrayRemove(idArray),
@@ -363,10 +365,18 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
                                 loadInvitedEntrants();
                                 return;
                             }
+
                             persistRejectedHistory(eventSnapshot, entrantIds);
-                            triggerAutomaticReplacementDraw();
-                            Toast.makeText(this, "Selected entrants cancelled", Toast.LENGTH_SHORT).show();
-                            loadInvitedEntrants();
+
+                            WaitlistLotteryHelper.fillOpenSpotsFromWaitlist(db, eventId)
+                                    .addOnSuccessListener(result -> {
+                                        Toast.makeText(this, "Selected entrants cancelled", Toast.LENGTH_SHORT).show();
+                                        loadInvitedEntrants();
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Toast.makeText(this, "Failed to run replacement draw", Toast.LENGTH_SHORT).show();
+                                        loadInvitedEntrants();
+                                    });
                         })
                         .addOnFailureListener(e -> {
                             Toast.makeText(this, "Failed to refresh event after cancel", Toast.LENGTH_SHORT).show();
@@ -398,6 +408,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         }
     }
 
+    /**
     private void triggerAutomaticReplacementDraw() {
         DocumentReference eventReference = db.collection("events").document(eventId);
         db.runTransaction(transaction -> {
@@ -451,4 +462,5 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
             return true;
         });
     }
+    **/
 }

@@ -187,24 +187,35 @@ public class UserEventDetailsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEvent();
-        // 可用性标签逻辑
-        // loadEvent() 里要有 eventId
+
+        // loadEvent() should contains eventId
+        TextView tvAvailability = findViewById(R.id.tv_detail_event_availability);
+
         if (eventId != null) {
             db.collection("events").document(eventId).get().addOnSuccessListener(documentSnapshot -> {
                 if (documentSnapshot.exists()) {
-                    com.example.wecookproject.model.Event event = documentSnapshot.toObject(com.example.wecookproject.model.Event.class);
-                    int waitlistCount = event.getCurrentWaitlistCount();
+                    com.example.wecookproject.model.Event event =
+                            documentSnapshot.toObject(com.example.wecookproject.model.Event.class);
+                    if (event == null) {
+                        return;
+                    }
+
+                    int waitlistCount = FirestoreFieldUtils
+                            .getStringList(documentSnapshot, "waitlistEntrantIds")
+                            .size();
                     int maxWaitlist = event.getMaxWaitlist();
-                    java.util.List<String> finalList = event.getSelectedEntrantIds();
-                    int finalCount = finalList != null ? finalList.size() : 0;
+                    java.util.List<String> selectedEntrants =
+                            FirestoreFieldUtils.getStringList(documentSnapshot, "selectedEntrantIds");
+                    int finalCount = selectedEntrants.size();
                     int capacity = event.getCapacity();
+
                     boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
                     if (available) {
-                        tvAvailability.setText("可用性：可报名");
-                        tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                        tvAvailability.setText("Availability: Open");
+                        tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
                     } else {
-                        tvAvailability.setText("可用性：不可报名");
-                        tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                        tvAvailability.setText("Availability: Full");
+                        tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
                     }
                 }
             });

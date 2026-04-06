@@ -23,6 +23,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.example.wecookproject.model.Event;
 import com.example.wecookproject.model.EventComment;
@@ -162,19 +163,17 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                         : event.getDescription().trim();
                                 tvEventDescription.setText(description);
 
-                                // 可用性标签逻辑
-                                int waitlistCount = event.getCurrentWaitlistCount();
+                                // Availability label
                                 int maxWaitlist = event.getMaxWaitlist();
-                                List<String> acceptedEntrantIds = FirestoreFieldUtils.getStringList(documentSnapshot, "acceptedEntrantIds");
-                                int finalCount = acceptedEntrantIds != null ? acceptedEntrantIds.size() : 0;
+                                int finalCount = acceptedCount;
                                 int capacity = event.getCapacity();
                                 boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
                                 if (available) {
-                                    tvAvailability.setText("可用性：可报名");
-                                    tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                                    tvAvailability.setText("Availability: Open");
+                                    tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
                                 } else {
-                                    tvAvailability.setText("可用性：不可报名");
-                                    tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                                    tvAvailability.setText("Availability: Full");
+                                    tvAvailability.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
                                 }
                             }
                         } else {

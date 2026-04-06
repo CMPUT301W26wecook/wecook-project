@@ -85,17 +85,17 @@ public class AdminEventDetailFragment extends Fragment {
                 tvWaitlistStatus.setText(String.format(Locale.getDefault(), "Waitlist: %d/%d", event.getCurrentWaitlistCount(), event.getMaxWaitlist()));
                 tvDetails.setText(event.getDescription());
 
-                // 可用性标签逻辑
+
                 int waitlistCount = event.getCurrentWaitlistCount();
                 int maxWaitlist = event.getMaxWaitlist();
                 int finalCount = event.getSelectedEntrantIds() != null ? event.getSelectedEntrantIds().size() : 0;
                 int capacity = event.getCapacity();
                 boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
                 if (available) {
-                    tvAvailability.setText("可用性：可报名");
+                    tvAvailability.setText("Availability: Open");
                     tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
                 } else {
-                    tvAvailability.setText("可用性：不可报名");
+                    tvAvailability.setText("Availability: Full");
                     tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
                 }
 
