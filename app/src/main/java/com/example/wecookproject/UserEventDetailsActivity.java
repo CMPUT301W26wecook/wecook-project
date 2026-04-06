@@ -234,7 +234,8 @@ public class UserEventDetailsActivity extends AppCompatActivity {
                     db.collection("events")
                             .document(eventId)
                             .get()
-                            .addOnSuccessListener(eventSnapshot -> bindEvent(eventSnapshot, historyStatus))
+                            .addOnSuccessListener(eventSnapshot ->
+                                    bindEvent(eventSnapshot, historyStatus, historySnapshot.exists()))
                             .addOnFailureListener(e -> Toast.makeText(this, "Failed to load event", Toast.LENGTH_SHORT).show());
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to load history", Toast.LENGTH_SHORT).show());
@@ -259,7 +260,7 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * @param eventSnapshot event document snapshot
      * @param historyStatus entrant history status
      */
-    private void bindEvent(DocumentSnapshot eventSnapshot, String historyStatus) {
+    private void bindEvent(DocumentSnapshot eventSnapshot, String historyStatus, boolean hasHistory) {
         if (!eventSnapshot.exists()) {
             Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
             finish();
@@ -268,9 +269,24 @@ public class UserEventDetailsActivity extends AppCompatActivity {
 
         currentEvent = UserEventRecord.fromEventSnapshot(eventSnapshot, entrantId, historyStatus);
 
+        List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
+        List<String> privateInviteeIds = FirestoreFieldUtils.getStringList(
+                eventSnapshot,
+                EntrantWaitlistManager.FIELD_PRIVATE_WAITLIST_INVITEE_IDS
+        );
+        String visibilityTag = getSafeTrimmedString(eventSnapshot, "visibilityTag");
+        boolean hasPrivateAccess = hasHistory
+                || currentEvent.isEntrantOnWaitlist()
+                || selectedEntrantIds.contains(entrantId)
+                || privateInviteeIds.contains(entrantId);
+        if ("private".equalsIgnoreCase(visibilityTag) && !hasPrivateAccess) {
+            Toast.makeText(this, "This private event is no longer available", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         // If the organizer has selected this entrant in the lottery, promote status to "invited"
         // unless they have already accepted.
-        List<String> selectedEntrantIds = FirestoreFieldUtils.getStringList(eventSnapshot, "selectedEntrantIds");
         boolean isSelected = selectedEntrantIds != null && selectedEntrantIds.contains(entrantId);
         String effectiveStatus = currentEvent.getEffectiveStatus();
         boolean isAccepted = UserEventRecord.STATUS_ACCEPTED.equals(effectiveStatus);
@@ -482,6 +498,20 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             return;
         }
 
+        if (UserEventRecord.STATUS_WAITLIST_INVITED.equals(status)) {
+            btnSecondary.setVisibility(View.VISIBLE);
+            btnSecondary.setText("Reject");
+            btnSecondary.setOnClickListener(v -> rejectPrivateWaitlistInvite());
+            if (currentEvent.isWaitlistFull()) {
+                btnPrimary.setText("Waitlist Full");
+                btnPrimary.setEnabled(false);
+                return;
+            }
+            btnPrimary.setText("Join the Waitlist");
+            btnPrimary.setOnClickListener(v -> requestLocationAndJoinWaitlist());
+            return;
+        }
+
         if (currentEvent.isWaitlistFull()) {
             btnPrimary.setText("Waitlist Full");
             btnPrimary.setEnabled(false);
@@ -566,7 +596,26 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * @param entrantLocation entrant location, if available
      */
     private void joinWaitlist(Location entrantLocation) {
-        updateWaitlistMembership(true, UserEventRecord.STATUS_WAITLISTED, false, "Joined waiting list successfully", entrantLocation);
+        EntrantWaitlistManager.joinWaitlist(db, entrantId, eventId, entrantLocation)
+                .addOnSuccessListener(result -> {
+                    currentEvent.setWaitlistEntrantIds(result.getUpdatedWaitlistEntrantIds());
+                    currentEvent.setHistoryStatus(UserEventRecord.STATUS_WAITLISTED);
+                    NotificationHelper.markMatchingNotificationsAsConfirmed(
+                            db,
+                            entrantId,
+                            eventId,
+                            NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE
+                    );
+                    Toast.makeText(this, "Joined waiting list successfully", Toast.LENGTH_SHORT).show();
+                    loadEvent();
+                })
+                .addOnFailureListener(e -> {
+                    String message = e.getMessage();
+                    if (message == null || message.trim().isEmpty()) {
+                        message = "Unable to update event status";
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                });
     }
 
     /**
@@ -574,6 +623,26 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      */
     private void leaveWaitlist() {
         updateWaitlistMembership(false, null, true, "Left waiting list", null);
+    }
+
+    /**
+     * Declines a private waitlist invitation and removes private-event access.
+     */
+    private void rejectPrivateWaitlistInvite() {
+        EntrantWaitlistManager.declinePrivateWaitlistInvite(db, entrantId, eventId)
+                .addOnSuccessListener(unused ->
+                        NotificationHelper.markMatchingNotificationsAsDeclined(
+                                        db,
+                                        entrantId,
+                                        eventId,
+                                        NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE
+                                )
+                                .addOnCompleteListener(task -> {
+                                    Toast.makeText(this, "Private waitlist invitation declined", Toast.LENGTH_SHORT).show();
+                                    finish();
+                                }))
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline private waitlist invite", Toast.LENGTH_SHORT).show());
     }
 
     /**
@@ -867,26 +936,11 @@ public class UserEventDetailsActivity extends AppCompatActivity {
      * @param status status to store
      */
     private void upsertHistoryDocument(String status) {
-        Map<String, Object> historyData = new HashMap<>();
-        historyData.put("eventId", currentEvent.getEventId());
-        historyData.put("eventName", currentEvent.getEventName());
-        historyData.put("location", currentEvent.getLocation());
-        historyData.put("organizerId", currentEvent.getOrganizerId());
-        historyData.put("organizerName", "");
-        historyData.put("posterPath", currentEvent.getPosterPath());
-        historyData.put("eventTime", currentEvent.getEventTime());
-        historyData.put("registrationStartDate", currentEvent.getRegistrationStartDate());
-        historyData.put("registrationEndDate", currentEvent.getRegistrationEndDate());
-        historyData.put("description", currentEvent.getDescription());
-        historyData.put("status", status);
-        historyData.put("eventDeleted", false);
-        historyData.put("updatedAt", FieldValue.serverTimestamp());
-
         db.collection("users")
                 .document(entrantId)
                 .collection("eventHistory")
                 .document(currentEvent.getEventId())
-                .set(historyData);
+                .set(UserEventHistoryHelper.buildHistoryData(currentEvent, status));
     }
 
     /**

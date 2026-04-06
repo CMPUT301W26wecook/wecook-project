@@ -43,32 +43,45 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/ll_filter_row"
+        android:id="@+id/ll_filter_section"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="20dp"
         android:layout_marginTop="12dp"
         android:layout_marginEnd="20dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:weightSum="2"
+        android:orientation="vertical"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/ll_events_header">
 
-        <Spinner
-            android:id="@+id/spinner_capacity_filter"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:id="@+id/ll_filter_row"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <Spinner
+                android:id="@+id/spinner_capacity_filter"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1" />
+
+            <Spinner
+                android:id="@+id/spinner_availability_filter"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1" />
+        </LinearLayout>
 
         <Spinner
-            android:id="@+id/spinner_availability_filter"
-            android:layout_width="0dp"
+            android:id="@+id/spinner_eligibility_filter"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1" />
+            android:layout_marginTop="8dp" />
     </LinearLayout>
 
     <TextView
@@ -83,7 +96,7 @@
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ll_filter_row" />
+        app:layout_constraintTop_toBottomOf="@id/ll_filter_section" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_events"
@@ -98,7 +111,7 @@
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ll_filter_row" />
+        app:layout_constraintTop_toBottomOf="@id/ll_filter_section" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
@@ -110,4 +123,3 @@
         app:menu="@menu/user_bottom_nav" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
-

@@ -234,6 +234,9 @@ public class UserHistoryActivity extends AppCompatActivity {
                             "waitlistEntrantIds", waitlistEntrants,
                             "currentWaitlistCount", waitlistEntrants.size());
                 }
+                transaction.update(eventRef,
+                        EntrantWaitlistManager.FIELD_PRIVATE_WAITLIST_INVITEE_IDS,
+                        com.google.firebase.firestore.FieldValue.arrayRemove(entrantId));
             }
             transaction.delete(historyRef);
             return null;

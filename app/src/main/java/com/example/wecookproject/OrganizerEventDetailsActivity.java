@@ -66,6 +66,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
     private TextView tvOrganizerLabel;
     private EditText etComment;
     private Button btnPostComment;
+    private Button btnInviteEntrants;
     private TextView tvCommentsEmpty;
     private LinearLayout commentsContainer;
 
@@ -97,6 +98,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         geolocationSwitch.setClickable(false);
         etComment = findViewById(R.id.et_organizer_comment);
         btnPostComment = findViewById(R.id.btn_post_organizer_comment);
+        btnInviteEntrants = findViewById(R.id.btn_invite_entrants);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
         commentsContainer = findViewById(R.id.layout_comments_container);
         TextView tvAvailability = findViewById(R.id.tv_event_availability);
@@ -150,6 +152,9 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                         ? "Private"
                                         : "Public";
                                 tvEventVisibility.setText("Visibility: " + visibilityLabel);
+                                btnInviteEntrants.setVisibility(Event.VISIBILITY_PRIVATE.equals(event.getVisibilityTag())
+                                        ? View.VISIBLE
+                                        : View.GONE);
                                 geolocationSwitch.setChecked(event.isGeolocationRequired());
                                 
                                 String description = event.getDescription() == null
@@ -232,6 +237,20 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
             }
+        });
+
+        btnInviteEntrants.setOnClickListener(v -> {
+            if (eventId == null || eventId.trim().isEmpty()) {
+                Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (currentEvent == null || !Event.VISIBILITY_PRIVATE.equals(currentEvent.getVisibilityTag())) {
+                Toast.makeText(this, "Private invites are available only for private events", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent intent = new Intent(this, OrganizerPrivateWaitlistInviteActivity.class);
+            intent.putExtra("eventId", eventId);
+            startActivity(intent);
         });
         
         findViewById(R.id.btn_registration_map).setOnClickListener(v -> {
