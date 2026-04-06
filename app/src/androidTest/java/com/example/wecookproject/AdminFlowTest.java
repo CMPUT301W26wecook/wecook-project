@@ -97,6 +97,7 @@ public class AdminFlowTest {
     public void setUp() {
         cleanupTestData();
         setupTestData();
+        setupAdminAccount();
     }
 
     @After
@@ -564,6 +565,38 @@ public class AdminFlowTest {
         tasks.add(db.collection("events").document(EVENT_1_ID).collection("comments").document("comment_1").set(commentData));
 
         awaitTaskList(tasks, "seed");
+    }
+
+    private void setupAdminAccount() {
+        String androidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+
+        Map<String, Boolean> roles = new HashMap<>();
+        roles.put(UserDocumentUtils.ROLE_ADMIN, true);
+
+        User adminUser = new User(
+                "Admin St",
+                "",
+                androidId,
+                "1970-01-01",
+                "Edmonton",
+                "Canada",
+                "Test",
+                "Admin",
+                "T6G 2R3",
+                true,
+                roles
+        );
+
+        List<Task<Void>> tasks = new ArrayList<>();
+        tasks.add(db.collection("users").document(androidId).set(adminUser.toFirestoreMap()));
+
+        Map<String, Object> keyData = new HashMap<>();
+        keyData.put("key", "wecook_admin");
+        tasks.add(db.collection("app_config").document("admin_key").set(keyData));
+
+        awaitTaskList(tasks, "admin setup");
     }
 
     private void awaitTaskList(List<? extends Task<?>> tasks, String operation) {
