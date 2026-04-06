@@ -32,6 +32,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -53,6 +54,8 @@ import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
@@ -78,6 +81,7 @@ public class UserEventActivity extends AppCompatActivity {
     private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
     private static final String ELIGIBILITY_ALL = "Eligibility: All";
     private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
+    private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -91,9 +95,11 @@ public class UserEventActivity extends AppCompatActivity {
     private Spinner spinnerCapacityFilter;
     private Spinner spinnerAvailabilityFilter;
     private Spinner spinnerEligibilityFilter;
+    private SearchView searchEventKeyword;
     private String selectedCapacityLabel = CAPACITY_ALL;
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
     private String selectedEligibilityLabel = ELIGIBILITY_ALL;
+    private String keywordQuery = "";
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -131,6 +137,7 @@ public class UserEventActivity extends AppCompatActivity {
         spinnerCapacityFilter = findViewById(R.id.spinner_capacity_filter);
         spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
         spinnerEligibilityFilter = findViewById(R.id.spinner_eligibility_filter);
+        searchEventKeyword = findViewById(R.id.search_event_keyword);
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -336,11 +343,22 @@ public class UserEventActivity extends AppCompatActivity {
         boolean capacityFiltered = !CAPACITY_ALL.equals(selectedCapacityLabel);
         boolean availabilityFiltered = !AVAILABILITY_ALL.equals(selectedAvailabilityLabel);
         boolean eligibilityFiltered = ELIGIBILITY_JOINABLE.equals(selectedEligibilityLabel);
+        boolean searchingByKeyword = keywordQuery != null && !keywordQuery.trim().isEmpty();
 
         if (eligibilityFiltered) {
+            if (searchingByKeyword) {
+                return capacityFiltered || availabilityFiltered
+                        ? "No joinable events match your keyword and filters."
+                        : "No joinable events match your keyword.";
+            }
             return capacityFiltered || availabilityFiltered
                     ? "No joinable events match the current filters."
                     : "No joinable events right now.";
+        }
+        if (searchingByKeyword) {
+            return capacityFiltered || availabilityFiltered
+                    ? "No events match your keyword and filters."
+                    : "No events match your keyword.";
         }
         if (capacityFiltered || availabilityFiltered) {
             return "No events match the current filters.";
@@ -427,11 +445,29 @@ public class UserEventActivity extends AppCompatActivity {
                 // no-op
             }
         });
+
+        searchEventKeyword.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                keywordQuery = query == null ? "" : query.trim();
+                applyFiltersAndRender();
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                keywordQuery = newText == null ? "" : newText.trim();
+                applyFiltersAndRender();
+                return true;
+            }
+        });
     }
 
     private void applyFiltersAndRender() {
         eventList.clear();
         com.google.firebase.Timestamp currentTime = com.google.firebase.Timestamp.now();
+        boolean isKeywordSearchEnabled = keywordQuery != null && !keywordQuery.trim().isEmpty();
+        List<ScoredEventRecord> scoredRecords = new ArrayList<>();
         for (UserEventRecord eventRecord : allEventRecords) {
             if (!matchesCapacityFilter(eventRecord.getCapacity())) {
                 continue;
@@ -442,10 +478,46 @@ public class UserEventActivity extends AppCompatActivity {
             if (!matchesEligibilityFilter(eventRecord, currentTime)) {
                 continue;
             }
-            eventList.add(eventRecord);
+
+            if (!isKeywordSearchEnabled) {
+                eventList.add(eventRecord);
+                continue;
+            }
+
+            double score = EventSearchMatcher.score(keywordQuery, eventRecord);
+            if (score < KEYWORD_SCORE_THRESHOLD) {
+                continue;
+            }
+            scoredRecords.add(new ScoredEventRecord(eventRecord, score));
         }
+
+        if (isKeywordSearchEnabled) {
+            Collections.sort(scoredRecords, Comparator.comparingDouble(ScoredEventRecord::getScore).reversed());
+            for (ScoredEventRecord scoredRecord : scoredRecords) {
+                eventList.add(scoredRecord.getEventRecord());
+            }
+        }
+
         eventAdapter.notifyDataSetChanged();
         updateEmptyState();
+    }
+
+    private static final class ScoredEventRecord {
+        private final UserEventRecord eventRecord;
+        private final double score;
+
+        private ScoredEventRecord(UserEventRecord eventRecord, double score) {
+            this.eventRecord = eventRecord;
+            this.score = score;
+        }
+
+        private UserEventRecord getEventRecord() {
+            return eventRecord;
+        }
+
+        private double getScore() {
+            return score;
+        }
     }
 
     private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
