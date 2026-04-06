@@ -18,7 +18,7 @@ public class User {
     private String postalCode;
     private String phoneNumber;
     private boolean profileCompleted;
-    private String role;
+    private Map<String, Boolean> roles = new HashMap<>();
 
     /**
      * Default constructor required for Firebase.
@@ -39,9 +39,9 @@ public class User {
      * @param lastName          The user's last name.
      * @param postalCode        The user's postal code.
      * @param profileCompleted  True if the profile is fully filled out.
-     * @param role              The user role (e.g., "entrant").
+     * @param roles             A map of roles associated with the user.
      */
-    public User(String addressLine1, String addressLine2, String androidId, String birthday, String city, String country, String firstName, String lastName, String postalCode, boolean profileCompleted, String role) {
+    public User(String addressLine1, String addressLine2, String androidId, String birthday, String city, String country, String firstName, String lastName, String postalCode, boolean profileCompleted, Map<String, Boolean> roles) {
         this.addressLine1 = addressLine1;
         this.addressLine2 = addressLine2;
         this.androidId = androidId;
@@ -52,7 +52,7 @@ public class User {
         this.lastName = lastName;
         this.postalCode = postalCode;
         this.profileCompleted = profileCompleted;
-        this.role = role;
+        this.roles = roles;
     }
 
     public String getAddressLine1() { return addressLine1; }
@@ -77,8 +77,8 @@ public class User {
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public boolean isProfileCompleted() { return profileCompleted; }
     public void setProfileCompleted(boolean profileCompleted) { this.profileCompleted = profileCompleted; }
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    public Map<String, Boolean> getRoles() { return roles; }
+    public void setRoles(Map<String, Boolean> roles) { this.roles = roles; }
 
     /**
      * This get the full name of the user.
@@ -123,7 +123,7 @@ public class User {
         userMap.put("postalCode", postalCode);
         userMap.put("phoneNumber", phoneNumber);
         userMap.put("profileCompleted", profileCompleted);
-        userMap.put("role", role);
+        userMap.put("roles", roles);
         return userMap;
     }
 }

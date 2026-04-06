@@ -13,6 +13,8 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -25,7 +27,9 @@ public class AdminViewModelUnitTest {
     @Test
     public void selectUserShouldUpdateUserLiveDataAndClearEventLiveData() throws InterruptedException {
         AdminViewModel viewModel = new AdminViewModel();
-        User user = new User("Addr1", "", "id1", "1990-01-01", "Edmonton", "Canada", "Alice", "Admin", "T6G", true, "entrant");
+        Map<String, Boolean> roles = new HashMap<>();
+        roles.put("entrant", true);
+        User user = new User("Addr1", "", "id1", "1990-01-01", "Edmonton", "Canada", "Alice", "Admin", "T6G", true, roles);
 
         viewModel.selectUser(user);
 

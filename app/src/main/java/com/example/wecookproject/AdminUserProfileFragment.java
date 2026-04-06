@@ -13,7 +13,11 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.wecookproject.model.User;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A Fragment that displays the profile of a specific User for administrative purposes.
@@ -36,7 +40,7 @@ public class AdminUserProfileFragment extends Fragment {
     }
 
     /**
-        * Show User Profile UI and handles Admin interactions for deleting the account.
+     * Show User Profile UI and handles Admin interactions for deleting the account.
      *
      * @param inflater           Parent view to which the fragment's UI should be attached.
      * @param container          Parent view for the fragment's UI.
@@ -77,16 +81,63 @@ public class AdminUserProfileFragment extends Fragment {
         
         view.findViewById(R.id.btn_delete_account).setOnClickListener(v -> {
             if (user != null) {
-                db.collection("users").document(user.getAndroidId())
-                        .delete()
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "User account deleted", Toast.LENGTH_SHORT).show();
-                            getParentFragmentManager().popBackStack();
-                        })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ENTRANT, "User account deleted");
             }
         });
 
         return view;
+    }
+
+    /**
+     * Removes a specific role from a user document in Firestore.
+     * If the user only has the specified role, the entire document is deleted.
+     * Otherwise, only the specified role is removed from the roles map.
+     * After operation, it navigates back to AdminUserFragment.
+     *
+     * @param userId         The unique Android ID of the user.
+     * @param role           The role string to remove (e.g., "entrant").
+     * @param successMessage Message to display in a Toast upon successful deletion.
+     */
+    private void removeRoleFromUser(String userId, String role, String successMessage) {
+        db.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (!snapshot.exists()) {
+                        getParentFragmentManager().popBackStack();
+                        return;
+                    }
+
+                    if (UserDocumentUtils.getRoleCount(snapshot) <= 1) {
+                        db.collection("users")
+                                .document(userId)
+                                .delete()
+                                .addOnSuccessListener(unused -> {
+                                    Toast.makeText(getContext(), successMessage, Toast.LENGTH_SHORT).show();
+                                    getParentFragmentManager().popBackStack();
+                                })
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("roles." + role, FieldValue.delete());
+                    if (UserDocumentUtils.ROLE_ENTRANT.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))
+                            && UserDocumentUtils.hasRole(snapshot, UserDocumentUtils.ROLE_ORGANIZER)) {
+                        updates.put("role", UserDocumentUtils.ROLE_ORGANIZER);
+                    }
+                    db.collection("users")
+                            .document(userId)
+                            .update(updates)
+                            .addOnSuccessListener(unused -> {
+                                Toast.makeText(getContext(), successMessage, Toast.LENGTH_SHORT).show();
+                                getParentFragmentManager().popBackStack();
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
     }
 }

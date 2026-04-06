@@ -11,7 +11,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ListElementAdapterTest {
 
@@ -21,8 +23,10 @@ public class ListElementAdapterTest {
     @Before
     public void setUp() {
         itemList = new ArrayList<>();
-        itemList.add(new User("Addr1", "", "id1", "1990-01-01", "City1", "Country1", "First1", "Last1", "Post1", true, "entrant"));
-        itemList.add(new User("Addr2", "", "id2", "1991-01-01", "City2", "Country2", "First2", "Last2", "Post2", true, "entrant"));
+        Map<String, Boolean> roles = new HashMap<>();
+        roles.put("entrant", true);
+        itemList.add(new User("Addr1", "", "id1", "1990-01-01", "City1", "Country1", "First1", "Last1", "Post1", true, new HashMap<>(roles)));
+        itemList.add(new User("Addr2", "", "id2", "1991-01-01", "City2", "Country2", "First2", "Last2", "Post2", true, new HashMap<>(roles)));
 
         adapter = new ListElementAdapter<>(itemList, null);
     }
