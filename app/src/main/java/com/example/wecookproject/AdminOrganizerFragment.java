@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.wecookproject.model.User;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
@@ -91,7 +92,7 @@ public class AdminOrganizerFragment extends Fragment {
              */
             @Override
             public void onDelete(User user, int position) {
-                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ORGANIZER, "Organizer account deleted");
+                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ORGANIZER, "Organizer account cleaned");
             }
         });
 
@@ -100,7 +101,7 @@ public class AdminOrganizerFragment extends Fragment {
             for (int i = 0; i < filteredOrganizerList.size(); i++) {
                 if (selected.get(i)) {
                     User user = filteredOrganizerList.get(i);
-                    removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ORGANIZER, "Selected organizers deleted");
+                    removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ORGANIZER, "Selected organizers cleaned");
                 }
             }
         });
@@ -167,7 +168,8 @@ public class AdminOrganizerFragment extends Fragment {
     /**
      * Removes a specific role from a user document in Firestore.
      * If the user only has the specified role, the entire document is deleted.
-     * Otherwise, only the specified role is removed from the roles map.
+     * Otherwise, only the specified role is removed from the roles map and a cleanup flag is added.
+     * When an organizer is removed, also remove all events owned by them.
      *
      * @param userId         The unique Android ID of the user.
      * @param role           The role string to remove (e.g., "organizer").
@@ -180,6 +182,11 @@ public class AdminOrganizerFragment extends Fragment {
                 .addOnSuccessListener(snapshot -> {
                     if (!snapshot.exists()) {
                         return;
+                    }
+
+                    // If removing Organizer role, also clean up their events
+                    if (UserDocumentUtils.ROLE_ORGANIZER.equals(role)) {
+                        cleanupOrganizerEvents(userId);
                     }
 
                     if (UserDocumentUtils.getRoleCount(snapshot) <= 1) {
@@ -195,10 +202,15 @@ public class AdminOrganizerFragment extends Fragment {
 
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("roles." + role, FieldValue.delete());
+                    updates.put("roles.OrganizerRoleCleaned", true);
+
                     if (UserDocumentUtils.ROLE_ORGANIZER.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))
                             && UserDocumentUtils.hasRole(snapshot, UserDocumentUtils.ROLE_ENTRANT)) {
                         updates.put("role", UserDocumentUtils.ROLE_ENTRANT);
+                    } else if (role.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))) {
+                        updates.put("role", "");
                     }
+
                     db.collection("users")
                             .document(userId)
                             .update(updates)
@@ -209,5 +221,33 @@ public class AdminOrganizerFragment extends Fragment {
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(getContext(), "Error deleting organizer", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Finds and deletes all events owned by the specified organizer.
+     * For each event, it also cleans up its associated comments.
+     * @param organizerId The ID of the organizer whose events should be removed.
+     */
+    private void cleanupOrganizerEvents(String organizerId) {
+        db.collection("events")
+                .whereEqualTo("organizerId", organizerId)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        String eventId = doc.getId();
+                        db.collection("events").document(eventId).collection("comments")
+                                .get()
+                                .addOnSuccessListener(commentSnapshots -> {
+                                    for (DocumentSnapshot commentDoc : commentSnapshots) {
+                                        commentDoc.getReference().delete();
+                                    }
+                                    // Then delete the event itself
+                                    db.collection("events").document(eventId).delete()
+                                            .addOnSuccessListener(unused -> Log.d("AdminOrganizerFragment", "Deleted event and comments owned by removed organizer: " + eventId))
+                                            .addOnFailureListener(e -> Log.e("AdminOrganizerFragment", "Failed to delete event owned by removed organizer: " + eventId, e));
+                                });
+                    }
+                })
+                .addOnFailureListener(e -> Log.e("AdminOrganizerFragment", "Failed to query events for cleanup", e));
     }
 }

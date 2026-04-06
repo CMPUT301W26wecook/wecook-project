@@ -21,6 +21,8 @@ public final class UserEventUiUtils {
     private static final String EVENT_TIME_WITH_ZONE_PATTERN = "MMM d, yyyy h:mm a z";
     public static final String STATUS_OPEN = "open";
     public static final String STATUS_FULL = "full";
+    public static final String STATUS_CLOSED = "closed";
+    public static final String STATUS_NOT_STARTED = "not_started";
 
     /**
      * Utility class constructor.
@@ -202,8 +204,13 @@ public final class UserEventUiUtils {
                 break;
             case UserEventRecord.STATUS_REJECTED:
             case STATUS_FULL:
+            case STATUS_CLOSED:
                 backgroundColor = Color.parseColor("#FDECEC");
                 textColor = Color.parseColor("#B3261E");
+                break;
+            case STATUS_NOT_STARTED:
+                backgroundColor = Color.parseColor("#FFF9C4");
+                textColor = Color.parseColor("#FBC02D");
                 break;
             case STATUS_OPEN:
             default:
@@ -240,6 +247,10 @@ public final class UserEventUiUtils {
                 return "Rejected";
             case STATUS_FULL:
                 return "Full";
+            case STATUS_CLOSED:
+                return "Registration Closed";
+            case STATUS_NOT_STARTED:
+                return "Not Started";
             case STATUS_OPEN:
             default:
                 return "Open";

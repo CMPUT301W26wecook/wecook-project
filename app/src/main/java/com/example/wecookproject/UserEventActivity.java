@@ -719,6 +719,18 @@ public class UserEventActivity extends AppCompatActivity {
             return;
         }
 
+        if (eventRecord.isRegistrationClosed()) {
+            btnJoinWaitlist.setText("Registration Closed");
+            btnJoinWaitlist.setEnabled(false);
+            return;
+        }
+
+        if (eventRecord.isRegistrationNotStarted()) {
+            btnJoinWaitlist.setText("Not Started");
+            btnJoinWaitlist.setEnabled(false);
+            return;
+        }
+
         btnJoinWaitlist.setText("Join the Waitlist");
         btnJoinWaitlist.setOnClickListener(v -> requestLocationAndJoinWaitlist(eventRecord, dialog));
     }
@@ -1248,11 +1260,15 @@ public class UserEventActivity extends AppCompatActivity {
             holder.tvEventName.setText(eventItem.getEventName());
 
             if (eventItem.getEffectiveStatus().isEmpty()) {
-                UserEventUiUtils.applyStatusChip(
-                        holder.tvEventStatus,
-                        eventItem.isWaitlistFull() ? UserEventUiUtils.STATUS_FULL : UserEventUiUtils.STATUS_OPEN,
-                        false
-                );
+                if (eventItem.isWaitlistFull()) {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_FULL, false);
+                } else if (eventItem.isRegistrationClosed()) {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_CLOSED, false);
+                } else if (eventItem.isRegistrationNotStarted()) {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_NOT_STARTED, false);
+                } else {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_OPEN, false);
+                }
             } else {
                 UserEventUiUtils.applyStatusChip(holder.tvEventStatus, eventItem.getEffectiveStatus(), false);
             }

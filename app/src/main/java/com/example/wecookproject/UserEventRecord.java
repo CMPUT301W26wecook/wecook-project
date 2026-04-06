@@ -332,6 +332,28 @@ public class UserEventRecord {
     }
 
     /**
+     * Checks if the registration period is currently closed.
+     * @return true if current time is after the registration end date
+     */
+    public boolean isRegistrationClosed() {
+        if (registrationEndDate == null) {
+            return false;
+        }
+        return Timestamp.now().compareTo(registrationEndDate) > 0;
+    }
+
+    /**
+     * Checks if the registration period has not yet started.
+     * @return true if current time is before the registration start date
+     */
+    public boolean isRegistrationNotStarted() {
+        if (registrationStartDate == null) {
+            return false;
+        }
+        return Timestamp.now().compareTo(registrationStartDate) < 0;
+    }
+
+    /**
      * @return true when current entrant is in waitlist
      */
     public boolean isEntrantOnWaitlist() {

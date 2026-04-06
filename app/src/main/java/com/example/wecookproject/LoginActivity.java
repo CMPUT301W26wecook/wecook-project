@@ -8,9 +8,11 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.Source;
@@ -132,7 +134,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         } else {
             if (userDocument != null && userDocument.exists()) {
-                grantSelectedRoleAndRoute();
+                checkAndShowCleanedMessage(() -> grantSelectedRoleAndRoute());
                 return;
             }
             jumpIntent = new Intent(LoginActivity.this, SignupDetailsActivity.class);
@@ -145,6 +147,43 @@ public class LoginActivity extends AppCompatActivity {
         }
         if ("ADMIN".equals(clickedRole)) {
             startActivity(jumpIntent);
+        }
+    }
+
+    /**
+     * Checks if the currently selected role was previously cleaned by an admin and shows a message.
+     * Continues with the specified action after the user confirms the dialog.
+     *
+     * @param onConfirm Runnable to execute after confirmation or if no message is needed.
+     */
+    private void checkAndShowCleanedMessage(Runnable onConfirm) {
+        if (userDocument == null || !userDocument.exists()) {
+            onConfirm.run();
+            return;
+        }
+        Object rolesObj = userDocument.get("roles");
+        if (!(rolesObj instanceof Map)) {
+            onConfirm.run();
+            return;
+        }
+        Map<?, ?> roles = (Map<?, ?>) rolesObj;
+
+        String message = null;
+        if ("ENTRANT".equals(clickedRole) && Boolean.TRUE.equals(roles.get("EntrantRoleCleaned"))) {
+            message = "Your entrant user data was cleaned by Admin";
+        } else if ("ORGANIZER".equals(clickedRole) && Boolean.TRUE.equals(roles.get("OrganizerRoleCleaned"))) {
+            message = "Your organizer user data was cleaned by Admin";
+        }
+
+        if (message != null) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Account Cleaned")
+                    .setMessage(message)
+                    .setPositiveButton("OK", (dialog, which) -> onConfirm.run())
+                    .setCancelable(false)
+                    .show();
+        } else {
+            onConfirm.run();
         }
     }
 
@@ -169,14 +208,18 @@ public class LoginActivity extends AppCompatActivity {
 
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         Map<String, Object> updates = new HashMap<>();
-        Map<String, Object> roles = new HashMap<>();
-        roles.put(roleKey, true);
-        updates.put("roles", roles);
+        updates.put("roles." + roleKey, true);
+        
+        if (UserDocumentUtils.ROLE_ENTRANT.equals(roleKey)) {
+            updates.put("roles.EntrantRoleCleaned", FieldValue.delete());
+        } else if (UserDocumentUtils.ROLE_ORGANIZER.equals(roleKey)) {
+            updates.put("roles.OrganizerRoleCleaned", FieldValue.delete());
+        }
 
         FirebaseFirestore.getInstance()
                 .collection("users")
                 .document(androidId)
-                .set(updates, SetOptions.merge())
+                .update(updates)
                 .addOnSuccessListener(unused -> {
                     if (UserDocumentUtils.ROLE_ORGANIZER.equals(roleKey)) {
                         startActivity(new Intent(LoginActivity.this, OrganizerHomeActivity.class));
@@ -204,5 +247,3 @@ public class LoginActivity extends AppCompatActivity {
         return null;
     }
 }
-
-
