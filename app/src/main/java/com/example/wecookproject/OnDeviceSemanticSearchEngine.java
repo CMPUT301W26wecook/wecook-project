@@ -45,7 +45,12 @@ public class OnDeviceSemanticSearchEngine {
             return size() > MAX_EMBEDDING_CACHE;
         }
     };
-    private final Map<String, String> normalizedTextCache = new HashMap<>();
+    private final Map<String, String> normalizedTextCache = new LinkedHashMap<String, String>(MAX_EMBEDDING_CACHE, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > MAX_EMBEDDING_CACHE;
+        }
+    };
     private String cachedQueryKey = "";
     private float[] cachedQueryEmbedding;
 

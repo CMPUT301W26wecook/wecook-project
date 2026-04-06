@@ -90,6 +90,7 @@ public class UserEventActivity extends AppCompatActivity {
     private static final int SEMANTIC_TOP_N = 40;
     private static final double LEXICAL_WEIGHT = 0.55d;
     private static final double SEMANTIC_WEIGHT = 0.45d;
+    private static final long KEYWORD_SEARCH_DEBOUNCE_MS = 300L;
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -108,6 +109,7 @@ public class UserEventActivity extends AppCompatActivity {
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
     private String selectedEligibilityLabel = ELIGIBILITY_ALL;
     private String keywordQuery = "";
+    private Runnable pendingKeywordSearch;
     private OnDeviceSemanticSearchEngine semanticSearchEngine;
     private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
@@ -177,6 +179,10 @@ public class UserEventActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (pendingKeywordSearch != null) {
+            mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+            pendingKeywordSearch = null;
+        }
         searchExecutor.shutdownNow();
         try {
             if (!searchExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
@@ -479,6 +485,10 @@ public class UserEventActivity extends AppCompatActivity {
         searchEventKeyword.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
+                if (pendingKeywordSearch != null) {
+                    mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+                    pendingKeywordSearch = null;
+                }
                 keywordQuery = query == null ? "" : query.trim();
                 applyFiltersAndRender();
                 return true;
@@ -487,7 +497,14 @@ public class UserEventActivity extends AppCompatActivity {
             @Override
             public boolean onQueryTextChange(String newText) {
                 keywordQuery = newText == null ? "" : newText.trim();
-                applyFiltersAndRender();
+                if (pendingKeywordSearch != null) {
+                    mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+                }
+                pendingKeywordSearch = () -> {
+                    pendingKeywordSearch = null;
+                    applyFiltersAndRender();
+                };
+                mainThreadHandler.postDelayed(pendingKeywordSearch, KEYWORD_SEARCH_DEBOUNCE_MS);
                 return true;
             }
         });
