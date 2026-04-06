@@ -72,6 +72,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private Button sendNotificationButton;
     private Button assignCoOrganizerButton;
     private String organizerId;
+    private String primaryOrganizerId;
     private final Set<String> pendingCoOrganizerIds = new HashSet<>();
     private final Set<String> coOrganizerIds = new HashSet<>();
 
@@ -306,6 +307,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     // Extract and store the registration end date
                     registrationEndDate = documentSnapshot.getDate("registrationEndDate");
                     isPrivateEvent = "private".equalsIgnoreCase(documentSnapshot.getString("visibilityTag"));
+                    primaryOrganizerId = documentSnapshot.getString("organizerId");
 
                     List<String> entrantIds = readEntrantIds(documentSnapshot);
                     syncWaitlistCountIfNeeded(documentSnapshot, entrantIds.size());
@@ -480,11 +482,16 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         boolean hasSelection = !adapter.getSelectedEntrantIds().isEmpty();
         inviteSelectedButton.setVisibility(isPrivateEvent && hasSelection ? View.VISIBLE : View.GONE);
         if (assignCoOrganizerButton != null) {
-            assignCoOrganizerButton.setVisibility(hasSelection ? View.VISIBLE : View.GONE);
+            assignCoOrganizerButton.setVisibility(isPrimaryOrganizer() && hasSelection ? View.VISIBLE : View.GONE);
         }
     }
 
     private void assignSelectedCoOrganizers() {
+        if (!isPrimaryOrganizer()) {
+            Toast.makeText(this, "Only the primary organizer can assign co-organizers", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         List<String> selectedIds = adapter.getSelectedEntrantIds();
         if (selectedIds.isEmpty()) {
             Toast.makeText(this, "Select at least one entrant", Toast.LENGTH_SHORT).show();
@@ -905,6 +912,12 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                 searchableEntrants.remove(i);
             }
         }
+    }
+
+    private boolean isPrimaryOrganizer() {
+        return organizerId != null
+                && !organizerId.trim().isEmpty()
+                && organizerId.equals(primaryOrganizerId);
     }
 
     private void sendReplacementNotifications(List<String> entrantIds) {

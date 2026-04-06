@@ -74,6 +74,12 @@ public class OrganizerHomeActivity extends AppCompatActivity {
             return true;
         });
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadEvents();
+    }
     
     /**
      * Subscribes to organizer events with real-time updates.
