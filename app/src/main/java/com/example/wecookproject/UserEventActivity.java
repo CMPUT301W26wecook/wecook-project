@@ -12,6 +12,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -62,6 +64,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Entrant event list screen with waitlist and invitation actions.
@@ -82,6 +86,9 @@ public class UserEventActivity extends AppCompatActivity {
     private static final String ELIGIBILITY_ALL = "Eligibility: All";
     private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
     private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
+    private static final int SEMANTIC_TOP_N = 40;
+    private static final double LEXICAL_WEIGHT = 0.55d;
+    private static final double SEMANTIC_WEIGHT = 0.45d;
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -100,6 +107,10 @@ public class UserEventActivity extends AppCompatActivity {
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
     private String selectedEligibilityLabel = ELIGIBILITY_ALL;
     private String keywordQuery = "";
+    private OnDeviceSemanticSearchEngine semanticSearchEngine;
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
+    private int keywordSearchGeneration = 0;
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -138,6 +149,8 @@ public class UserEventActivity extends AppCompatActivity {
         spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
         spinnerEligibilityFilter = findViewById(R.id.spinner_eligibility_filter);
         searchEventKeyword = findViewById(R.id.search_event_keyword);
+        semanticSearchEngine = new OnDeviceSemanticSearchEngine(getApplicationContext());
+        searchExecutor.execute(() -> semanticSearchEngine.warmup());
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -158,6 +171,13 @@ public class UserEventActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEventsAndHistory();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        searchExecutor.shutdownNow();
+        semanticSearchEngine.close();
     }
 
     /**
@@ -464,6 +484,7 @@ public class UserEventActivity extends AppCompatActivity {
     }
 
     private void applyFiltersAndRender() {
+        keywordSearchGeneration++;
         eventList.clear();
         com.google.firebase.Timestamp currentTime = com.google.firebase.Timestamp.now();
         boolean isKeywordSearchEnabled = keywordQuery != null && !keywordQuery.trim().isEmpty();
@@ -496,10 +517,67 @@ public class UserEventActivity extends AppCompatActivity {
             for (ScoredEventRecord scoredRecord : scoredRecords) {
                 eventList.add(scoredRecord.getEventRecord());
             }
+            requestSemanticRerank(scoredRecords, keywordQuery, keywordSearchGeneration);
         }
 
         eventAdapter.notifyDataSetChanged();
         updateEmptyState();
+    }
+
+    private void requestSemanticRerank(List<ScoredEventRecord> lexicalScores,
+                                       String query,
+                                       int generation) {
+        if (lexicalScores.isEmpty()) {
+            return;
+        }
+
+        List<ScoredEventRecord> semanticWindow = SemanticRankingUtils.topN(lexicalScores, SEMANTIC_TOP_N);
+        List<OnDeviceSemanticSearchEngine.EventCandidate> candidates = new ArrayList<>();
+        Map<String, UserEventRecord> semanticRecordsById = new HashMap<>();
+        List<SemanticRankingUtils.ScoredId> lexicalWindowForBlend = new ArrayList<>();
+        for (ScoredEventRecord item : semanticWindow) {
+            candidates.add(new OnDeviceSemanticSearchEngine.EventCandidate(
+                    item.getEventRecord().getEventId(),
+                    EventSearchMatcher.buildSearchDocument(item.getEventRecord())
+            ));
+            semanticRecordsById.put(item.getEventRecord().getEventId(), item.getEventRecord());
+            lexicalWindowForBlend.add(new SemanticRankingUtils.ScoredId(item.getEventRecord().getEventId(), item.getScore()));
+        }
+
+        searchExecutor.execute(() -> {
+            Map<String, Double> semanticScores = semanticSearchEngine.score(query, candidates);
+            if (semanticScores.isEmpty()) {
+                return;
+            }
+
+            List<SemanticRankingUtils.ScoredId> blendedWindow = SemanticRankingUtils.blendTopWindow(
+                    lexicalWindowForBlend,
+                    semanticScores,
+                    LEXICAL_WEIGHT,
+                    SEMANTIC_WEIGHT
+            );
+
+            mainThreadHandler.post(() -> {
+                if (generation != keywordSearchGeneration) {
+                    return;
+                }
+                if (!query.equals(keywordQuery)) {
+                    return;
+                }
+                eventList.clear();
+                for (SemanticRankingUtils.ScoredId scoredItem : blendedWindow) {
+                    UserEventRecord record = semanticRecordsById.get(scoredItem.id);
+                    if (record != null) {
+                        eventList.add(record);
+                    }
+                }
+                for (int i = semanticWindow.size(); i < lexicalScores.size(); i++) {
+                    eventList.add(lexicalScores.get(i).getEventRecord());
+                }
+                eventAdapter.notifyDataSetChanged();
+                updateEmptyState();
+            });
+        });
     }
 
     private static final class ScoredEventRecord {

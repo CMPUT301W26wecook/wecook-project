@@ -35,7 +35,7 @@ public final class EventSearchMatcher {
             return 0;
         }
 
-        String normalizedText = normalize(buildEventText(eventRecord));
+        String normalizedText = normalize(buildSearchDocument(eventRecord));
         if (normalizedText.isEmpty()) {
             return 0;
         }
@@ -59,7 +59,13 @@ public final class EventSearchMatcher {
                 + (phraseBonus * 2.0);
     }
 
-    private static String buildEventText(UserEventRecord eventRecord) {
+    /**
+     * Builds the event text block used by lexical and semantic search.
+     *
+     * @param eventRecord event candidate
+     * @return concatenated searchable text
+     */
+    public static String buildSearchDocument(UserEventRecord eventRecord) {
         String name = valueOrEmpty(eventRecord.getEventName());
         String description = valueOrEmpty(eventRecord.getDescription());
         String location = valueOrEmpty(eventRecord.getLocation());
