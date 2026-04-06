@@ -23,6 +23,8 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 
 
 import java.util.ArrayList;
@@ -510,6 +512,9 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             if (selectedItem == null || !selectedItem.hasEntrantRole()) {
                 continue;
             }
+            if (!waitlistEntrantIds.contains(selectedId)) {
+                continue;
+            }
             if (organizerId.equals(selectedId) || pendingCoOrganizerIds.contains(selectedId) || coOrganizerIds.contains(selectedId)) {
                 continue;
             }
@@ -517,7 +522,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         }
 
         if (assignableIds.isEmpty()) {
-            Toast.makeText(this, "Selected users are already co-organizers or do not have entrant access", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Select entrants from this event's waitlist who are not already co-organizers", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -554,27 +559,49 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     pendingCoOrganizerIds.addAll(updatedPending);
                     removeEntrantsFromSearchResults(assignableIds);
                     removeEntrantsFromVisibleWaitlist(assignableIds);
-                    clearEntrantHistory(assignableIds);
-                    sendCoOrganizerNotifications(assignableIds);
-                    Toast.makeText(this, "Co-organizer invitation sent", Toast.LENGTH_SHORT).show();
-                    onWaitlistSelectionChanged();
+                    clearEntrantHistory(assignableIds)
+                            .addOnSuccessListener(historyUnused -> {
+                                sendCoOrganizerNotifications(assignableIds);
+                                Toast.makeText(this, "Co-organizer invitation sent", Toast.LENGTH_SHORT).show();
+                                onWaitlistSelectionChanged();
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this, "Assigned co-organizer, but failed to clear entrant history", Toast.LENGTH_LONG).show());
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to assign co-organizer", Toast.LENGTH_SHORT).show());
     }
 
-    private void clearEntrantHistory(List<String> entrantIds) {
+    private Task<Void> clearEntrantHistory(List<String> entrantIds) {
         if (entrantIds == null || entrantIds.isEmpty()) {
-            return;
+            return Tasks.forResult(null);
         }
+
+        List<Task<Void>> batchTasks = new ArrayList<>();
         WriteBatch batch = db.batch();
+        int operationCount = 0;
+
         for (String entrantId : entrantIds) {
-            batch.delete(db.collection("users")
-                    .document(entrantId)
-                    .collection("eventHistory")
-                    .document(eventId));
+            batch.delete(
+                    db.collection("users")
+                            .document(entrantId)
+                            .collection("eventHistory")
+                            .document(eventId)
+            );
+            operationCount++;
+
+            if (operationCount == 500) {
+                batchTasks.add(batch.commit());
+                batch = db.batch();
+                operationCount = 0;
+            }
         }
-        batch.commit();
+
+        if (operationCount > 0) {
+            batchTasks.add(batch.commit());
+        }
+
+        return Tasks.whenAll(batchTasks);
     }
 
     private void sendCoOrganizerNotifications(List<String> recipientIds) {

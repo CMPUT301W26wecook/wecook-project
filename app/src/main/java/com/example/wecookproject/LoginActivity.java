@@ -169,9 +169,7 @@ public class LoginActivity extends AppCompatActivity {
 
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         Map<String, Object> updates = new HashMap<>();
-        Map<String, Object> roles = new HashMap<>();
-        roles.put(roleKey, true);
-        updates.put("roles", roles);
+        updates.put("roles." + roleKey, true);
 
         FirebaseFirestore.getInstance()
                 .collection("users")

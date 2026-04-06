@@ -258,9 +258,7 @@ public class UserNotificationActivity extends AppCompatActivity {
             return null;
         }).addOnSuccessListener(unused -> {
             Map<String, Object> updates = new HashMap<>();
-            Map<String, Object> roles = new HashMap<>();
-            roles.put(UserDocumentUtils.ROLE_ORGANIZER, true);
-            updates.put("roles", roles);
+            updates.put("roles." + UserDocumentUtils.ROLE_ORGANIZER, true);
             db.collection("users")
                     .document(entrantId)
                     .set(updates, SetOptions.merge())
