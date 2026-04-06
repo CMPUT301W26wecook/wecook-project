@@ -6,16 +6,19 @@ import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
-import static androidx.test.espresso.matcher.ViewMatchers.hasSibling;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.ViewMatchers.hasSibling;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.fail;
 
 import android.view.View;
 
+import android.provider.Settings;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
@@ -24,6 +27,7 @@ import com.example.wecookproject.model.Event;
 import com.example.wecookproject.model.User;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import org.hamcrest.Matcher;
@@ -36,7 +40,9 @@ import org.junit.runner.RunWith;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
@@ -46,7 +52,7 @@ public class AdminFlowTest {
     private static final long FIRESTORE_TIMEOUT_SECONDS = 30;
     private static final int WAIT_RETRY_COUNT = 30;
     private static final long WAIT_INTERVAL_MS = 600;
-    private static final long UI_SETTLE_MS = 350;
+    private static final long UI_SETTLE_MS = 450;
     private static final String RUN_ID = String.valueOf(System.currentTimeMillis());
 
     private static final String USER_1_ID = "adminflow_user_1_" + RUN_ID;
@@ -61,6 +67,9 @@ public class AdminFlowTest {
     private static final String EVENT_1_ID = "adminflow_event_1_" + RUN_ID;
     private static final String EVENT_2_ID = "adminflow_event_2_" + RUN_ID;
     private static final String EVENT_3_ID = "adminflow_event_3_" + RUN_ID;
+
+    private static final String NOTIF_1_MSG = "AF Notification Msg " + RUN_ID;
+    private static final String COMMENT_1_TEXT = "AF Comment 1 " + RUN_ID;
 
     private static final String USER_1_NAME = "AFEntrant1 " + RUN_ID;
     private static final String USER_2_NAME = "AFEntrant2 " + RUN_ID;
@@ -99,16 +108,19 @@ public class AdminFlowTest {
     public void adminStoryLoginAndNavigateTabs() {
         navigateToAdminMainMenu();
 
+        performSearch(R.id.sv_user_search, RUN_ID);
         waitUntilVisible(withId(R.id.rv_user_list));
         waitUntilVisible(withText(USER_1_NAME));
 
         onView(withId(R.id.nav_organizers)).perform(click());
         safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_organizer_search, RUN_ID);
         waitUntilVisible(withId(R.id.rv_organizer_list));
         waitUntilVisible(withText(ORG_1_NAME));
 
         onView(withId(R.id.nav_events)).perform(click());
         safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_event_search, RUN_ID);
         waitUntilVisible(withId(R.id.rv_event_list));
         waitUntilVisible(withText(EVENT_1_NAME));
 
@@ -120,10 +132,11 @@ public class AdminFlowTest {
     @Test
     public void adminStoryViewEntrantProfileDetails() {
         navigateToAdminMainMenu();
+        performSearch(R.id.sv_user_search, RUN_ID);
         waitUntilVisible(withText(USER_1_NAME));
 
         onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(USER_1_NAME)))).perform(click());
-        waitUntilVisible(withText("Show Detail"));
+        safeSleep(UI_SETTLE_MS);
         onView(withText("Show Detail")).perform(click());
         safeSleep(UI_SETTLE_MS);
 
@@ -140,16 +153,18 @@ public class AdminFlowTest {
     @Test
     public void adminStoryDeleteEntrantFromListAndDetail() {
         navigateToAdminMainMenu();
+        performSearch(R.id.sv_user_search, RUN_ID);
         waitUntilVisible(withText(USER_1_NAME));
         waitUntilVisible(withText(USER_2_NAME));
 
         onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(USER_1_NAME)))).perform(click());
+        safeSleep(UI_SETTLE_MS);
         onView(withText("Delete")).perform(click());
         waitUntilUserDeleted(USER_1_ID);
         waitUntilGone(withText(USER_1_NAME));
 
         onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(USER_2_NAME)))).perform(click());
-        waitUntilVisible(withText("Show Detail"));
+        safeSleep(UI_SETTLE_MS);
         onView(withText("Show Detail")).perform(click());
         safeSleep(UI_SETTLE_MS);
         waitUntilVisible(withId(R.id.btn_delete_account));
@@ -169,12 +184,14 @@ public class AdminFlowTest {
 
         onView(withId(R.id.nav_organizers)).perform(click());
         safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_organizer_search, RUN_ID);
         waitUntilVisible(withId(R.id.rv_organizer_list));
         waitUntilVisible(withText(ORG_1_NAME));
         waitUntilVisible(withText(ORG_2_NAME));
         waitUntilVisible(withText(ORG_3_NAME));
 
         onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(ORG_1_NAME)))).perform(click());
+        safeSleep(UI_SETTLE_MS);
         onView(withText("Delete")).perform(click());
         safeSleep(UI_SETTLE_MS);
         waitUntilUserDeleted(ORG_1_ID);
@@ -197,10 +214,11 @@ public class AdminFlowTest {
 
         onView(withId(R.id.nav_events)).perform(click());
         safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_event_search, RUN_ID);
         waitUntilVisible(withText(EVENT_1_NAME));
 
         onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(EVENT_1_NAME)))).perform(click());
-        waitUntilVisible(withText("Show Detail"));
+        safeSleep(UI_SETTLE_MS);
         onView(withText("Show Detail")).perform(click());
         safeSleep(UI_SETTLE_MS);
 
@@ -219,11 +237,13 @@ public class AdminFlowTest {
 
         onView(withId(R.id.nav_events)).perform(click());
         safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_event_search, RUN_ID);
         waitUntilVisible(withText(EVENT_1_NAME));
         waitUntilVisible(withText(EVENT_2_NAME));
         waitUntilVisible(withText(EVENT_3_NAME));
 
         onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(EVENT_1_NAME)))).perform(click());
+        safeSleep(UI_SETTLE_MS);
         onView(withText("Delete")).perform(click());
         safeSleep(UI_SETTLE_MS);
         waitUntilEventDeleted(EVENT_1_ID);
@@ -240,6 +260,110 @@ public class AdminFlowTest {
         waitUntilGone(withText(EVENT_3_NAME));
     }
 
+    @Test
+    public void adminStoryBrowseNotifications() {
+        navigateToAdminMainMenu();
+
+        onView(withId(R.id.nav_notifications)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+
+        performSearch(R.id.sv_notification_search, RUN_ID);
+        waitUntilVisible(withId(R.id.rv_notification_list));
+        waitUntilVisible(withText(NOTIF_1_MSG));
+        waitUntilVisible(withText(EVENT_1_NAME));
+    }
+
+    @Test
+    public void adminStoryViewEventDetailAndManageComments() {
+        navigateToAdminMainMenu();
+
+        onView(withId(R.id.nav_events)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_event_search, RUN_ID);
+        waitUntilVisible(withText(EVENT_1_NAME));
+
+        onView(allOf(withId(R.id.btn_element_menu), hasSibling(withText(EVENT_1_NAME)))).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        onView(withText("Show Detail")).perform(click());
+        safeSleep(UI_SETTLE_MS);
+
+        waitUntilVisible(withId(R.id.tv_event_name_header));
+
+        onView(withId(R.id.btn_event_menu)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        onView(withText("Show Comments")).perform(click());
+        safeSleep(UI_SETTLE_MS);
+
+        waitUntilVisible(withText(COMMENT_1_TEXT));
+        onView(withId(R.id.btn_delete_comment)).perform(click());
+
+        waitUntilGone(withText(COMMENT_1_TEXT));
+    }
+
+    @Test
+    public void adminStoryCrossRoleSelfSearch() {
+        String androidId = Settings.Secure.getString(
+                ApplicationProvider.getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        try {
+            // Delete the device's user document so we can start completely fresh
+            Tasks.await(db.collection("users").document(androidId).delete(), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+        }
+
+        ActivityScenario.launch(LoginActivity.class);
+        safeSleep(UI_SETTLE_MS);
+
+        // 1. Sign up as Entrant (Initializes the profile with a searchable name)
+        onView(withId(R.id.btn_entrant_login)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+
+        waitUntilVisible(withId(R.id.et_first_name));
+        onView(withId(R.id.et_first_name)).perform(replaceText("AdminCrossRole"), closeSoftKeyboard());
+        onView(withId(R.id.et_last_name)).perform(replaceText("Tester"), closeSoftKeyboard());
+        onView(withId(R.id.et_birthday)).perform(replaceText("01/01/2000"), closeSoftKeyboard());
+        onView(withId(R.id.et_phone_number)).perform(replaceText("1234567890"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        safeSleep(UI_SETTLE_MS);
+        waitUntilVisible(withId(R.id.et_address_line_1));
+        onView(withId(R.id.et_address_line_1)).perform(replaceText("123 Admin Way"), closeSoftKeyboard());
+        onView(withId(R.id.et_city)).perform(replaceText("Edmonton"), closeSoftKeyboard());
+        onView(withId(R.id.et_postal_code)).perform(replaceText("T6G 2R3"), closeSoftKeyboard());
+        onView(withId(R.id.btn_continue)).perform(click());
+
+        safeSleep(WAIT_INTERVAL_MS * 5); // Wait for Firestore write and navigation
+        waitUntilVisible(withId(R.id.bottom_nav));
+
+        // 2. Login as Organizer (Grants the missing Organizer role to the same account)
+        ActivityScenario.launch(LoginActivity.class);
+        safeSleep(UI_SETTLE_MS);
+        onView(withId(R.id.btn_organizer_login)).perform(click());
+        safeSleep(WAIT_INTERVAL_MS * 5);
+        waitUntilVisible(withId(R.id.bottom_nav));
+
+        // 3. Login as Admin (Access the dashboard to perform search)
+        ActivityScenario.launch(LoginActivity.class);
+        safeSleep(UI_SETTLE_MS);
+        navigateToAdminMainMenu();
+
+        // 4. Search self in Entrant list
+        performSearch(R.id.sv_user_search, "AdminCrossRole");
+        waitUntilVisible(withText(containsString("AdminCrossRole Tester")));
+
+        // 5. Search self in Organizer list
+        onView(withId(R.id.nav_organizers)).perform(click());
+        safeSleep(UI_SETTLE_MS);
+        performSearch(R.id.sv_organizer_search, "AdminCrossRole");
+        waitUntilVisible(withText(containsString("AdminCrossRole Tester")));
+
+        // Cleanup generated cross-role user
+        try {
+            Tasks.await(db.collection("users").document(androidId).delete(), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void cleanupTestData() {
         List<Task<Void>> tasks = new ArrayList<>();
 
@@ -251,11 +375,16 @@ public class AdminFlowTest {
             tasks.add(db.collection("events").document(eventId).delete());
         }
 
+        tasks.add(db.collection("events").document(EVENT_1_ID).collection("comments").document("comment_1").delete());
+
         awaitTaskList(tasks, "cleanup");
     }
 
     private void setupTestData() {
         List<Task<Void>> tasks = new ArrayList<>();
+
+        Map<String, Boolean> organizerRoles = new HashMap<>();
+        organizerRoles.put("organizer", true);
 
         User organizer1 = new User(
                 "Org St 1",
@@ -268,7 +397,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T6G 2R3",
                 true,
-                "organizer"
+                organizerRoles
         );
         User organizer2 = new User(
                 "Org St 2",
@@ -281,7 +410,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T6G 2R3",
                 true,
-                "organizer"
+                organizerRoles
         );
         User organizer3 = new User(
                 "Org St 3",
@@ -294,12 +423,15 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T6G 2R3",
                 true,
-                "organizer"
+                organizerRoles
         );
 
         tasks.add(db.collection("users").document(ORG_1_ID).set(organizer1.toFirestoreMap()));
         tasks.add(db.collection("users").document(ORG_2_ID).set(organizer2.toFirestoreMap()));
         tasks.add(db.collection("users").document(ORG_3_ID).set(organizer3.toFirestoreMap()));
+
+        Map<String, Boolean> entrantRoles = new HashMap<>();
+        entrantRoles.put("entrant", true);
 
         User user1 = new User(
                 "User Ave 1",
@@ -312,7 +444,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRoles
         );
         User user2 = new User(
                 "User Ave 2",
@@ -325,7 +457,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRoles
         );
         User user3 = new User(
                 "User Ave 3",
@@ -338,7 +470,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRoles
         );
         User user4 = new User(
                 "User Ave 4",
@@ -351,7 +483,7 @@ public class AdminFlowTest {
                 RUN_ID,
                 "T2P 2M5",
                 true,
-                "entrant"
+                entrantRoles
         );
 
         tasks.add(db.collection("users").document(USER_1_ID).set(user1.toFirestoreMap()));
@@ -368,8 +500,9 @@ public class AdminFlowTest {
                 EVENT_1_NAME,
                 now,
                 weekLater,
+                now,
                 50,
-                10,
+                0,
                 false,
                 "Sample Location",
                 "Sample description 1"
@@ -382,8 +515,9 @@ public class AdminFlowTest {
                 EVENT_2_NAME,
                 now,
                 weekLater,
+                now,
                 50,
-                11,
+                0,
                 false,
                 "Sample Location",
                 "Sample description 2"
@@ -396,8 +530,9 @@ public class AdminFlowTest {
                 EVENT_3_NAME,
                 now,
                 weekLater,
+                now,
                 50,
-                12,
+                0,
                 false,
                 "Sample Location",
                 "Sample description 3"
@@ -408,6 +543,26 @@ public class AdminFlowTest {
         tasks.add(db.collection("events").document(EVENT_2_ID).set(event2));
         tasks.add(db.collection("events").document(EVENT_3_ID).set(event3));
 
+        // Seed a notification for USER_1
+        Map<String, Object> notifData = new HashMap<>();
+        notifData.put("eventId", EVENT_1_ID);
+        notifData.put("eventName", EVENT_1_NAME);
+        notifData.put("message", NOTIF_1_MSG);
+        notifData.put("status", "unread");
+        notifData.put("createdAt", Timestamp.now());
+        tasks.add(db.collection("users").document(USER_1_ID).collection("notifications").document("notif_1").set(notifData));
+
+        // Seed a comment for EVENT_1
+        Map<String, Object> commentData = new HashMap<>();
+        commentData.put("commentId", "comment_1");
+        commentData.put("eventId", EVENT_1_ID);
+        commentData.put("authorId", USER_1_ID);
+        commentData.put("authorName", USER_1_NAME);
+        commentData.put("authorRole", "entrant");
+        commentData.put("commentText", COMMENT_1_TEXT);
+        commentData.put("createdAt", Timestamp.now());
+        tasks.add(db.collection("events").document(EVENT_1_ID).collection("comments").document("comment_1").set(commentData));
+
         awaitTaskList(tasks, "seed");
     }
 
@@ -417,6 +572,12 @@ public class AdminFlowTest {
         } catch (Exception e) {
             fail("Firestore " + operation + " failed: " + e.getMessage());
         }
+    }
+
+    private void performSearch(int searchViewId, String text) {
+        onView(withId(searchViewId)).perform(click());
+        onView(withId(androidx.appcompat.R.id.search_src_text)).perform(replaceText(text), closeSoftKeyboard());
+        safeSleep(UI_SETTLE_MS);
     }
 
     private void waitUntilPosterCleared(String eventId) {
@@ -511,9 +672,8 @@ public class AdminFlowTest {
     private void navigateToAdminMainMenu() {
         onView(withId(R.id.text_Admin_login)).perform(click());
         safeSleep(UI_SETTLE_MS);
-        waitUntilVisible(withId(R.id.et_username));
-        onView(withId(R.id.et_username)).perform(replaceText("admin"), closeSoftKeyboard());
-        onView(withId(R.id.et_password)).perform(replaceText("admin"), closeSoftKeyboard());
+        waitUntilVisible(withId(R.id.et_password));
+        onView(withId(R.id.et_password)).perform(replaceText("wecook_admin"), closeSoftKeyboard());
         onView(withId(R.id.btn_login)).perform(click());
         safeSleep(UI_SETTLE_MS);
         waitUntilVisible(withId(R.id.bottom_nav));
