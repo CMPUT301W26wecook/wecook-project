@@ -112,6 +112,9 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         if (NotificationHelper.TYPE_CANCELLED_ENTRANT_OUTREACH.equals(type)) {
             return "Cancelled";
         }
+        if (NotificationHelper.TYPE_CO_ORGANIZER_INVITE.equals(type)) {
+            return "Co-organizer";
+        }
         return "Update";
     }
 

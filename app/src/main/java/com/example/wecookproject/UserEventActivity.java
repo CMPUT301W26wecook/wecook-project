@@ -12,6 +12,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -32,6 +34,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -52,32 +55,41 @@ import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Entrant event list screen with waitlist and invitation actions.
  */
 public class UserEventActivity extends AppCompatActivity {
-    private static final String CAPACITY_ALL = "Capacity: All";
-    private static final String CAPACITY_SMALL = "Capacity: Small";
-    private static final String CAPACITY_MEDIUM = "Capacity: Medium";
-    private static final String CAPACITY_LARGE = "Capacity: Large";
-    private static final String CAPACITY_VERY_LARGE = "Capacity: Very Large";
+    private static final String CAPACITY_ALL = UserEventFilterLogic.CAPACITY_ALL;
+    private static final String CAPACITY_SMALL = UserEventFilterLogic.CAPACITY_SMALL;
+    private static final String CAPACITY_MEDIUM = UserEventFilterLogic.CAPACITY_MEDIUM;
+    private static final String CAPACITY_LARGE = UserEventFilterLogic.CAPACITY_LARGE;
+    private static final String CAPACITY_VERY_LARGE = UserEventFilterLogic.CAPACITY_VERY_LARGE;
 
-    private static final String AVAILABILITY_ALL = "Availability: All";
-    private static final String AVAILABILITY_EARLY_MORNING = "Early Morning (06:00-09:59)";
-    private static final String AVAILABILITY_MORNING = "Morning (10:00-11:59)";
-    private static final String AVAILABILITY_AFTERNOON = "Afternoon (12:00-16:59)";
-    private static final String AVAILABILITY_EVENING = "Evening (17:00-20:59)";
-    private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
-    private static final String ELIGIBILITY_ALL = "Eligibility: All";
-    private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
+    private static final String AVAILABILITY_ALL = UserEventFilterLogic.AVAILABILITY_ALL;
+    private static final String AVAILABILITY_EARLY_MORNING = UserEventFilterLogic.AVAILABILITY_EARLY_MORNING;
+    private static final String AVAILABILITY_MORNING = UserEventFilterLogic.AVAILABILITY_MORNING;
+    private static final String AVAILABILITY_AFTERNOON = UserEventFilterLogic.AVAILABILITY_AFTERNOON;
+    private static final String AVAILABILITY_EVENING = UserEventFilterLogic.AVAILABILITY_EVENING;
+    private static final String AVAILABILITY_NIGHT = UserEventFilterLogic.AVAILABILITY_NIGHT;
+    private static final String ELIGIBILITY_ALL = UserEventFilterLogic.ELIGIBILITY_ALL;
+    private static final String ELIGIBILITY_JOINABLE = UserEventFilterLogic.ELIGIBILITY_JOINABLE;
+    private static final double KEYWORD_SCORE_THRESHOLD = UserEventFilterLogic.KEYWORD_SCORE_THRESHOLD;
+    private static final int SEMANTIC_TOP_N = 40;
+    private static final double LEXICAL_WEIGHT = 0.55d;
+    private static final double SEMANTIC_WEIGHT = 0.45d;
+    private static final long KEYWORD_SEARCH_DEBOUNCE_MS = 300L;
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -91,9 +103,16 @@ public class UserEventActivity extends AppCompatActivity {
     private Spinner spinnerCapacityFilter;
     private Spinner spinnerAvailabilityFilter;
     private Spinner spinnerEligibilityFilter;
+    private SearchView searchEventKeyword;
     private String selectedCapacityLabel = CAPACITY_ALL;
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
     private String selectedEligibilityLabel = ELIGIBILITY_ALL;
+    private String keywordQuery = "";
+    private Runnable pendingKeywordSearch;
+    private OnDeviceSemanticSearchEngine semanticSearchEngine;
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
+    private int keywordSearchGeneration = 0;
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -131,6 +150,9 @@ public class UserEventActivity extends AppCompatActivity {
         spinnerCapacityFilter = findViewById(R.id.spinner_capacity_filter);
         spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
         spinnerEligibilityFilter = findViewById(R.id.spinner_eligibility_filter);
+        searchEventKeyword = findViewById(R.id.search_event_keyword);
+        semanticSearchEngine = new OnDeviceSemanticSearchEngine(getApplicationContext());
+        searchExecutor.execute(() -> semanticSearchEngine.warmup());
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -151,6 +173,29 @@ public class UserEventActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadEventsAndHistory();
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_events);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (pendingKeywordSearch != null) {
+            mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+            pendingKeywordSearch = null;
+        }
+        searchExecutor.shutdownNow();
+        try {
+            if (!searchExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                searchExecutor.shutdownNow();
+            }
+        } catch (InterruptedException ie) {
+            searchExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        } finally {
+            semanticSearchEngine.close();
+        }
     }
 
     /**
@@ -165,7 +210,7 @@ public class UserEventActivity extends AppCompatActivity {
             if (itemId == R.id.nav_events) {
                 return true;
             } else if (itemId == R.id.nav_scan) {
-                Toast.makeText(this, "Scan (coming soon)", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(UserEventActivity.this, UserScanActivity.class));
                 return true;
             } else if (itemId == R.id.nav_history) {
                 Intent intent = new Intent(UserEventActivity.this, UserHistoryActivity.class);
@@ -256,11 +301,17 @@ public class UserEventActivity extends AppCompatActivity {
                         String eventId = document.getId();
                         String visibilityTag = document.getString("visibilityTag");
                         List<String> waitlistEntrants = FirestoreFieldUtils.getStringList(document, "waitlistEntrantIds");
+                        List<String> pendingCoOrganizers = FirestoreFieldUtils.getStringList(document, "pendingCoOrganizerIds");
+                        List<String> coOrganizers = FirestoreFieldUtils.getStringList(document, "coOrganizerIds");
                         boolean entrantOnWaitlist = waitlistEntrants != null && waitlistEntrants.contains(entrantId);
+                        boolean entrantPendingCoOrganizer = pendingCoOrganizers.contains(entrantId);
+                        boolean entrantIsCoOrganizer = coOrganizers.contains(entrantId);
                         boolean entrantHasHistory = historyEventIds.contains(eventId);
 
                         if (Event.VISIBILITY_PRIVATE.equalsIgnoreCase(visibilityTag)
                                 && !entrantOnWaitlist
+                                && !entrantPendingCoOrganizer
+                                && !entrantIsCoOrganizer
                                 && !entrantHasHistory) {
                             continue;
                         }
@@ -333,19 +384,12 @@ public class UserEventActivity extends AppCompatActivity {
     }
 
     private String resolveEmptyStateMessage() {
-        boolean capacityFiltered = !CAPACITY_ALL.equals(selectedCapacityLabel);
-        boolean availabilityFiltered = !AVAILABILITY_ALL.equals(selectedAvailabilityLabel);
-        boolean eligibilityFiltered = ELIGIBILITY_JOINABLE.equals(selectedEligibilityLabel);
-
-        if (eligibilityFiltered) {
-            return capacityFiltered || availabilityFiltered
-                    ? "No joinable events match the current filters."
-                    : "No joinable events right now.";
-        }
-        if (capacityFiltered || availabilityFiltered) {
-            return "No events match the current filters.";
-        }
-        return "No events available yet.";
+        return UserEventFilterLogic.resolveEmptyStateMessage(
+                selectedCapacityLabel,
+                selectedAvailabilityLabel,
+                selectedEligibilityLabel,
+                keywordQuery
+        );
     }
 
     private void setupFilterControls() {
@@ -427,11 +471,41 @@ public class UserEventActivity extends AppCompatActivity {
                 // no-op
             }
         });
+
+        searchEventKeyword.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                if (pendingKeywordSearch != null) {
+                    mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+                    pendingKeywordSearch = null;
+                }
+                keywordQuery = query == null ? "" : query.trim();
+                applyFiltersAndRender();
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                keywordQuery = newText == null ? "" : newText.trim();
+                if (pendingKeywordSearch != null) {
+                    mainThreadHandler.removeCallbacks(pendingKeywordSearch);
+                }
+                pendingKeywordSearch = () -> {
+                    pendingKeywordSearch = null;
+                    applyFiltersAndRender();
+                };
+                mainThreadHandler.postDelayed(pendingKeywordSearch, KEYWORD_SEARCH_DEBOUNCE_MS);
+                return true;
+            }
+        });
     }
 
     private void applyFiltersAndRender() {
+        keywordSearchGeneration++;
         eventList.clear();
         com.google.firebase.Timestamp currentTime = com.google.firebase.Timestamp.now();
+        boolean isKeywordSearchEnabled = keywordQuery != null && !keywordQuery.trim().isEmpty();
+        List<ScoredEventRecord> scoredRecords = new ArrayList<>();
         for (UserEventRecord eventRecord : allEventRecords) {
             if (!matchesCapacityFilter(eventRecord.getCapacity())) {
                 continue;
@@ -442,73 +516,119 @@ public class UserEventActivity extends AppCompatActivity {
             if (!matchesEligibilityFilter(eventRecord, currentTime)) {
                 continue;
             }
-            eventList.add(eventRecord);
+
+            if (!isKeywordSearchEnabled) {
+                eventList.add(eventRecord);
+                continue;
+            }
+
+            double score = EventSearchMatcher.score(keywordQuery, eventRecord);
+            if (score < KEYWORD_SCORE_THRESHOLD) {
+                continue;
+            }
+            scoredRecords.add(new ScoredEventRecord(eventRecord, score));
         }
+
+        if (isKeywordSearchEnabled) {
+            Collections.sort(scoredRecords, Comparator.comparingDouble(ScoredEventRecord::getScore).reversed());
+            for (ScoredEventRecord scoredRecord : scoredRecords) {
+                eventList.add(scoredRecord.getEventRecord());
+            }
+            requestSemanticRerank(scoredRecords, keywordQuery, keywordSearchGeneration);
+        }
+
         eventAdapter.notifyDataSetChanged();
         updateEmptyState();
     }
 
-    private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
-        if (ELIGIBILITY_ALL.equals(selectedEligibilityLabel)) {
-            return true;
+    private void requestSemanticRerank(List<ScoredEventRecord> lexicalScores,
+                                       String query,
+                                       int generation) {
+        if (lexicalScores.isEmpty()) {
+            return;
         }
-        return eventRecord.isJoinableAt(currentTime);
+
+        List<ScoredEventRecord> semanticWindow = SemanticRankingUtils.topN(lexicalScores, SEMANTIC_TOP_N);
+        List<OnDeviceSemanticSearchEngine.EventCandidate> candidates = new ArrayList<>();
+        Map<String, UserEventRecord> semanticRecordsById = new HashMap<>();
+        List<SemanticRankingUtils.ScoredId> lexicalWindowForBlend = new ArrayList<>();
+        for (ScoredEventRecord item : semanticWindow) {
+            candidates.add(new OnDeviceSemanticSearchEngine.EventCandidate(
+                    item.getEventRecord().getEventId(),
+                    EventSearchMatcher.buildSearchDocument(item.getEventRecord())
+            ));
+            semanticRecordsById.put(item.getEventRecord().getEventId(), item.getEventRecord());
+            lexicalWindowForBlend.add(new SemanticRankingUtils.ScoredId(item.getEventRecord().getEventId(), item.getScore()));
+        }
+
+        searchExecutor.execute(() -> {
+            Map<String, Double> semanticScores = semanticSearchEngine.score(query, candidates);
+            if (semanticScores.isEmpty()) {
+                return;
+            }
+
+            List<SemanticRankingUtils.ScoredId> blendedWindow = SemanticRankingUtils.blendTopWindow(
+                    lexicalWindowForBlend,
+                    semanticScores,
+                    LEXICAL_WEIGHT,
+                    SEMANTIC_WEIGHT
+            );
+
+            mainThreadHandler.post(() -> {
+                if (generation != keywordSearchGeneration) {
+                    return;
+                }
+                if (!query.equals(keywordQuery)) {
+                    return;
+                }
+                eventList.clear();
+                for (SemanticRankingUtils.ScoredId scoredItem : blendedWindow) {
+                    UserEventRecord record = semanticRecordsById.get(scoredItem.id);
+                    if (record != null) {
+                        eventList.add(record);
+                    }
+                }
+                for (int i = semanticWindow.size(); i < lexicalScores.size(); i++) {
+                    eventList.add(lexicalScores.get(i).getEventRecord());
+                }
+                eventAdapter.notifyDataSetChanged();
+                updateEmptyState();
+            });
+        });
+    }
+
+    private static final class ScoredEventRecord {
+        private final UserEventRecord eventRecord;
+        private final double score;
+
+        private ScoredEventRecord(UserEventRecord eventRecord, double score) {
+            this.eventRecord = eventRecord;
+            this.score = score;
+        }
+
+        private UserEventRecord getEventRecord() {
+            return eventRecord;
+        }
+
+        private double getScore() {
+            return score;
+        }
+    }
+
+    private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
+        return UserEventFilterLogic.matchesEligibilityFilter(
+                selectedEligibilityLabel,
+                eventRecord,
+                currentTime
+        );
     }
 
     private boolean matchesCapacityFilter(int capacity) {
-        if (CAPACITY_ALL.equals(selectedCapacityLabel)) {
-            return true;
-        }
-        if (capacity <= 0) {
-            return false;
-        }
-        if (CAPACITY_SMALL.equals(selectedCapacityLabel)) {
-            return capacity <= 20;
-        }
-        if (CAPACITY_MEDIUM.equals(selectedCapacityLabel)) {
-            return capacity >= 21 && capacity <= 50;
-        }
-        if (CAPACITY_LARGE.equals(selectedCapacityLabel)) {
-            return capacity >= 51 && capacity <= 100;
-        }
-        if (CAPACITY_VERY_LARGE.equals(selectedCapacityLabel)) {
-            return capacity >= 101;
-        }
-        return true;
+        return UserEventFilterLogic.matchesCapacityFilter(selectedCapacityLabel, capacity);
     }
 
     private boolean matchesAvailabilityFilter(com.google.firebase.Timestamp eventTime) {
-        if (AVAILABILITY_ALL.equals(selectedAvailabilityLabel)) {
-            return true;
-        }
-        if (eventTime == null) {
-            return false;
-        }
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(eventTime.toDate());
-        int minutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE);
-
-        if (AVAILABILITY_EARLY_MORNING.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 6 * 60, 9 * 60 + 59);
-        }
-        if (AVAILABILITY_MORNING.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 10 * 60, 11 * 60 + 59);
-        }
-        if (AVAILABILITY_AFTERNOON.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 12 * 60, 16 * 60 + 59);
-        }
-        if (AVAILABILITY_EVENING.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 17 * 60, 20 * 60 + 59);
-        }
-        if (AVAILABILITY_NIGHT.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 21 * 60, 23 * 60 + 59);
-        }
-        return true;
-    }
-
-    private boolean inMinuteRange(int value, int minInclusive, int maxInclusive) {
-        return value >= minInclusive && value <= maxInclusive;
+        return UserEventFilterLogic.matchesAvailabilityFilter(selectedAvailabilityLabel, eventTime);
     }
 
     private void maybeShowSelectionConfirmationPopup() {
@@ -687,6 +807,18 @@ public class UserEventActivity extends AppCompatActivity {
             return;
         }
 
+        if (UserEventRecord.STATUS_CO_ORGANIZER_PENDING.equals(status)) {
+            btnJoinWaitlist.setText("Co-organizer Invite Pending");
+            btnJoinWaitlist.setEnabled(false);
+            return;
+        }
+
+        if (UserEventRecord.STATUS_CO_ORGANIZER.equals(status)) {
+            btnJoinWaitlist.setText("Sign in as Organizer");
+            btnJoinWaitlist.setOnClickListener(v -> startActivity(new Intent(this, LoginActivity.class)));
+            return;
+        }
+
         if (UserEventRecord.STATUS_REJECTED.equals(status)) {
             btnJoinWaitlist.setText("Rejected");
             btnJoinWaitlist.setEnabled(false);
@@ -715,6 +847,18 @@ public class UserEventActivity extends AppCompatActivity {
 
         if (eventRecord.isWaitlistFull()) {
             btnJoinWaitlist.setText("Waitlist Full");
+            btnJoinWaitlist.setEnabled(false);
+            return;
+        }
+
+        if (eventRecord.isRegistrationClosed()) {
+            btnJoinWaitlist.setText("Registration Closed");
+            btnJoinWaitlist.setEnabled(false);
+            return;
+        }
+
+        if (eventRecord.isRegistrationNotStarted()) {
+            btnJoinWaitlist.setText("Not Started");
             btnJoinWaitlist.setEnabled(false);
             return;
         }
@@ -1020,7 +1164,12 @@ public class UserEventActivity extends AppCompatActivity {
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
             Object existingEntrantLocation = snapshot.get("waitlistEntrantLocations." + entrantId);
+            List<String> pendingCoOrganizers = FirestoreFieldUtils.getStringList(snapshot, "pendingCoOrganizerIds");
+            List<String> coOrganizers = FirestoreFieldUtils.getStringList(snapshot, "coOrganizerIds");
             if (addEntrant) {
+                if (pendingCoOrganizers.contains(entrantId) || coOrganizers.contains(entrantId)) {
+                    throw new IllegalStateException("Co-organizers cannot join the entrant pool for this event");
+                }
                 if (geolocationRequired && entrantLocation == null && !hasStoredEntrantLocation(existingEntrantLocation)) {
                     throw new IllegalStateException("Location is required to join this waitlist");
                 }
@@ -1248,11 +1397,15 @@ public class UserEventActivity extends AppCompatActivity {
             holder.tvEventName.setText(eventItem.getEventName());
 
             if (eventItem.getEffectiveStatus().isEmpty()) {
-                UserEventUiUtils.applyStatusChip(
-                        holder.tvEventStatus,
-                        eventItem.isWaitlistFull() ? UserEventUiUtils.STATUS_FULL : UserEventUiUtils.STATUS_OPEN,
-                        false
-                );
+                if (eventItem.isWaitlistFull()) {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_FULL, false);
+                } else if (eventItem.isRegistrationClosed()) {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_CLOSED, false);
+                } else if (eventItem.isRegistrationNotStarted()) {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_NOT_STARTED, false);
+                } else {
+                    UserEventUiUtils.applyStatusChip(holder.tvEventStatus, UserEventUiUtils.STATUS_OPEN, false);
+                }
             } else {
                 UserEventUiUtils.applyStatusChip(holder.tvEventStatus, eventItem.getEffectiveStatus(), false);
             }
@@ -1325,8 +1478,9 @@ public class UserEventActivity extends AppCompatActivity {
             linkView.setTextColor(Color.BLUE);
             linkView.setPaintFlags(linkView.getPaintFlags() | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
             linkView.setOnClickListener(v -> {
-                Intent openIntent = new Intent(this, PublicEventLandingActivity.class);
-                openIntent.setData(Uri.parse(payload));
+                Intent openIntent = new Intent(this, UserEventDetailsActivity.class);
+                String eventIdFromPayload = payload.substring("https://wecook.app/event/".length());
+                openIntent.putExtra("eventId", eventIdFromPayload);
                 startActivity(openIntent);
             });
             linkView.setOnLongClickListener(v -> {

@@ -29,6 +29,7 @@ public final class NotificationHelper {
     public static final String TYPE_ROSTER_UPDATED = "roster_updated";
     /** Organizer outreach to entrants whose registration is cancelled (declined). */
     public static final String TYPE_CANCELLED_ENTRANT_OUTREACH = "cancelled_entrant_outreach";
+    public static final String TYPE_CO_ORGANIZER_INVITE = "co_organizer_invite";
 
     private NotificationHelper() { }
 

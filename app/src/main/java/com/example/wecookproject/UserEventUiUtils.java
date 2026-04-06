@@ -21,6 +21,8 @@ public final class UserEventUiUtils {
     private static final String EVENT_TIME_WITH_ZONE_PATTERN = "MMM d, yyyy h:mm a z";
     public static final String STATUS_OPEN = "open";
     public static final String STATUS_FULL = "full";
+    public static final String STATUS_CLOSED = "closed";
+    public static final String STATUS_NOT_STARTED = "not_started";
 
     /**
      * Utility class constructor.
@@ -200,10 +202,23 @@ public final class UserEventUiUtils {
                 backgroundColor = Color.parseColor("#ECE3FF");
                 textColor = Color.parseColor("#5B3E96");
                 break;
+            case UserEventRecord.STATUS_CO_ORGANIZER_PENDING:
+                backgroundColor = Color.parseColor("#FFF4D6");
+                textColor = Color.parseColor("#8A6116");
+                break;
+            case UserEventRecord.STATUS_CO_ORGANIZER:
+                backgroundColor = Color.parseColor("#E4F0E8");
+                textColor = Color.parseColor("#256343");
+                break;
             case UserEventRecord.STATUS_REJECTED:
             case STATUS_FULL:
+            case STATUS_CLOSED:
                 backgroundColor = Color.parseColor("#FDECEC");
                 textColor = Color.parseColor("#B3261E");
+                break;
+            case STATUS_NOT_STARTED:
+                backgroundColor = Color.parseColor("#FFF9C4");
+                textColor = Color.parseColor("#FBC02D");
                 break;
             case STATUS_OPEN:
             default:
@@ -236,10 +251,18 @@ public final class UserEventUiUtils {
                 return invitedAsPicked ? "Picked" : "Invited";
             case UserEventRecord.STATUS_ACCEPTED:
                 return "Accepted";
+            case UserEventRecord.STATUS_CO_ORGANIZER_PENDING:
+                return "Co-organizer Invite";
+            case UserEventRecord.STATUS_CO_ORGANIZER:
+                return "Co-organizer";
             case UserEventRecord.STATUS_REJECTED:
                 return "Rejected";
             case STATUS_FULL:
                 return "Full";
+            case STATUS_CLOSED:
+                return "Registration Closed";
+            case STATUS_NOT_STARTED:
+                return "Not Started";
             case STATUS_OPEN:
             default:
                 return "Open";

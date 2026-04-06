@@ -497,6 +497,18 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             return;
         }
 
+        if (UserEventRecord.STATUS_CO_ORGANIZER_PENDING.equals(status)) {
+            btnPrimary.setText("Co-organizer Invite Pending");
+            btnPrimary.setEnabled(false);
+            return;
+        }
+
+        if (UserEventRecord.STATUS_CO_ORGANIZER.equals(status)) {
+            btnPrimary.setText("Sign in as Organizer");
+            btnPrimary.setOnClickListener(v -> startActivity(new Intent(this, LoginActivity.class)));
+            return;
+        }
+
         if (UserEventRecord.STATUS_REJECTED.equals(status)) {
             btnPrimary.setText("Rejected");
             btnPrimary.setEnabled(false);
@@ -786,7 +798,12 @@ public class UserEventDetailsActivity extends AppCompatActivity {
             Boolean geolocationRequiredValue = snapshot.getBoolean("geolocationRequired");
             boolean geolocationRequired = geolocationRequiredValue == null || geolocationRequiredValue;
             Object existingEntrantLocation = snapshot.get("waitlistEntrantLocations." + entrantId);
+            List<String> pendingCoOrganizers = FirestoreFieldUtils.getStringList(snapshot, "pendingCoOrganizerIds");
+            List<String> coOrganizers = FirestoreFieldUtils.getStringList(snapshot, "coOrganizerIds");
             if (addEntrant) {
+                if (pendingCoOrganizers.contains(entrantId) || coOrganizers.contains(entrantId)) {
+                    throw new IllegalStateException("Co-organizers cannot join the entrant pool for this event");
+                }
                 if (geolocationRequired && entrantLocation == null && !hasStoredEntrantLocation(existingEntrantLocation)) {
                     throw new IllegalStateException("Location is required to join this waitlist");
                 }

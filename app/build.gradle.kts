@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.activity:activity:1.8.2")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 
     // Google Play Services location
     implementation("com.google.android.gms:play-services-location:21.3.0")
@@ -65,9 +66,11 @@ dependencies {
     implementation("androidx.navigation:navigation-fragment:2.9.7")
     implementation("androidx.navigation:navigation-ui:2.9.7")
 
-    // Camera (if needed)
+    // Camera
     implementation("androidx.camera:camera-core:1.3.1")
     implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

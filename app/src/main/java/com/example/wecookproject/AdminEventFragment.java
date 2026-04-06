@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.wecookproject.model.Event;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
@@ -102,13 +103,7 @@ public class AdminEventFragment extends Fragment {
              */
             @Override
             public void onDelete(Event event, int position) {
-                db.collection("events").document(event.getEventId())
-                        .delete()
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "Event deleted", Toast.LENGTH_SHORT).show();
-                        })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Error deleting event", Toast.LENGTH_SHORT).show());
-
+                deleteEvent(event.getEventId(), true);
             }
         });
 
@@ -117,12 +112,47 @@ public class AdminEventFragment extends Fragment {
             for (int i = 0; i < filteredEventList.size(); i++) {
                 if (selected.get(i)) {
                     Event event = filteredEventList.get(i);
-                    db.collection("events").document(event.getEventId()).delete();
+                    deleteEvent(event.getEventId(), false);
                 }
             }
             Toast.makeText(getContext(), "Selected events deleted", Toast.LENGTH_SHORT).show();
         });
         return view;
+    }
+
+    /**
+     * Deletes an event and its associated comments from Firestore.
+     * 
+     * @param eventId    The ID of the event to delete.
+     * @param showToast  Whether to show a Toast message on success.
+     */
+    private void deleteEvent(String eventId, boolean showToast) {
+        if (eventId == null) return;
+
+        db.collection("events").document(eventId).collection("comments")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    for (DocumentSnapshot doc : queryDocumentSnapshots) {
+                        doc.getReference().delete();
+                    }
+
+                    db.collection("events").document(eventId)
+                            .delete()
+                            .addOnSuccessListener(aVoid -> {
+                                if (showToast) {
+                                    Toast.makeText(getContext(), "Event and comments deleted", Toast.LENGTH_SHORT).show();
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                if (showToast) {
+                                    Toast.makeText(getContext(), "Error deleting event", Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("AdminEventFragment", "Failed to delete comments for event: " + eventId, e);
+                    db.collection("events").document(eventId).delete();
+                });
     }
 
     /**
