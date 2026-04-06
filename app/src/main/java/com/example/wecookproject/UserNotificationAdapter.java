@@ -47,7 +47,12 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
 
         boolean actionEnabled;
         String actionText;
-        if (item.requiresConfirmation()) {
+        if (item.isPrivateWaitlistInvite()) {
+            actionEnabled = !item.isConfirmed() && !item.isDeclined();
+            actionText = item.isConfirmed()
+                    ? "Joined"
+                    : item.isDeclined() ? "Declined" : "Join";
+        } else if (item.requiresConfirmation()) {
             actionEnabled = !item.isConfirmed();
             actionText = item.isConfirmed() ? "Confirmed" : "Confirm";
         } else {
@@ -92,6 +97,9 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         if (NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)) {
             return "Invitation";
         }
+        if (NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE.equals(type)) {
+            return "Private Waitlist";
+        }
         if (NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)) {
             return "Lottery";
         }
@@ -101,6 +109,9 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
         if (NotificationHelper.TYPE_REPLACEMENT_SELECTED.equals(type)) {
             return "Replacement";
         }
+        if (NotificationHelper.TYPE_CANCELLED_ENTRANT_OUTREACH.equals(type)) {
+            return "Cancelled";
+        }
         if (NotificationHelper.TYPE_CO_ORGANIZER_INVITE.equals(type)) {
             return "Co-organizer";
         }
@@ -108,6 +119,12 @@ public class UserNotificationAdapter extends RecyclerView.Adapter<UserNotificati
     }
 
     private static String formatStatus(UserNotificationItem item) {
+        if (item.isPrivateWaitlistInvite() && item.isDeclined()) {
+            return "Declined";
+        }
+        if (item.isPrivateWaitlistInvite() && item.isConfirmed()) {
+            return "Joined";
+        }
         if (item.isConfirmed()) {
             return "Confirmed";
         }

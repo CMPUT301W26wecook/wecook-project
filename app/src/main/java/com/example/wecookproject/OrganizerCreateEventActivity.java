@@ -62,6 +62,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private TextView btnRemovePoster;
     private Uri selectedPosterUri;
     private ActivityResultLauncher<String> posterPickerLauncher;
+    private boolean privateVisibilityHintShown;
 
     /**
      * Initializes event creation form, validators, and navigation.
@@ -103,6 +104,12 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 showDatePicker(etEventTime, "Event Time"));
         flPosterUpload.setOnClickListener(v -> posterPickerLauncher.launch("image/*"));
         btnRemovePoster.setOnClickListener(v -> clearSelectedPoster());
+        rgEventVisibility.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rb_visibility_private && !privateVisibilityHintShown) {
+                privateVisibilityHintShown = true;
+                showPrivateEventInviteHint();
+            }
+        });
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setSelectedItemId(R.id.nav_create_events);
@@ -121,6 +128,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         findViewById(R.id.iv_back).setOnClickListener(v -> finish());
         findViewById(R.id.btn_cancel).setOnClickListener(v -> finish());
         findViewById(R.id.btn_create_event).setOnClickListener(v -> createEvent());
+    }
+
+    private void showPrivateEventInviteHint() {
+        new AlertDialog.Builder(this)
+                .setTitle("Private Event Reminder")
+                .setMessage("Invites are not added during event creation. Add them later from the Event Info page after the private event is created.")
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private void createEvent() {

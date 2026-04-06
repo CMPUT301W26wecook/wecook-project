@@ -9,6 +9,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -30,6 +31,7 @@ public class AdminEventFragment extends Fragment {
     private RecyclerView recyclerView;
     private ListElementAdapter<Event> adapter;
     private List<Event> eventList;
+    private List<Event> filteredEventList;
     private FirebaseFirestore db;
     private AdminViewModel viewModel;
 
@@ -54,10 +56,26 @@ public class AdminEventFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         eventList = new ArrayList<>();
-        adapter = new ListElementAdapter<>(eventList, viewModel);
+        filteredEventList = new ArrayList<>();
+        adapter = new ListElementAdapter<>(filteredEventList, viewModel);
         adapter.setShowDetailOption(true);
         adapter.setShowDeleteOption(true);
         recyclerView.setAdapter(adapter);
+
+        SearchView searchView = view.findViewById(R.id.sv_event_search);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                filter(query);
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                filter(newText);
+                return true;
+            }
+        });
 
         loadEventsFromFirestore();
 
@@ -96,15 +114,40 @@ public class AdminEventFragment extends Fragment {
 
         view.findViewById(R.id.btn_delete_selected).setOnClickListener(v -> {
             List<Boolean> selected = adapter.getSelectedList();
-            for (int i = 0; i < eventList.size(); i++) {
+            for (int i = 0; i < filteredEventList.size(); i++) {
                 if (selected.get(i)) {
-                    Event event = eventList.get(i);
+                    Event event = filteredEventList.get(i);
                     db.collection("events").document(event.getEventId()).delete();
                 }
             }
             Toast.makeText(getContext(), "Selected events deleted", Toast.LENGTH_SHORT).show();
         });
         return view;
+    }
+
+    /**
+     * Filters the event list based on the user's search query.
+     * It checks if the event name matches the search string.
+     *
+     * @param text The search query string.
+     */
+    private void filter(String text) {
+        filteredEventList.clear();
+        adapter.getSelectedList().clear();
+        if (text.isEmpty()) {
+            filteredEventList.addAll(eventList);
+        } else {
+            text = text.toLowerCase();
+            for (Event event : eventList) {
+                if (event.getEventName().toLowerCase().contains(text)) {
+                    filteredEventList.add(event);
+                }
+            }
+        }
+        for (int i = 0; i < filteredEventList.size(); i++) {
+            adapter.getSelectedList().add(false);
+        }
+        adapter.notifyDataSetChanged();
     }
 
     /**
@@ -119,15 +162,19 @@ public class AdminEventFragment extends Fragment {
                     }
 
                     eventList.clear();
-                    adapter.getSelectedList().clear();
                     if (value != null) {
                         for (QueryDocumentSnapshot doc : value) {
                             Event event = doc.toObject(Event.class);
                             eventList.add(event);
-                            adapter.getSelectedList().add(false);
                         }
                     }
-                    adapter.notifyDataSetChanged();
+                    
+                    SearchView searchView = getView() != null ? getView().findViewById(R.id.sv_event_search) : null;
+                    if (searchView != null) {
+                        filter(searchView.getQuery().toString());
+                    } else {
+                        filter("");
+                    }
                 });
     }
 }

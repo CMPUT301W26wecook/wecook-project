@@ -6,6 +6,7 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,12 +18,16 @@ public final class NotificationHelper {
     public static final String STATUS_UNREAD = "unread";
     public static final String STATUS_READ = "read";
     public static final String STATUS_CONFIRMED = "confirmed";
+    public static final String STATUS_DECLINED = "declined";
 
     public static final String TYPE_MANUAL_WAITLIST_UPDATE = "manual_waitlist_update";
     public static final String TYPE_PRIVATE_INVITE = "private_invite";
+    public static final String TYPE_PRIVATE_WAITLIST_INVITE = "private_waitlist_invite";
     public static final String TYPE_LOTTERY_SELECTED = "lottery_selected";
     public static final String TYPE_LOTTERY_NOT_SELECTED = "lottery_not_selected";
     public static final String TYPE_REPLACEMENT_SELECTED = "replacement_selected";
+    /** Organizer outreach to entrants whose registration is cancelled (declined). */
+    public static final String TYPE_CANCELLED_ENTRANT_OUTREACH = "cancelled_entrant_outreach";
     public static final String TYPE_CO_ORGANIZER_INVITE = "co_organizer_invite";
 
     private NotificationHelper() { }
@@ -113,6 +118,80 @@ public final class NotificationHelper {
                 .collection("notifications")
                 .document(notificationId)
                 .set(updates, SetOptions.merge());
+    }
+
+    /**
+     * Marks all notifications for one event/type pair as confirmed.
+     */
+    public static Task<Void> markMatchingNotificationsAsConfirmed(FirebaseFirestore db,
+                                                                  String recipientId,
+                                                                  String eventId,
+                                                                  String type) {
+        if (db == null || isBlank(recipientId) || isBlank(eventId) || isBlank(type)) {
+            return Tasks.forResult(null);
+        }
+
+        return db.collection("users")
+                .document(recipientId)
+                .collection("notifications")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("type", type)
+                .get()
+                .continueWithTask(queryTask -> {
+                    if (!queryTask.isSuccessful() || queryTask.getResult() == null
+                            || queryTask.getResult().isEmpty()) {
+                        return Tasks.forResult(null);
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("status", STATUS_CONFIRMED);
+                    updates.put("confirmedAt", FieldValue.serverTimestamp());
+                    updates.put("readAt", FieldValue.serverTimestamp());
+
+                    WriteBatch batch = db.batch();
+                    for (com.google.firebase.firestore.DocumentSnapshot snapshot
+                            : queryTask.getResult().getDocuments()) {
+                        batch.set(snapshot.getReference(), updates, SetOptions.merge());
+                    }
+                    return batch.commit();
+                });
+    }
+
+    /**
+     * Marks all notifications for one event/type pair as declined.
+     */
+    public static Task<Void> markMatchingNotificationsAsDeclined(FirebaseFirestore db,
+                                                                 String recipientId,
+                                                                 String eventId,
+                                                                 String type) {
+        if (db == null || isBlank(recipientId) || isBlank(eventId) || isBlank(type)) {
+            return Tasks.forResult(null);
+        }
+
+        return db.collection("users")
+                .document(recipientId)
+                .collection("notifications")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("type", type)
+                .get()
+                .continueWithTask(queryTask -> {
+                    if (!queryTask.isSuccessful() || queryTask.getResult() == null
+                            || queryTask.getResult().isEmpty()) {
+                        return Tasks.forResult(null);
+                    }
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("status", STATUS_DECLINED);
+                    updates.put("readAt", FieldValue.serverTimestamp());
+                    updates.put("declinedAt", FieldValue.serverTimestamp());
+
+                    WriteBatch batch = db.batch();
+                    for (com.google.firebase.firestore.DocumentSnapshot snapshot
+                            : queryTask.getResult().getDocuments()) {
+                        batch.set(snapshot.getReference(), updates, SetOptions.merge());
+                    }
+                    return batch.commit();
+                });
     }
 
     private static String safeValue(String value) {

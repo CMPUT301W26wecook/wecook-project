@@ -76,6 +76,8 @@ public class UserEventActivity extends AppCompatActivity {
     private static final String AVAILABILITY_AFTERNOON = "Afternoon (12:00-16:59)";
     private static final String AVAILABILITY_EVENING = "Evening (17:00-20:59)";
     private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
+    private static final String ELIGIBILITY_ALL = "Eligibility: All";
+    private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final List<UserEventRecord> eventList = new ArrayList<>();
@@ -88,8 +90,10 @@ public class UserEventActivity extends AppCompatActivity {
     private BottomNavigationView bottomNav;
     private Spinner spinnerCapacityFilter;
     private Spinner spinnerAvailabilityFilter;
+    private Spinner spinnerEligibilityFilter;
     private String selectedCapacityLabel = CAPACITY_ALL;
     private String selectedAvailabilityLabel = AVAILABILITY_ALL;
+    private String selectedEligibilityLabel = ELIGIBILITY_ALL;
     private FusedLocationProviderClient fusedLocationClient;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private UserEventRecord pendingJoinEventRecord;
@@ -126,6 +130,7 @@ public class UserEventActivity extends AppCompatActivity {
         bottomNav = findViewById(R.id.bottom_nav);
         spinnerCapacityFilter = findViewById(R.id.spinner_capacity_filter);
         spinnerAvailabilityFilter = findViewById(R.id.spinner_availability_filter);
+        spinnerEligibilityFilter = findViewById(R.id.spinner_eligibility_filter);
         findViewById(R.id.btn_view_lottery_criteria).setOnClickListener(v ->
                 startActivity(new Intent(this, UserLotteryCriteriaActivity.class)));
 
@@ -324,12 +329,29 @@ public class UserEventActivity extends AppCompatActivity {
      */
     private void updateEmptyState() {
         if (eventList.isEmpty()) {
+            tvEmptyState.setText(resolveEmptyStateMessage());
             tvEmptyState.setVisibility(View.VISIBLE);
             rvEvents.setVisibility(View.GONE);
         } else {
             tvEmptyState.setVisibility(View.GONE);
             rvEvents.setVisibility(View.VISIBLE);
         }
+    }
+
+    private String resolveEmptyStateMessage() {
+        boolean capacityFiltered = !CAPACITY_ALL.equals(selectedCapacityLabel);
+        boolean availabilityFiltered = !AVAILABILITY_ALL.equals(selectedAvailabilityLabel);
+        boolean eligibilityFiltered = ELIGIBILITY_JOINABLE.equals(selectedEligibilityLabel);
+
+        if (eligibilityFiltered) {
+            return capacityFiltered || availabilityFiltered
+                    ? "No joinable events match the current filters."
+                    : "No joinable events right now.";
+        }
+        if (capacityFiltered || availabilityFiltered) {
+            return "No events match the current filters.";
+        }
+        return "No events available yet.";
     }
 
     private void setupFilterControls() {
@@ -362,6 +384,17 @@ public class UserEventActivity extends AppCompatActivity {
         availabilityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerAvailabilityFilter.setAdapter(availabilityAdapter);
 
+        ArrayAdapter<String> eligibilityAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                new String[]{
+                        ELIGIBILITY_ALL,
+                        ELIGIBILITY_JOINABLE
+                }
+        );
+        eligibilityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerEligibilityFilter.setAdapter(eligibilityAdapter);
+
         spinnerCapacityFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -387,10 +420,24 @@ public class UserEventActivity extends AppCompatActivity {
                 // no-op
             }
         });
+
+        spinnerEligibilityFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedEligibilityLabel = (String) parent.getItemAtPosition(position);
+                applyFiltersAndRender();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
+        });
     }
 
     private void applyFiltersAndRender() {
         eventList.clear();
+        com.google.firebase.Timestamp currentTime = com.google.firebase.Timestamp.now();
         for (UserEventRecord eventRecord : allEventRecords) {
             if (!matchesCapacityFilter(eventRecord.getCapacity())) {
                 continue;
@@ -398,10 +445,20 @@ public class UserEventActivity extends AppCompatActivity {
             if (!matchesAvailabilityFilter(eventRecord.getEventTime())) {
                 continue;
             }
+            if (!matchesEligibilityFilter(eventRecord, currentTime)) {
+                continue;
+            }
             eventList.add(eventRecord);
         }
         eventAdapter.notifyDataSetChanged();
         updateEmptyState();
+    }
+
+    private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
+        if (ELIGIBILITY_ALL.equals(selectedEligibilityLabel)) {
+            return true;
+        }
+        return eventRecord.isJoinableAt(currentTime);
     }
 
     private boolean matchesCapacityFilter(int capacity) {
@@ -660,6 +717,20 @@ public class UserEventActivity extends AppCompatActivity {
             return;
         }
 
+        if (UserEventRecord.STATUS_WAITLIST_INVITED.equals(status)) {
+            btnSecondary.setVisibility(View.VISIBLE);
+            btnSecondary.setText("Reject");
+            btnSecondary.setOnClickListener(v -> rejectPrivateWaitlistInvite(eventRecord, dialog));
+            if (eventRecord.isWaitlistFull()) {
+                btnJoinWaitlist.setText("Waitlist Full");
+                btnJoinWaitlist.setEnabled(false);
+                return;
+            }
+            btnJoinWaitlist.setText("Join the Waitlist");
+            btnJoinWaitlist.setOnClickListener(v -> requestLocationAndJoinWaitlist(eventRecord, dialog));
+            return;
+        }
+
         if (eventRecord.isWaitlistFull()) {
             btnJoinWaitlist.setText("Waitlist Full");
             btnJoinWaitlist.setEnabled(false);
@@ -752,15 +823,28 @@ public class UserEventActivity extends AppCompatActivity {
      * @param entrantLocation entrant location if available
      */
     private void joinWaitingList(UserEventRecord eventRecord, AlertDialog dialog, Location entrantLocation) {
-        updateWaitlistMembership(
-                eventRecord,
-                true,
-                UserEventRecord.STATUS_WAITLISTED,
-                false,
-                "Joined waiting list successfully",
-                dialog,
-                entrantLocation
-        );
+        EntrantWaitlistManager.joinWaitlist(db, entrantId, eventRecord.getEventId(), entrantLocation)
+                .addOnSuccessListener(result -> {
+                    eventRecord.setWaitlistEntrantIds(result.getUpdatedWaitlistEntrantIds());
+                    eventRecord.setHistoryStatus(UserEventRecord.STATUS_WAITLISTED);
+                    NotificationHelper.markMatchingNotificationsAsConfirmed(
+                            db,
+                            entrantId,
+                            eventRecord.getEventId(),
+                            NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE
+                    );
+                    eventAdapter.notifyDataSetChanged();
+                    Toast.makeText(this, "Joined waiting list successfully", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                    loadEventsAndHistory();
+                })
+                .addOnFailureListener(e -> {
+                    String message = e.getMessage();
+                    if (message == null || message.trim().isEmpty()) {
+                        message = "Unable to update event status";
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                });
     }
 
     /**
@@ -779,6 +863,29 @@ public class UserEventActivity extends AppCompatActivity {
                 dialog,
                 null
         );
+    }
+
+    /**
+     * Declines a private waitlist invitation and removes private-event access.
+     */
+    private void rejectPrivateWaitlistInvite(UserEventRecord eventRecord, AlertDialog dialog) {
+        EntrantWaitlistManager.declinePrivateWaitlistInvite(db, entrantId, eventRecord.getEventId())
+                .addOnSuccessListener(unused ->
+                        NotificationHelper.markMatchingNotificationsAsDeclined(
+                                        db,
+                                        entrantId,
+                                        eventRecord.getEventId(),
+                                        NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE
+                                )
+                                .addOnCompleteListener(task -> {
+                                    eventRecord.setHistoryStatus("");
+                                    eventAdapter.notifyDataSetChanged();
+                                    Toast.makeText(this, "Private waitlist invitation declined", Toast.LENGTH_SHORT).show();
+                                    dialog.dismiss();
+                                    loadEventsAndHistory();
+                                }))
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to decline private waitlist invite", Toast.LENGTH_SHORT).show());
     }
 
     /**
@@ -1100,26 +1207,11 @@ public class UserEventActivity extends AppCompatActivity {
      * @param status status to persist
      */
     private void upsertHistoryDocument(UserEventRecord eventRecord, String status) {
-        Map<String, Object> historyData = new HashMap<>();
-        historyData.put("eventId", eventRecord.getEventId());
-        historyData.put("eventName", eventRecord.getEventName());
-        historyData.put("location", eventRecord.getLocation());
-        historyData.put("organizerId", eventRecord.getOrganizerId());
-        historyData.put("organizerName", "");
-        historyData.put("posterUrl", eventRecord.getPosterPath());
-        historyData.put("eventTime", eventRecord.getEventTime());
-        historyData.put("registrationStartDate", eventRecord.getRegistrationStartDate());
-        historyData.put("registrationEndDate", eventRecord.getRegistrationEndDate());
-        historyData.put("description", eventRecord.getDescription());
-        historyData.put("status", status);
-        historyData.put("eventDeleted", false);
-        historyData.put("updatedAt", FieldValue.serverTimestamp());
-
         db.collection("users")
                 .document(entrantId)
                 .collection("eventHistory")
                 .document(eventRecord.getEventId())
-                .set(historyData);
+                .set(UserEventHistoryHelper.buildHistoryData(eventRecord, status));
     }
 
     /**

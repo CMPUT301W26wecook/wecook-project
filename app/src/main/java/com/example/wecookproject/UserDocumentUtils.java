@@ -11,6 +11,7 @@ public final class UserDocumentUtils {
 
     public static final String ROLE_ENTRANT = "entrant";
     public static final String ROLE_ORGANIZER = "organizer";
+    public static final String ROLE_ADMIN = "admin";
 
     private UserDocumentUtils() {
     }
@@ -42,6 +43,9 @@ public final class UserDocumentUtils {
                 count++;
             }
             if (Boolean.TRUE.equals(rolesMap.get(ROLE_ORGANIZER))) {
+                count++;
+            }
+            if (Boolean.TRUE.equals(rolesMap.get(ROLE_ADMIN))) {
                 count++;
             }
         }

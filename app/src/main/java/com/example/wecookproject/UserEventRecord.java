@@ -11,6 +11,7 @@ import java.util.List;
  */
 public class UserEventRecord {
     public static final String STATUS_WAITLISTED = "waitlisted";
+    public static final String STATUS_WAITLIST_INVITED = "waitlist_invited";
     public static final String STATUS_INVITED = "invited";
     public static final String STATUS_ACCEPTED = "accepted";
     public static final String STATUS_REJECTED = "rejected";
@@ -81,8 +82,59 @@ public class UserEventRecord {
         this.registrationEndDate = registrationEndDate;
         this.eventTime = eventTime;
         this.geolocationRequired = geolocationRequired;
-        this.waitlistEntrantIds = waitlistEntrantIds;
+        this.waitlistEntrantIds = waitlistEntrantIds == null ? new ArrayList<>() : new ArrayList<>(waitlistEntrantIds);
         this.historyStatus = historyStatus == null ? "" : historyStatus;
+    }
+
+    /**
+     * Backward-compatible constructor for callers that do not pass event capacity.
+     *
+     * @param eventId event identifier
+     * @param eventName event name
+     * @param location location label
+     * @param organizerId organizer identifier
+     * @param description event description
+     * @param posterPath poster path/url
+     * @param maxWaitlist waitlist capacity
+     * @param entrantId current entrant identifier
+     * @param registrationStartDate registration start timestamp
+     * @param registrationEndDate registration end timestamp
+     * @param eventTime event time timestamp
+     * @param geolocationRequired geolocation requirement flag
+     * @param waitlistEntrantIds current waitlist entrant ids
+     * @param historyStatus current entrant history status
+     */
+    public UserEventRecord(String eventId,
+                           String eventName,
+                           String location,
+                           String organizerId,
+                           String description,
+                           String posterPath,
+                           int maxWaitlist,
+                           String entrantId,
+                           Timestamp registrationStartDate,
+                           Timestamp registrationEndDate,
+                           Timestamp eventTime,
+                           boolean geolocationRequired,
+                           List<String> waitlistEntrantIds,
+                           String historyStatus) {
+        this(
+                eventId,
+                eventName,
+                location,
+                organizerId,
+                description,
+                posterPath,
+                0,
+                maxWaitlist,
+                entrantId,
+                registrationStartDate,
+                registrationEndDate,
+                eventTime,
+                geolocationRequired,
+                waitlistEntrantIds,
+                historyStatus
+        );
     }
 
     /**
@@ -294,6 +346,38 @@ public class UserEventRecord {
      */
     public boolean isEntrantOnWaitlist() {
         return waitlistEntrantIds.contains(entrantId);
+    }
+
+    /**
+     * @return true when the entrant can currently join the waitlist
+     */
+    public boolean isJoinableNow() {
+        return isJoinableAt(Timestamp.now());
+    }
+
+    /**
+     * Checks whether the entrant can join the waitlist at the provided timestamp.
+     *
+     * @param currentTime timestamp used for registration-window evaluation
+     * @return true when the entrant is currently eligible to join
+     */
+    public boolean isJoinableAt(Timestamp currentTime) {
+        if (currentTime == null) {
+            return false;
+        }
+        String effectiveStatus = getEffectiveStatus();
+        if (!effectiveStatus.isEmpty()
+                && !STATUS_WAITLIST_INVITED.equals(effectiveStatus)) {
+            return false;
+        }
+        if (isEntrantOnWaitlist() || isWaitlistFull()) {
+            return false;
+        }
+        if (registrationStartDate == null || registrationEndDate == null) {
+            return false;
+        }
+        return registrationStartDate.compareTo(currentTime) <= 0
+                && registrationEndDate.compareTo(currentTime) >= 0;
     }
 
     /**
