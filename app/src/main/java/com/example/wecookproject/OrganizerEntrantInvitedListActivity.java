@@ -13,10 +13,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,8 +50,7 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
         configureSearchInput();
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new OrganizerInvitedEntrantAdapter(item ->
-                Toast.makeText(this, "Delete action is not available yet", Toast.LENGTH_SHORT).show());
+        adapter = new OrganizerInvitedEntrantAdapter(this::onCancelMenuClicked);
         recyclerView.setAdapter(adapter);
 
         setupBottomNav();
@@ -144,7 +146,17 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
             applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
         });
         findViewById(R.id.btn_revoke_selected).setOnClickListener(v ->
-                Toast.makeText(this, "Revoke selected entrants is not available yet", Toast.LENGTH_SHORT).show());
+                cancelPendingEntrants(adapter.getSelectedPendingEntrantIds()));
+    }
+
+    private void onCancelMenuClicked(OrganizerInvitedEntrantItem item) {
+        if (!OrganizerInvitedEntrantAdapter.STATUS_PENDING.equals(item.getStatus())) {
+            Toast.makeText(this,
+                    "Only invited entrants who have not completed sign-up can be cancelled",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        cancelPendingEntrants(java.util.Collections.singletonList(item.getEntrantId()));
     }
 
     private void loadInvitedEntrants() {
@@ -317,5 +329,126 @@ public class OrganizerEntrantInvitedListActivity extends AppCompatActivity {
 
     private static String safe(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    /**
+     * Cancels entrants who were invited or drawn but have not completed sign-up (same Firestore
+     * updates as when an entrant declines an invitation).
+     */
+    private void cancelPendingEntrants(List<String> rawEntrantIds) {
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+        for (String id : rawEntrantIds) {
+            if (id != null && !id.trim().isEmpty()) {
+                unique.add(id.trim());
+            }
+        }
+        if (unique.isEmpty()) {
+            Toast.makeText(this,
+                    "Select at least one invited entrant who has not completed sign-up",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> entrantIds = new ArrayList<>(unique);
+        Object[] idArray = entrantIds.toArray();
+        db.collection("events").document(eventId)
+                .update(
+                        "selectedEntrantIds", FieldValue.arrayRemove(idArray),
+                        "replacementEntrantIds", FieldValue.arrayRemove(idArray),
+                        "declinedEntrantIds", FieldValue.arrayUnion(idArray),
+                        "acceptedEntrantIds", FieldValue.arrayRemove(idArray)
+                )
+                .addOnSuccessListener(unused -> db.collection("events").document(eventId).get()
+                        .addOnSuccessListener(eventSnapshot -> {
+                            if (!eventSnapshot.exists()) {
+                                loadInvitedEntrants();
+                                return;
+                            }
+                            persistRejectedHistory(eventSnapshot, entrantIds);
+                            triggerAutomaticReplacementDraw();
+                            Toast.makeText(this, "Selected entrants cancelled", Toast.LENGTH_SHORT).show();
+                            loadInvitedEntrants();
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(this, "Failed to refresh event after cancel", Toast.LENGTH_SHORT).show();
+                            loadInvitedEntrants();
+                        }))
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to cancel entrants", Toast.LENGTH_SHORT).show());
+    }
+
+    private void persistRejectedHistory(DocumentSnapshot eventSnapshot, List<String> entrantIds) {
+        for (String entrantId : entrantIds) {
+            HashMap<String, Object> historyData = new HashMap<>();
+            historyData.put("eventId", eventId);
+            historyData.put("eventName", eventSnapshot.getString("eventName"));
+            historyData.put("location", eventSnapshot.getString("location"));
+            historyData.put("organizerId", eventSnapshot.getString("organizerId"));
+            historyData.put("organizerName", "");
+            historyData.put("posterPath", eventSnapshot.getString("posterPath"));
+            historyData.put("eventTime", eventSnapshot.getTimestamp("eventTime"));
+            historyData.put("registrationStartDate", eventSnapshot.getTimestamp("registrationStartDate"));
+            historyData.put("registrationEndDate", eventSnapshot.getTimestamp("registrationEndDate"));
+            historyData.put("description", eventSnapshot.getString("description"));
+            historyData.put("status", UserEventRecord.STATUS_REJECTED);
+            historyData.put("eventDeleted", false);
+            historyData.put("updatedAt", FieldValue.serverTimestamp());
+            db.collection("users").document(entrantId)
+                    .collection("eventHistory").document(eventId)
+                    .set(historyData);
+        }
+    }
+
+    private void triggerAutomaticReplacementDraw() {
+        DocumentReference eventReference = db.collection("events").document(eventId);
+        db.runTransaction(transaction -> {
+            DocumentSnapshot snapshot = transaction.get(eventReference);
+            if (!snapshot.exists()) {
+                return false;
+            }
+
+            Long lotteryCountValue = snapshot.getLong("lotteryCount");
+            int lotteryCount = lotteryCountValue == null ? 0 : lotteryCountValue.intValue();
+            if (lotteryCount <= 0) {
+                return false;
+            }
+
+            List<String> waitlist = FirestoreFieldUtils.getStringList(snapshot, "waitlistEntrantIds");
+            waitlist = waitlist == null ? new ArrayList<>() : new ArrayList<>(waitlist);
+            List<String> selected = FirestoreFieldUtils.getStringList(snapshot, "selectedEntrantIds");
+            selected = selected == null ? new ArrayList<>() : new ArrayList<>(selected);
+            List<String> replacements = FirestoreFieldUtils.getStringList(snapshot, "replacementEntrantIds");
+            replacements = replacements == null ? new ArrayList<>() : new ArrayList<>(replacements);
+            List<String> declined = FirestoreFieldUtils.getStringList(snapshot, "declinedEntrantIds");
+            declined = declined == null ? new ArrayList<>() : new ArrayList<>(declined);
+
+            int vacancies = lotteryCount - selected.size();
+            if (vacancies <= 0) {
+                return false;
+            }
+
+            List<String> pool = new ArrayList<>(waitlist);
+            pool.removeAll(declined);
+            pool.removeAll(selected);
+            pool.removeAll(replacements);
+            if (pool.isEmpty()) {
+                return false;
+            }
+
+            java.util.Collections.shuffle(pool);
+            int drawCount = Math.min(vacancies, pool.size());
+            List<String> drawn = new ArrayList<>(pool.subList(0, drawCount));
+
+            selected.addAll(drawn);
+            replacements.addAll(drawn);
+            waitlist.removeAll(drawn);
+
+            transaction.update(eventReference,
+                    "selectedEntrantIds", selected,
+                    "replacementEntrantIds", replacements,
+                    "waitlistEntrantIds", waitlist,
+                    "currentWaitlistCount", waitlist.size(),
+                    "declinedEntrantIds", FieldValue.arrayRemove(drawn.toArray()));
+            return true;
+        });
     }
 }
