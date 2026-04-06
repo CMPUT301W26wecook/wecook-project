@@ -55,7 +55,6 @@ import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -72,20 +71,20 @@ import java.util.concurrent.TimeUnit;
  * Entrant event list screen with waitlist and invitation actions.
  */
 public class UserEventActivity extends AppCompatActivity {
-    private static final String CAPACITY_ALL = "Capacity: All";
-    private static final String CAPACITY_SMALL = "Capacity: Small";
-    private static final String CAPACITY_MEDIUM = "Capacity: Medium";
-    private static final String CAPACITY_LARGE = "Capacity: Large";
-    private static final String CAPACITY_VERY_LARGE = "Capacity: Very Large";
+    private static final String CAPACITY_ALL = UserEventFilterLogic.CAPACITY_ALL;
+    private static final String CAPACITY_SMALL = UserEventFilterLogic.CAPACITY_SMALL;
+    private static final String CAPACITY_MEDIUM = UserEventFilterLogic.CAPACITY_MEDIUM;
+    private static final String CAPACITY_LARGE = UserEventFilterLogic.CAPACITY_LARGE;
+    private static final String CAPACITY_VERY_LARGE = UserEventFilterLogic.CAPACITY_VERY_LARGE;
 
-    private static final String AVAILABILITY_ALL = "Availability: All";
-    private static final String AVAILABILITY_EARLY_MORNING = "Early Morning (06:00-09:59)";
-    private static final String AVAILABILITY_MORNING = "Morning (10:00-11:59)";
-    private static final String AVAILABILITY_AFTERNOON = "Afternoon (12:00-16:59)";
-    private static final String AVAILABILITY_EVENING = "Evening (17:00-20:59)";
-    private static final String AVAILABILITY_NIGHT = "Night (21:00-23:59)";
-    private static final String ELIGIBILITY_ALL = "Eligibility: All";
-    private static final String ELIGIBILITY_JOINABLE = "Eligibility: Joinable";
+    private static final String AVAILABILITY_ALL = UserEventFilterLogic.AVAILABILITY_ALL;
+    private static final String AVAILABILITY_EARLY_MORNING = UserEventFilterLogic.AVAILABILITY_EARLY_MORNING;
+    private static final String AVAILABILITY_MORNING = UserEventFilterLogic.AVAILABILITY_MORNING;
+    private static final String AVAILABILITY_AFTERNOON = UserEventFilterLogic.AVAILABILITY_AFTERNOON;
+    private static final String AVAILABILITY_EVENING = UserEventFilterLogic.AVAILABILITY_EVENING;
+    private static final String AVAILABILITY_NIGHT = UserEventFilterLogic.AVAILABILITY_NIGHT;
+    private static final String ELIGIBILITY_ALL = UserEventFilterLogic.ELIGIBILITY_ALL;
+    private static final String ELIGIBILITY_JOINABLE = UserEventFilterLogic.ELIGIBILITY_JOINABLE;
     private static final double KEYWORD_SCORE_THRESHOLD = 0.45d;
     private static final int SEMANTIC_TOP_N = 40;
     private static final double LEXICAL_WEIGHT = 0.55d;
@@ -376,30 +375,12 @@ public class UserEventActivity extends AppCompatActivity {
     }
 
     private String resolveEmptyStateMessage() {
-        boolean capacityFiltered = !CAPACITY_ALL.equals(selectedCapacityLabel);
-        boolean availabilityFiltered = !AVAILABILITY_ALL.equals(selectedAvailabilityLabel);
-        boolean eligibilityFiltered = ELIGIBILITY_JOINABLE.equals(selectedEligibilityLabel);
-        boolean searchingByKeyword = keywordQuery != null && !keywordQuery.trim().isEmpty();
-
-        if (eligibilityFiltered) {
-            if (searchingByKeyword) {
-                return capacityFiltered || availabilityFiltered
-                        ? "No joinable events match your keyword and filters."
-                        : "No joinable events match your keyword.";
-            }
-            return capacityFiltered || availabilityFiltered
-                    ? "No joinable events match the current filters."
-                    : "No joinable events right now.";
-        }
-        if (searchingByKeyword) {
-            return capacityFiltered || availabilityFiltered
-                    ? "No events match your keyword and filters."
-                    : "No events match your keyword.";
-        }
-        if (capacityFiltered || availabilityFiltered) {
-            return "No events match the current filters.";
-        }
-        return "No events available yet.";
+        return UserEventFilterLogic.resolveEmptyStateMessage(
+                selectedCapacityLabel,
+                selectedAvailabilityLabel,
+                selectedEligibilityLabel,
+                keywordQuery
+        );
     }
 
     private void setupFilterControls() {
@@ -626,66 +607,19 @@ public class UserEventActivity extends AppCompatActivity {
     }
 
     private boolean matchesEligibilityFilter(UserEventRecord eventRecord, com.google.firebase.Timestamp currentTime) {
-        if (ELIGIBILITY_ALL.equals(selectedEligibilityLabel)) {
-            return true;
-        }
-        return eventRecord.isJoinableAt(currentTime);
+        return UserEventFilterLogic.matchesEligibilityFilter(
+                selectedEligibilityLabel,
+                eventRecord,
+                currentTime
+        );
     }
 
     private boolean matchesCapacityFilter(int capacity) {
-        if (CAPACITY_ALL.equals(selectedCapacityLabel)) {
-            return true;
-        }
-        if (capacity <= 0) {
-            return false;
-        }
-        if (CAPACITY_SMALL.equals(selectedCapacityLabel)) {
-            return capacity <= 20;
-        }
-        if (CAPACITY_MEDIUM.equals(selectedCapacityLabel)) {
-            return capacity >= 21 && capacity <= 50;
-        }
-        if (CAPACITY_LARGE.equals(selectedCapacityLabel)) {
-            return capacity >= 51 && capacity <= 100;
-        }
-        if (CAPACITY_VERY_LARGE.equals(selectedCapacityLabel)) {
-            return capacity >= 101;
-        }
-        return true;
+        return UserEventFilterLogic.matchesCapacityFilter(selectedCapacityLabel, capacity);
     }
 
     private boolean matchesAvailabilityFilter(com.google.firebase.Timestamp eventTime) {
-        if (AVAILABILITY_ALL.equals(selectedAvailabilityLabel)) {
-            return true;
-        }
-        if (eventTime == null) {
-            return false;
-        }
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(eventTime.toDate());
-        int minutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE);
-
-        if (AVAILABILITY_EARLY_MORNING.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 6 * 60, 9 * 60 + 59);
-        }
-        if (AVAILABILITY_MORNING.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 10 * 60, 11 * 60 + 59);
-        }
-        if (AVAILABILITY_AFTERNOON.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 12 * 60, 16 * 60 + 59);
-        }
-        if (AVAILABILITY_EVENING.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 17 * 60, 20 * 60 + 59);
-        }
-        if (AVAILABILITY_NIGHT.equals(selectedAvailabilityLabel)) {
-            return inMinuteRange(minutes, 21 * 60, 23 * 60 + 59);
-        }
-        return true;
-    }
-
-    private boolean inMinuteRange(int value, int minInclusive, int maxInclusive) {
-        return value >= minInclusive && value <= maxInclusive;
+        return UserEventFilterLogic.matchesAvailabilityFilter(selectedAvailabilityLabel, eventTime);
     }
 
     private void maybeShowSelectionConfirmationPopup() {
