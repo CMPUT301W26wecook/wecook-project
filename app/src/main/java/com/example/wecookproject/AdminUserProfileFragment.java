@@ -1,6 +1,7 @@
 package com.example.wecookproject;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,10 +14,12 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.wecookproject.model.User;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,7 +43,7 @@ public class AdminUserProfileFragment extends Fragment {
     }
 
     /**
-     * Show User Profile UI and handles Admin interactions for deleting the account.
+     * Show User Profile UI and handles Admin interactions for cleaning the account.
      *
      * @param inflater           Parent view to which the fragment's UI should be attached.
      * @param container          Parent view for the fragment's UI.
@@ -81,7 +84,7 @@ public class AdminUserProfileFragment extends Fragment {
         
         view.findViewById(R.id.btn_delete_account).setOnClickListener(v -> {
             if (user != null) {
-                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ENTRANT, "User account deleted");
+                removeRoleFromUser(user.getAndroidId(), UserDocumentUtils.ROLE_ENTRANT, "User account cleaned");
             }
         });
 
@@ -91,7 +94,7 @@ public class AdminUserProfileFragment extends Fragment {
     /**
      * Removes a specific role from a user document in Firestore.
      * If the user only has the specified role, the entire document is deleted.
-     * Otherwise, only the specified role is removed from the roles map.
+     * Otherwise, only the specified role is removed from the roles map and a cleanup flag is added.
      * After operation, it navigates back to AdminUserFragment.
      *
      * @param userId         The unique Android ID of the user.
@@ -108,6 +111,10 @@ public class AdminUserProfileFragment extends Fragment {
                         return;
                     }
 
+                    if (UserDocumentUtils.ROLE_ENTRANT.equals(role)) {
+                        cleanupUserFromEvents(userId);
+                    }
+
                     if (UserDocumentUtils.getRoleCount(snapshot) <= 1) {
                         db.collection("users")
                                 .document(userId)
@@ -117,16 +124,21 @@ public class AdminUserProfileFragment extends Fragment {
                                     getParentFragmentManager().popBackStack();
                                 })
                                 .addOnFailureListener(e ->
-                                        Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                                        Toast.makeText(getContext(), "Error cleaning account", Toast.LENGTH_SHORT).show());
                         return;
                     }
 
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("roles." + role, FieldValue.delete());
+                    updates.put("roles.EntrantRoleCleaned", true);
+
                     if (UserDocumentUtils.ROLE_ENTRANT.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))
                             && UserDocumentUtils.hasRole(snapshot, UserDocumentUtils.ROLE_ORGANIZER)) {
                         updates.put("role", UserDocumentUtils.ROLE_ORGANIZER);
+                    } else if (role.equals(UserDocumentUtils.getSafeTrimmedString(snapshot, "role"))) {
+                        updates.put("role", "");
                     }
+
                     db.collection("users")
                             .document(userId)
                             .update(updates)
@@ -135,9 +147,52 @@ public class AdminUserProfileFragment extends Fragment {
                                 getParentFragmentManager().popBackStack();
                             })
                             .addOnFailureListener(e ->
-                                    Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                                    Toast.makeText(getContext(), "Error cleaning account", Toast.LENGTH_SHORT).show());
                 })
                 .addOnFailureListener(e ->
-                        Toast.makeText(getContext(), "Error deleting account", Toast.LENGTH_SHORT).show());
+                        Toast.makeText(getContext(), "Error cleaning account", Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Cleans up the user from any events they are related to (waitlist, selected, etc.).
+     * @param userId The ID of the user to clean up.
+     */
+    private void cleanupUserFromEvents(String userId) {
+        db.collection("users").document(userId).collection("eventHistory").get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (DocumentSnapshot historyDoc : querySnapshot) {
+                        String eventId = historyDoc.getString("eventId");
+                        if (eventId != null) {
+                            removeFromEvent(eventId, userId);
+                            historyDoc.getReference().delete();
+                        }
+                    }
+                });
+    }
+
+    /**
+     * Removes a user from a specific event's lists and updates the waitlist count.
+     * @param eventId The event ID.
+     * @param userId  The user ID.
+     */
+    private void removeFromEvent(String eventId, String userId) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("waitlistEntrantIds", FieldValue.arrayRemove(userId));
+        updates.put("selectedEntrantIds", FieldValue.arrayRemove(userId));
+        updates.put("replacementEntrantIds", FieldValue.arrayRemove(userId));
+        updates.put("acceptedEntrantIds", FieldValue.arrayRemove(userId));
+        updates.put("declinedEntrantIds", FieldValue.arrayRemove(userId));
+        updates.put("waitlistEntrantLocations." + userId, FieldValue.delete());
+
+        db.collection("events").document(eventId).update(updates)
+                .addOnSuccessListener(unused -> {
+                    db.collection("events").document(eventId).get().addOnSuccessListener(snapshot -> {
+                        if (snapshot.exists()) {
+                            List<?> waitlist = (List<?>) snapshot.get("waitlistEntrantIds");
+                            int count = waitlist != null ? waitlist.size() : 0;
+                            db.collection("events").document(eventId).update("currentWaitlistCount", count);
+                        }
+                    });
+                });
     }
 }

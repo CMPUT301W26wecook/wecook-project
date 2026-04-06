@@ -173,13 +173,29 @@ public class AdminEventDetailFragment extends Fragment {
 
         btnDeleteEvent.setOnClickListener(v -> {
             if (currentEvent != null && currentEvent.getEventId() != null) {
-                db.collection("events").document(currentEvent.getEventId())
-                        .delete()
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "Event deleted", Toast.LENGTH_SHORT).show();
-                            getParentFragmentManager().popBackStack();
+                String eventId = currentEvent.getEventId();
+                db.collection("events").document(eventId).collection("comments")
+                        .get()
+                        .addOnSuccessListener(queryDocumentSnapshots -> {
+                            for (DocumentSnapshot doc : queryDocumentSnapshots) {
+                                doc.getReference().delete();
+                            }
+                            db.collection("events").document(eventId)
+                                    .delete()
+                                    .addOnSuccessListener(aVoid -> {
+                                        Toast.makeText(getContext(), "Event and comments deleted", Toast.LENGTH_SHORT).show();
+                                        getParentFragmentManager().popBackStack();
+                                    })
+                                    .addOnFailureListener(e -> Toast.makeText(getContext(), "Failed to delete event", Toast.LENGTH_SHORT).show());
                         })
-                        .addOnFailureListener(e -> Toast.makeText(getContext(), "Failed to delete event", Toast.LENGTH_SHORT).show());
+                        .addOnFailureListener(e -> {
+                            Log.e("AdminEventDetail", "Failed to delete comments for event: " + eventId, e);
+                            db.collection("events").document(eventId).delete()
+                                    .addOnSuccessListener(aVoid -> {
+                                        Toast.makeText(getContext(), "Event deleted", Toast.LENGTH_SHORT).show();
+                                        getParentFragmentManager().popBackStack();
+                                    });
+                        });
             }
         });
 

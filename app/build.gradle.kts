@@ -66,9 +66,11 @@ dependencies {
     implementation("androidx.navigation:navigation-fragment:2.9.7")
     implementation("androidx.navigation:navigation-ui:2.9.7")
 
-    // Camera (if needed)
+    // Camera
     implementation("androidx.camera:camera-core:1.3.1")
     implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
