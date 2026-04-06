@@ -22,13 +22,18 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Activity for organizers to review an event's waitlist, search entrants, and run a lottery draw
@@ -67,7 +72,11 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
     private boolean isPrivateEvent = false;
     private Button inviteSelectedButton;
     private Button sendNotificationButton;
+    private Button assignCoOrganizerButton;
     private String organizerId;
+    private String primaryOrganizerId;
+    private final Set<String> pendingCoOrganizerIds = new HashSet<>();
+    private final Set<String> coOrganizerIds = new HashSet<>();
 
 
     /**
@@ -90,6 +99,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         actionButtons = findViewById(R.id.ll_action_buttons);
         lotteryCountInput = findViewById(R.id.et_lottery_count);
         inviteSelectedButton = findViewById(R.id.btn_invite_selected_waitlist);
+        assignCoOrganizerButton = findViewById(R.id.btn_assign_selected_coorganizer);
         ImageButton backButton = findViewById(R.id.btn_back);
 
         entrantsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -204,6 +214,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             startActivity(intent);
         });
         inviteSelectedButton.setOnClickListener(v -> sendInvitationToSelectedWaitlistEntrants());
+        assignCoOrganizerButton.setOnClickListener(v -> assignSelectedCoOrganizers());
         /**
          findViewById(R.id.btn_lottery_draw).setOnClickListener(v -> {
             performLotteryDraw();
@@ -298,6 +309,7 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                     // Extract and store the registration end date
                     registrationEndDate = documentSnapshot.getDate("registrationEndDate");
                     isPrivateEvent = "private".equalsIgnoreCase(documentSnapshot.getString("visibilityTag"));
+                    primaryOrganizerId = documentSnapshot.getString("organizerId");
 
                     List<String> entrantIds = readEntrantIds(documentSnapshot);
                     syncWaitlistCountIfNeeded(documentSnapshot, entrantIds.size());
@@ -334,6 +346,11 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
                             }
                         }
                     }
+
+                    pendingCoOrganizerIds.clear();
+                    pendingCoOrganizerIds.addAll(FirestoreFieldUtils.getStringList(documentSnapshot, "pendingCoOrganizerIds"));
+                    coOrganizerIds.clear();
+                    coOrganizerIds.addAll(FirestoreFieldUtils.getStringList(documentSnapshot, "coOrganizerIds"));
 
                     Object rawLotteryCount = documentSnapshot.get("lotteryCount");
                     if (rawLotteryCount instanceof Number) {
@@ -466,6 +483,146 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         }
         boolean hasSelection = !adapter.getSelectedEntrantIds().isEmpty();
         inviteSelectedButton.setVisibility(isPrivateEvent && hasSelection ? View.VISIBLE : View.GONE);
+        if (assignCoOrganizerButton != null) {
+            assignCoOrganizerButton.setVisibility(isPrimaryOrganizer() && hasSelection ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void assignSelectedCoOrganizers() {
+        if (!isPrimaryOrganizer()) {
+            Toast.makeText(this, "Only the primary organizer can assign co-organizers", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> selectedIds = adapter.getSelectedEntrantIds();
+        if (selectedIds.isEmpty()) {
+            Toast.makeText(this, "Select at least one entrant", Toast.LENGTH_SHORT).show();
+            onWaitlistSelectionChanged();
+            return;
+        }
+
+        Map<String, OrganizerWaitlistItem> userItemsById = new HashMap<>();
+        for (OrganizerWaitlistItem item : searchableEntrants) {
+            userItemsById.put(item.getEntrantId(), item);
+        }
+
+        List<String> assignableIds = new ArrayList<>();
+        for (String selectedId : selectedIds) {
+            OrganizerWaitlistItem selectedItem = userItemsById.get(selectedId);
+            if (selectedItem == null || !selectedItem.hasEntrantRole()) {
+                continue;
+            }
+            if (!waitlistEntrantIds.contains(selectedId)) {
+                continue;
+            }
+            if (organizerId.equals(selectedId) || pendingCoOrganizerIds.contains(selectedId) || coOrganizerIds.contains(selectedId)) {
+                continue;
+            }
+            assignableIds.add(selectedId);
+        }
+
+        if (assignableIds.isEmpty()) {
+            Toast.makeText(this, "Select entrants from this event's waitlist who are not already co-organizers", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
+        updatedWaitlist.removeAll(assignableIds);
+        List<String> updatedSelected = new ArrayList<>(selectedEntrantIds);
+        updatedSelected.removeAll(assignableIds);
+        List<String> updatedReplacement = new ArrayList<>(replacementEntrantIds);
+        updatedReplacement.removeAll(assignableIds);
+        List<String> updatedDeclined = new ArrayList<>(declinedEntrantIds);
+        updatedDeclined.removeAll(assignableIds);
+        Set<String> updatedPending = new HashSet<>(pendingCoOrganizerIds);
+        updatedPending.addAll(assignableIds);
+
+        Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, assignableIds);
+        updates.put("selectedEntrantIds", updatedSelected);
+        updates.put("replacementEntrantIds", updatedReplacement);
+        updates.put("acceptedEntrantIds", FieldValue.arrayRemove(assignableIds.toArray()));
+        updates.put("declinedEntrantIds", updatedDeclined);
+        updates.put("pendingCoOrganizerIds", new ArrayList<>(updatedPending));
+
+        db.collection("events").document(eventId)
+                .update(updates)
+                .addOnSuccessListener(unused -> {
+                    waitlistEntrantIds.clear();
+                    waitlistEntrantIds.addAll(updatedWaitlist);
+                    selectedEntrantIds.clear();
+                    selectedEntrantIds.addAll(updatedSelected);
+                    replacementEntrantIds.clear();
+                    replacementEntrantIds.addAll(updatedReplacement);
+                    declinedEntrantIds.clear();
+                    declinedEntrantIds.addAll(updatedDeclined);
+                    pendingCoOrganizerIds.clear();
+                    pendingCoOrganizerIds.addAll(updatedPending);
+                    removeEntrantsFromSearchResults(assignableIds);
+                    removeEntrantsFromVisibleWaitlist(assignableIds);
+                    clearEntrantHistory(assignableIds)
+                            .addOnSuccessListener(historyUnused -> {
+                                sendCoOrganizerNotifications(assignableIds);
+                                Toast.makeText(this, "Co-organizer invitation sent", Toast.LENGTH_SHORT).show();
+                                onWaitlistSelectionChanged();
+                            })
+                            .addOnFailureListener(e ->
+                                    Toast.makeText(this, "Assigned co-organizer, but failed to clear entrant history", Toast.LENGTH_LONG).show());
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to assign co-organizer", Toast.LENGTH_SHORT).show());
+    }
+
+    private Task<Void> clearEntrantHistory(List<String> entrantIds) {
+        if (entrantIds == null || entrantIds.isEmpty()) {
+            return Tasks.forResult(null);
+        }
+
+        List<Task<Void>> batchTasks = new ArrayList<>();
+        WriteBatch batch = db.batch();
+        int operationCount = 0;
+
+        for (String entrantId : entrantIds) {
+            batch.delete(
+                    db.collection("users")
+                            .document(entrantId)
+                            .collection("eventHistory")
+                            .document(eventId)
+            );
+            operationCount++;
+
+            if (operationCount == 500) {
+                batchTasks.add(batch.commit());
+                batch = db.batch();
+                operationCount = 0;
+            }
+        }
+
+        if (operationCount > 0) {
+            batchTasks.add(batch.commit());
+        }
+
+        return Tasks.whenAll(batchTasks);
+    }
+
+    private void sendCoOrganizerNotifications(List<String> recipientIds) {
+        if (recipientIds == null || recipientIds.isEmpty()) {
+            return;
+        }
+
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(eventSnapshot -> {
+                    if (!eventSnapshot.exists()) {
+                        return;
+                    }
+
+                    sendNotifications(
+                            recipientIds,
+                            eventSnapshot.getString("eventName"),
+                            eventSnapshot.getString("location"),
+                            "You have been invited to co-organize this event. Confirm this invitation, then sign in as Organizer to manage the event.",
+                            NotificationHelper.TYPE_CO_ORGANIZER_INVITE
+                    );
+                });
     }
 
     private void sendInvitationToSelectedWaitlistEntrants() {
@@ -754,8 +911,29 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
         if (removedEntrantIds == null || removedEntrantIds.isEmpty()) {
             return;
         }
-        waitlistEntrants.removeIf(item -> removedEntrantIds.contains(item.getEntrantId()));
+        for (int i = waitlistEntrants.size() - 1; i >= 0; i--) {
+            if (removedEntrantIds.contains(waitlistEntrants.get(i).getEntrantId())) {
+                waitlistEntrants.remove(i);
+            }
+        }
         applyFilter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
+    }
+
+    private void removeEntrantsFromSearchResults(List<String> removedEntrantIds) {
+        if (removedEntrantIds == null || removedEntrantIds.isEmpty()) {
+            return;
+        }
+        for (int i = searchableEntrants.size() - 1; i >= 0; i--) {
+            if (removedEntrantIds.contains(searchableEntrants.get(i).getEntrantId())) {
+                searchableEntrants.remove(i);
+            }
+        }
+    }
+
+    private boolean isPrimaryOrganizer() {
+        return organizerId != null
+                && !organizerId.trim().isEmpty()
+                && organizerId.equals(primaryOrganizerId);
     }
 
     private void sendReplacementNotifications(List<String> entrantIds) {

@@ -68,6 +68,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
     private EditText etComment;
     private Button btnPostComment;
     private Button btnInviteEntrants;
+    private Button btnCancelEvent;
     private TextView tvCommentsEmpty;
     private LinearLayout commentsContainer;
 
@@ -100,6 +101,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         etComment = findViewById(R.id.et_organizer_comment);
         btnPostComment = findViewById(R.id.btn_post_organizer_comment);
         btnInviteEntrants = findViewById(R.id.btn_invite_entrants);
+        btnCancelEvent = findViewById(R.id.btn_cancel_event);
         tvCommentsEmpty = findViewById(R.id.tv_comments_empty);
         commentsContainer = findViewById(R.id.layout_comments_container);
         TextView tvAvailability = findViewById(R.id.tv_event_availability);
@@ -156,6 +158,7 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                                 btnInviteEntrants.setVisibility(Event.VISIBILITY_PRIVATE.equals(event.getVisibilityTag())
                                         ? View.VISIBLE
                                         : View.GONE);
+                                btnCancelEvent.setVisibility(isPrimaryOrganizer(event) ? View.VISIBLE : View.GONE);
                                 geolocationSwitch.setChecked(event.isGeolocationRequired());
                                 
                                 String description = event.getDescription() == null
@@ -261,6 +264,8 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
                  Toast.makeText(this, "No event ID provided", Toast.LENGTH_SHORT).show();
              }
         });
+
+        btnCancelEvent.setOnClickListener(v -> showCancelEventConfirmation());
 
         findViewById(R.id.iv_back).setOnClickListener(v -> finish());
 
@@ -555,6 +560,54 @@ public class OrganizerEventDetailsActivity extends AppCompatActivity {
         } catch (WriterException e) {
             Toast.makeText(this, "Failed to generate QR code", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void showCancelEventConfirmation() {
+        if (currentEvent == null || currentEvent.getEventId() == null || currentEvent.getEventId().trim().isEmpty()) {
+            Toast.makeText(this, "Event unavailable", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!isPrimaryOrganizer(currentEvent)) {
+            Toast.makeText(this, "Only the event holder can cancel this event", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Cancel Event")
+                .setMessage("Are you sure you want to cancel this event?")
+                .setPositiveButton("Cancel Event", (dialog, which) -> cancelCurrentEvent())
+                .setNegativeButton("Keep Event", null)
+                .show();
+    }
+
+    private void cancelCurrentEvent() {
+        if (currentEvent == null || currentEvent.getEventId() == null || currentEvent.getEventId().trim().isEmpty()) {
+            Toast.makeText(this, "Event unavailable", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        db.collection("events")
+                .document(currentEvent.getEventId())
+                .delete()
+                .addOnSuccessListener(unused -> {
+                    Toast.makeText(this, "Event deleted", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(this, OrganizerHomeActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                    finish();
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Failed to delete event", Toast.LENGTH_SHORT).show());
+    }
+
+    private boolean isPrimaryOrganizer(Event event) {
+        if (event == null) {
+            return false;
+        }
+        String eventOrganizerId = event.getOrganizerId();
+        return eventOrganizerId != null
+                && !eventOrganizerId.trim().isEmpty()
+                && eventOrganizerId.equals(organizerId);
     }
     
     /**

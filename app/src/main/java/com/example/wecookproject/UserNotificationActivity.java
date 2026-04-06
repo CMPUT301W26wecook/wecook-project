@@ -25,9 +25,12 @@ import com.google.android.gms.tasks.CancellationTokenSource;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.SetOptions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Entrant notifications inbox.
@@ -197,6 +200,11 @@ public class UserNotificationActivity extends AppCompatActivity {
             return;
         }
 
+        if (NotificationHelper.TYPE_CO_ORGANIZER_INVITE.equals(item.getType())) {
+            acceptCoOrganizerInvitation(item, openAfterConfirm);
+            return;
+        }
+
         if (item.isConfirmed()) {
             if (openAfterConfirm) {
                 navigateToNotificationTarget(item);
@@ -220,7 +228,81 @@ public class UserNotificationActivity extends AppCompatActivity {
                 });
     }
 
+    private void acceptCoOrganizerInvitation(UserNotificationItem item, boolean openAfterConfirm) {
+        String inviteEventId = item.getEventId();
+        if (inviteEventId == null || inviteEventId.trim().isEmpty()) {
+            Toast.makeText(this, "Event details unavailable for this invitation", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        db.runTransaction(transaction -> {
+            com.google.firebase.firestore.DocumentSnapshot eventSnapshot = transaction.get(
+                    db.collection("events").document(inviteEventId)
+            );
+            if (!eventSnapshot.exists()) {
+                throw new IllegalStateException("Event no longer exists");
+            }
+
+            List<String> pendingIds = FirestoreFieldUtils.getStringList(eventSnapshot, "pendingCoOrganizerIds");
+            List<String> coOrganizerIds = FirestoreFieldUtils.getStringList(eventSnapshot, "coOrganizerIds");
+            pendingIds.remove(entrantId);
+            if (!coOrganizerIds.contains(entrantId)) {
+                coOrganizerIds.add(entrantId);
+            }
+
+            transaction.update(
+                    db.collection("events").document(inviteEventId),
+                    "pendingCoOrganizerIds", pendingIds,
+                    "coOrganizerIds", coOrganizerIds
+            );
+            return null;
+        }).addOnSuccessListener(unused -> {
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("roles." + UserDocumentUtils.ROLE_ORGANIZER, true);
+            db.collection("users")
+                    .document(entrantId)
+                    .set(updates, SetOptions.merge())
+                    .addOnSuccessListener(roleResult ->
+                            NotificationHelper.markAsConfirmed(db, entrantId, item.getId())
+                                    .addOnSuccessListener(notificationResult -> {
+                                        loadNotifications();
+                                        Toast.makeText(
+                                                this,
+                                                "Co-organizer access granted. Sign in as Organizer to manage this event.",
+                                                Toast.LENGTH_LONG
+                                        ).show();
+                                        if (openAfterConfirm) {
+                                            Intent intent = new Intent(this, LoginActivity.class);
+                                            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                                            startActivity(intent);
+                                        }
+                                    })
+                                    .addOnFailureListener(e ->
+                                            Toast.makeText(this, "Failed to confirm notification", Toast.LENGTH_SHORT).show()))
+                    .addOnFailureListener(e ->
+                            Toast.makeText(this, "Failed to grant organizer access", Toast.LENGTH_SHORT).show());
+        }).addOnFailureListener(e -> {
+            String message = e.getMessage();
+            if (message == null || message.trim().isEmpty()) {
+                message = "Failed to accept co-organizer invitation";
+            }
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        });
+    }
+
     private void navigateToNotificationTarget(UserNotificationItem item) {
+        if (NotificationHelper.TYPE_CO_ORGANIZER_INVITE.equals(item.getType())) {
+            if (!item.isConfirmed()) {
+                Toast.makeText(this, "Confirm this invitation, then sign in as Organizer to manage the event.", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+            return;
+        }
+
         String eventId = item.getActionTarget().isEmpty() ? item.getEventId() : item.getActionTarget();
         if (eventId == null || eventId.trim().isEmpty()) {
             Toast.makeText(this, "Event details unavailable for this notification", Toast.LENGTH_SHORT).show();

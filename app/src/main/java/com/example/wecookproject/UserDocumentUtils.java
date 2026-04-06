@@ -59,6 +59,13 @@ public final class UserDocumentUtils {
         return count;
     }
 
+    public static boolean hasRole(Map<?, ?> rolesMap, String role) {
+        if (rolesMap == null || role == null || role.trim().isEmpty()) {
+            return false;
+        }
+        return Boolean.TRUE.equals(rolesMap.get(role));
+    }
+
     public static String getSafeTrimmedString(DocumentSnapshot snapshot, String field) {
         if (snapshot == null || field == null) {
             return "";
