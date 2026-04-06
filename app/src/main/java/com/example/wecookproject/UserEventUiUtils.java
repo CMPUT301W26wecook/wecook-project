@@ -188,6 +188,10 @@ public final class UserEventUiUtils {
                 backgroundColor = Color.parseColor("#E8F0FE");
                 textColor = Color.parseColor("#2F5FB3");
                 break;
+            case UserEventRecord.STATUS_WAITLIST_INVITED:
+                backgroundColor = Color.parseColor("#FFF4DD");
+                textColor = Color.parseColor("#8A5A00");
+                break;
             case UserEventRecord.STATUS_INVITED:
                 backgroundColor = Color.parseColor("#DFF3E4");
                 textColor = Color.parseColor("#2F7A3E");
@@ -226,6 +230,8 @@ public final class UserEventUiUtils {
         switch (status) {
             case UserEventRecord.STATUS_WAITLISTED:
                 return "Waitlisted";
+            case UserEventRecord.STATUS_WAITLIST_INVITED:
+                return "Waitlist Invite";
             case UserEventRecord.STATUS_INVITED:
                 return invitedAsPicked ? "Picked" : "Invited";
             case UserEventRecord.STATUS_ACCEPTED:

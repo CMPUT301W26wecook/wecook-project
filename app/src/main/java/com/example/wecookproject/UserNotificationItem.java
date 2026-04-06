@@ -117,6 +117,14 @@ public class UserNotificationItem {
         return NotificationHelper.STATUS_CONFIRMED.equalsIgnoreCase(status) || confirmedAt != null;
     }
 
+    public boolean isDeclined() {
+        return NotificationHelper.STATUS_DECLINED.equalsIgnoreCase(status);
+    }
+
+    public boolean isPrivateWaitlistInvite() {
+        return NotificationHelper.TYPE_PRIVATE_WAITLIST_INVITE.equals(type);
+    }
+
     public boolean requiresConfirmation() {
         return NotificationHelper.TYPE_PRIVATE_INVITE.equals(type)
                 || NotificationHelper.TYPE_LOTTERY_SELECTED.equals(type)

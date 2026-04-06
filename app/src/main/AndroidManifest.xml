@@ -65,6 +65,9 @@
             android:name=".OrganizerEventDetailsActivity"
             android:exported="false" />
         <activity
+            android:name=".OrganizerPrivateWaitlistInviteActivity"
+            android:exported="false" />
+        <activity
             android:name=".OrganizerEventMapActivity"
             android:hardwareAccelerated="false"
             android:exported="false" />
