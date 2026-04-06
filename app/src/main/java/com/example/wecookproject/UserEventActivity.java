@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Entrant event list screen with waitlist and invitation actions.
@@ -177,7 +178,16 @@ public class UserEventActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         searchExecutor.shutdownNow();
-        semanticSearchEngine.close();
+        try {
+            if (!searchExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                searchExecutor.shutdownNow();
+            }
+        } catch (InterruptedException ie) {
+            searchExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        } finally {
+            semanticSearchEngine.close();
+        }
     }
 
     /**
