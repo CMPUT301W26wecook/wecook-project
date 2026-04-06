@@ -97,6 +97,7 @@ public class AdminEventDetailFragment extends Fragment {
         TextView tvOrganizerName = view.findViewById(R.id.tv_organizer_name);
         TextView tvWaitlistStatus = view.findViewById(R.id.tv_waitlist_status);
         TextView tvDetails = view.findViewById(R.id.tv_event_details);
+        TextView tvAvailability = view.findViewById(R.id.tv_event_availability);
         Button btnDeletePoster = view.findViewById(R.id.btn_delete_poster);
         Button btnDeleteEvent = view.findViewById(R.id.btn_delete_event);
         ImageButton btnEventMenu = view.findViewById(R.id.btn_event_menu);
@@ -120,6 +121,20 @@ public class AdminEventDetailFragment extends Fragment {
                 
                 tvWaitlistStatus.setText(String.format(Locale.getDefault(), "Waitlist: %d/%d", event.getCurrentWaitlistCount(), event.getMaxWaitlist()));
                 tvDetails.setText(event.getDescription());
+
+
+                int waitlistCount = event.getCurrentWaitlistCount();
+                int maxWaitlist = event.getMaxWaitlist();
+                int finalCount = event.getSelectedEntrantIds() != null ? event.getSelectedEntrantIds().size() : 0;
+                int capacity = event.getCapacity();
+                boolean available = (waitlistCount < maxWaitlist) && (finalCount < capacity);
+                if (available) {
+                    tvAvailability.setText("Availability: Open");
+                    tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                } else {
+                    tvAvailability.setText("Availability: Full");
+                    tvAvailability.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
+                }
 
                 if (event.getEventName() != null && !event.getEventName().isEmpty()) {
                     tvAvatar.setText(event.getEventName().substring(0, 1).toUpperCase());

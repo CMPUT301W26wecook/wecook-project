@@ -700,53 +700,42 @@ public class OrganizerEntrantListActivity extends AppCompatActivity {
             Toast.makeText(this, "Registration end date not found", Toast.LENGTH_SHORT).show();
             return;
         }
+
         Date currentDate = new Date();
         if (!currentDate.after(registrationEndDate)) {
             Toast.makeText(this, "Replacement draw is available only after registration ends", Toast.LENGTH_SHORT).show();
             return;
         }
+
         if (lotteryCount <= 0) {
             Toast.makeText(this, "Run lottery draw before selecting replacements", Toast.LENGTH_SHORT).show();
             return;
         }
+
         int vacancies = lotteryCount - selectedEntrantIds.size();
         if (vacancies <= 0) {
             Toast.makeText(this, "No replacement needed at this time", Toast.LENGTH_SHORT).show();
             return;
         }
-        List<String> pool = new ArrayList<>(waitlistEntrantIds);
-        pool.removeAll(declinedEntrantIds);
-        pool.removeAll(selectedEntrantIds);
-        pool.removeAll(replacementEntrantIds);
-        if (pool.isEmpty()) {
-            Toast.makeText(this, "No remaining applicants for replacement", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        java.util.Collections.shuffle(pool);
-        int drawCount = Math.min(vacancies, pool.size());
-        List<String> drawn = new ArrayList<>(pool.subList(0, drawCount));
-        List<String> newReplacements = new ArrayList<>(replacementEntrantIds);
-        newReplacements.addAll(drawn);
-        List<String> newSelected = new ArrayList<>(selectedEntrantIds);
-        newSelected.addAll(drawn);
-        List<String> updatedWaitlist = new ArrayList<>(waitlistEntrantIds);
-        updatedWaitlist.removeAll(drawn);
-        Map<String, Object> updates = buildWaitlistRemovalUpdate(updatedWaitlist, drawn);
-        updates.put("replacementEntrantIds", newReplacements);
-        updates.put("selectedEntrantIds", newSelected);
-        updates.put("declinedEntrantIds", FieldValue.arrayRemove(drawn.toArray()));
-        db.collection("events").document(eventId)
-                .update(updates)
-                .addOnSuccessListener(unused -> {
+
+        WaitlistLotteryHelper.fillOpenSpotsFromWaitlist(db, eventId)
+                .addOnSuccessListener(result -> {
+                    if (result == null || !result.hasDrawnEntrants()) {
+                        Toast.makeText(this, "No remaining applicants for replacement", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
                     waitlistEntrantIds.clear();
-                    waitlistEntrantIds.addAll(updatedWaitlist);
-                    removeEntrantsFromVisibleWaitlist(drawn);
-                    replacementEntrantIds.clear();
-                    replacementEntrantIds.addAll(newReplacements);
+                    waitlistEntrantIds.addAll(result.getUpdatedWaitlistEntrantIds());
+
                     selectedEntrantIds.clear();
-                    selectedEntrantIds.addAll(newSelected);
+                    selectedEntrantIds.addAll(result.getUpdatedSelectedEntrantIds());
+
+                    replacementEntrantIds.clear();
+                    replacementEntrantIds.addAll(result.getUpdatedReplacementEntrantIds());
+
+                    removeEntrantsFromVisibleWaitlist(result.getDrawnEntrantIds());
                     Toast.makeText(this, "Replacement selected", Toast.LENGTH_SHORT).show();
-                    sendReplacementNotifications(drawn);
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Failed to save replacement", Toast.LENGTH_SHORT).show());
